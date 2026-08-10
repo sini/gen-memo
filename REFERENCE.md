@@ -4,6 +4,29 @@
 **Status:** SCAFFOLD — repository shell, empty export surface
 **Last audited:** 2026-08-10
 
+**Why this file is in the repository root, and why there is no papers copy.** Root-only is the
+majority form for a *new* gen library, not a departure from one. Among the sibling `gen-*` repos
+first committed on or after 2026-07-05, five of seven carry a root `REFERENCE.md`
+(gen-demand, gen-edge, gen-pipe, gen-product, gen-settings; gen-link and gen-lsp are the
+exceptions), and four of those five have no `papers/den-architecture/gen-specs/<lib>/` directory at
+all. No `gen-specs/gen-memo/` entry was created here, and that is the precedented shape rather than
+an oversight — `gen-memo` occurs 0 times in `gen-specs/ECOSYSTEM.md` (live control: `gen-graph`
+occurs 13 times in the same file, same run), so nothing there points at a missing entry.
+
+This is **not** a migration away from the papers tree. Measured against that story and refuting it:
+exactly one `gen-specs/*/REFERENCE.md` has ever been deleted — `gen-derive`, a rename artefact,
+since gen-derive became gen-dispatch — with a live control finding 19 adds under
+`--diff-filter=A`; and gen-pipe and gen-select each carry **both** copies as *different* documents
+(gen-pipe 424 root lines against 256 in papers; gen-select 223 against 376). That is a split with
+active divergence. Keeping one copy, in the repo the code will land in, is what avoids joining it.
+
+```sh
+# the placement measurement, re-runnable
+cd ~/Documents/papers/den-architecture
+git log --diff-filter=D --name-only --format= -- 'gen-specs/*/REFERENCE.md' | grep REFERENCE.md
+git log --diff-filter=A --name-only --format= -- 'gen-specs/*/REFERENCE.md' | grep -c REFERENCE.md
+```
+
 ## Purpose
 
 gen-memo is the **incremental plane**: a decision layer over the evaluator that never evaluates, only
@@ -63,14 +86,37 @@ different destination in the same retirement.
 
 ## Academic Provenance
 
-No code in this repository realizes these claims yet. They are recorded because the first content is
-answerable to them, and a claim stated up front cannot be quietly swapped for a weaker one later.
+**This section is the canonical provenance statement for gen-memo.** `AGENTS.md` and `README.md`
+restate these two entries and add nothing to them; where any of the three disagree, this one is
+right.
 
-| Feature | Source | Relationship |
+**Nothing here is implemented.** The relationship column reads *Claimed, unrealized* for every row.
+It is not *Implements* — that is false on its face for a library whose export surface is empty — and
+not *Informed by*, which would understate what the first content is answerable to. The claim is
+recorded up front precisely so it cannot be quietly exchanged for a weaker one once code arrives.
+
+| Claim | Source | Relationship |
 |---|---|---|
-| Scheduler/rebuilder decomposition; the plane is the rebuilder dimension | Mokhov, Mitchell & Peyton Jones (2018), *Build Systems à la Carte* | **Claims to implement.** The flat relocatable store (§3.1), verifying trace (§4.2.2) and `verify` (§4.2) are realized today in gen-rebuild — the content destined to move here |
-| Invalidation relation: the AFFECTED set and the unchanged-value cutoff | Reps, Teitelbaum & Demers (1983) | **Informed by.** Reverse-transitive-dependency propagation. True `O(\|AFFECTED\|)` optimality and characteristic graphs are recorded as **not reached** in pure evaluation; that finding travels with the content rather than being re-opened by the move |
-| The change/propagate split and the reverse-topo splice | Acar et al. (2002), *Adaptive Functional Programming* | **Informed by**, inherited with gen-rebuild's content |
+| The scheduler/rebuilder decomposition; the plane is the **rebuilder** dimension, and the scheduler is Nix's own laziness, which the evaluator already takes | Mokhov, Mitchell & Peyton Jones (2018), *Build Systems à la Carte* | **Claimed, unrealized.** The cell in the paper's own Table 2 is *suspending* scheduler (§4.1.3) × *verifying traces* (§4.2.2). That is deliberately **not** the paper's own Nix row, which is `nix = suspending dctRebuilder` — deep constructive traces (§4.2.4). The difference is load-bearing rather than cosmetic: §4.2.2 states that all traces *except* deep traces support early cutoff, and the cutoff is exactly what the invalidation claim below needs. gen-rebuild's spike recorded §4.2.4 as an expected no-go (`spike/vsummary.nix`) |
+| The invalidation relation: the AFFECTED set and the unchanged-value cutoff | Reps, Teitelbaum & Demers (1983) | **Claimed, unrealized.** Reverse-transitive-dependency propagation. AFFECTED and `O(\|AFFECTED\|)` optimality are §4.3 (*Suboptimal Behavior*); the cutoff — reevaluating an attribute instance to a value equal to its old value means changes need not be propagated further — is §4.1 (*Change Propagation*). True `O(\|AFFECTED\|)` optimality and characteristic graphs are recorded as **not reached** in pure evaluation; that finding travels with the content rather than being re-opened by the move |
+
+**Open precondition on the Mokhov claim — unsettled, and load-bearing.** A Mokhov rebuilder consults
+*persistent build information*. §3.1 defines the store as also containing "information maintained by
+the build system itself, which persists from one invocation of the build system to the next — its
+'memory'", and §4.2.2 says of the verifying trace specifically that "since the verifying trace
+persists from one build to the next — it constitutes the build system's 'memory'". **A pure Nix
+evaluation has no cross-invocation persistence.** The plane therefore claims a component defined by
+consulting information it has no established means of carrying, and how that information is carried
+is part of the plane's spec rather than a detail of its implementation. gen-rebuild records the
+matching limit on the RTD side and this repository carries that forward; the Mokhov-side
+precondition is the one that governs here, and it is open.
+
+**Deliberately not restated: gen-rebuild's wider reading.** gen-rebuild lists seven further
+*Informed by* sources against code that exists. That set belongs to the content and travels with it
+when the content moves. Reproducing an arbitrary slice of another repository's provenance against no
+code of our own is a claim this repository has not earned — so the lone Acar et al. (2002) row that
+stood here at `aa77f7e` is removed, and the removal is recorded here so it is not re-added by
+inheritance.
 
 **Byte-parity is a definition, not a citation.** A plane output must be byte-identical to a cold
 evaluation. A plane that is fast and not byte-parity is not a faster plane; it is a wrong one.
@@ -93,31 +139,50 @@ gen-prelude and gen-algebra do not need for the same reason gen-memo does not ye
 **Roster.** gen-memo is **not** in the hub roster (`gen/lib/mkGenLibs.nix` has no `memo` entry) and
 has **no stratum**. The stratum declaration there is total and explicit by design — a member with no
 entry is a build error, never a member of an implicit residue bucket — so assigning one is a design
-decision rather than scaffolding. Since the plane is none of `modules`, `aspects` or `framework`,
-"substrate by elimination" is precisely the silent default that declaration exists to forbid.
-gen-vars and gen-rebuild sit off the roster on the same footing. Consume via `inputs.gen-memo.lib`,
-never through `mkGenLibs`.
+decision rather than scaffolding.
+
+`mkGenLibs.nix` documents **five** buckets, not four: `substrate`, `modules`, `aspects`,
+`framework`, and `retiring` — the last being "on the roster and leaving it: its content is moving to
+another member", carried today by `resolve`, `flake`, `edge`, `demand` and `pipe`. The plane is none
+of `modules`, `aspects` or `framework`; nor is it `retiring`, which describes a member on its way
+off the roster rather than one that was never on it — the plane is the *destination* of three of
+those five retirements. The elimination therefore still terminates at "substrate by default", which
+is precisely the silent choice that declaration exists to forbid, and the conclusion is unchanged:
+the stratum needs a ruling and does not get one here. gen-vars and gen-rebuild sit off the roster on
+the same footing. Consume via `inputs.gen-memo.lib`, never through `mkGenLibs`.
 
 ## API Surface
 
-**Empty.** There is nothing to document, and the empty state is itself asserted:
+**Empty.** There is nothing to document, and the empty state is itself asserted. The drift check,
+run from the repository root:
 
 ```sh
-nix eval --json --expr 'builtins.attrNames (import ./lib)'
-# []
+nix eval --json .#lib --apply builtins.attrNames
 ```
+
+```json
+[]
+```
+
+The flake-ref form is required, not stylistic. The `--expr` form over a relative path fails outright
+under the default pure evaluation mode — *"access to absolute path '…/gen-memo/lib' is forbidden in
+pure evaluation mode (use '--impure' to override)"*, exit 1 — so `--impure` is what makes that form
+run at all. gen-graph, gen-product, gen-algebra, gen-prelude and gen-settings all back their exports
+section with the same `.#lib --apply` flake-ref form. `AGENTS.md` carries the failing command
+verbatim.
 
 ## Laws (test-group mapping)
 
 | Group | Law | Covers |
 |---|---|---|
-| `purity` | — | `lib/**.nix` + `flake.nix` + `default.nix` are free of `nixpkgs`, `lib.`, `{ lib }`/`{ lib,`, `evalModules`, `mkOption`. Carries an in-suite positive control asserting the token predicate matches a string that *does* contain a forbidden token, and a non-vacuity assertion that the scan read non-empty sources |
+| `purity` | — | `lib/**.nix` + `flake.nix` + `default.nix` are free of `nixpkgs`, `lib.`, `{ lib }`/`{ lib,`, `evalModules`, `mkOption`. Violation labels are repo-root-relative (`lib/default.nix` vs `default.nix`), because `readDir` yields bare basenames and the two files would otherwise be indistinguishable in the report. Carries an in-suite positive control asserting the token predicate matches a string that *does* contain a forbidden token, and a non-vacuity assertion that the scan read non-empty sources |
 | `surface` | — | The export surface is empty; the standalone root entry and the `lib/` entry are one value |
 
-Both the purity scan's reach and the collection predicate were armed during scaffolding: injecting
-`{ lib }: lib.id` into `lib/default.nix` fails the purity cell naming both tokens, and dropping a
-cell's `test-` prefix silently reduces the run to 4/4 green. `AGENTS.md` carries the evidence and the
-both-ways reconciliation command.
+Both the purity scan's reach and the collection predicate were armed: injecting `{ lib }: lib.id`
+into `lib/default.nix` **and** into the root `default.nix` in one run fails the purity cell with four
+distinctly-labelled violations, and dropping a cell's `test-` prefix reduces the nix-unit run to 4/4
+green while `nix flake check` still catches it. `AGENTS.md` carries the evidence and the both-ways
+reconciliation command.
 
 ## Compat / purity
 
@@ -128,3 +193,9 @@ both-ways reconciliation command.
   formatter). Every other input the shared runner needs — `nix-unit`, `flake-parts`, `treefmt-nix`,
   `devshell`, `flake-root`, `git-hooks-nix`, `import-tree`, `gen-prelude` — resolves through the hub's
   own pins rather than being re-declared here.
+- gen-memo therefore adds **one** edge to the hand-maintained sibling-pin graph: the `gen` pin
+  itself, and no sibling library at all. Counting `^\s*gen[a-z-]*\.url\s*=` in each sibling's
+  `ci/flake.nix`, gen-memo's 1 is matched exactly by gen-algebra and gen-prelude — the same two
+  libraries whose zero-input root shape gen-memo takes. Across the other 23 sibling repos the count
+  runs 1 to 9 with both median and mode 3, and only four (gen-resolve, gen-flake, gen-settings,
+  gen-link) sit at 6 or above.

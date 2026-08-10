@@ -21,10 +21,14 @@ let
       map (line: lib.head (lib.splitString "#" line)) (lib.splitString "\n" text)
     );
 
+  # Labels are repo-root-relative rather than bare basenames. `readDir libDir` yields
+  # `default.nix` for `lib/default.nix`, which is the SAME string as the root `default.nix`
+  # appended below — so an unqualified label makes a violation in the library indistinguishable
+  # from one in the root entry, and the scan names a file that cannot be located.
   nixFiles = lib.filter (lib.hasSuffix ".nix") (lib.attrNames (builtins.readDir libDir));
   sources =
     map (name: {
-      inherit name;
+      name = "lib/${name}";
       code = stripComments (builtins.readFile (libDir + "/${name}"));
     }) nixFiles
     ++ [

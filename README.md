@@ -37,9 +37,12 @@ documentation to match.
 - **Hub roster membership and a stratum.** `gen/lib/mkGenLibs.nix`'s stratum declaration is total
   and explicit by design: a member with no entry there is a build error, never a member of an
   implicit residue bucket. Assigning gen-memo a stratum is therefore a design decision, not
-  scaffolding — and since the plane is none of `modules`, `aspects` or `framework`, "substrate by
-  elimination" is exactly the silent default that declaration exists to forbid. gen-vars and
-  gen-rebuild sit off the roster on the same footing.
+  scaffolding. The buckets are five — `substrate`, `modules`, `aspects`, `framework`, `retiring` —
+  and the plane is none of the middle three, nor `retiring`, which names a member leaving the roster
+  where the plane is the destination of three of those five retirements. The elimination therefore
+  still lands on "substrate by default", exactly the silent choice that declaration exists to
+  forbid, so the stratum needs a ruling and does not get one here. gen-vars and gen-rebuild sit off
+  the roster on the same footing.
 - **Migrated content.** The warm fold and override cone (today in
   [gen-resolve](https://github.com/sini/gen-resolve)), the dirty-cone propagation (today in
   [gen-rebuild](https://github.com/sini/gen-rebuild)), and gen-flake's compose warm/override/trace
@@ -125,21 +128,30 @@ The surface suite is a **tripwire, not a wall**: when the first export lands it 
 updates it alongside `AGENTS.md` and `REFERENCE.md` in the same change. That is the point — the
 library cannot widen silently.
 
-`nix-unit` collects only cells named `test-*`; a cell that loses the prefix disappears and the run
-still reports green. `AGENTS.md` carries the both-ways reconciliation command, and the rest of the
-measured traps.
+`nix-unit` collects only cells named `test-*`; a cell that loses the prefix disappears from the
+nix-unit run, which still reports green. `nix flake check` — what CI runs — backstops this: gen's
+asserter does not filter on the prefix, so it still catches a broken un-prefixed cell (exit 1).
+`AGENTS.md` carries both armings and the both-ways reconciliation command.
 
 ## Theoretical Foundations
 
+**Claimed, unrealized.** No code in this repository realizes either claim — so the relationship is
+neither *Implements*, which would be false on its face for an empty library, nor *Informed by*,
+which understates what the first content is answerable to. They are recorded because a claim stated
+up front cannot be quietly swapped for a weaker one later. `REFERENCE.md` § Academic Provenance is
+the canonical statement; this list restates it and adds nothing.
+
 - **Mokhov, Mitchell & Peyton Jones (2018), *[Build Systems à la Carte](https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/)*.**
   The scheduler/rebuilder decomposition. gen-memo is the **rebuilder** dimension; the scheduler is
-  Nix's own laziness, taken by the evaluator. The flat relocatable store (§3.1), verifying trace
-  (§4.2.2) and `verify` (§4.2) are realized today in gen-rebuild, which is the content destined to
-  move here.
+  Nix's own laziness, taken by the evaluator. In the paper's Table 2 the claimed cell is
+  **suspending** (§4.1.3) × **verifying traces** (§4.2.2) — deliberately not the paper's own Nix row,
+  `nix = suspending dctRebuilder`, which is deep constructive traces (§4.2.4) and does not support
+  the early cutoff the invalidation claim below needs. gen-rebuild realizes a verifying trace today,
+  and that is the content destined to move here. **Open precondition:** a Mokhov rebuilder consults
+  build information that "persists from one invocation of the build system to the next" (§3.1), and
+  a pure Nix evaluation has no cross-invocation persistence — how the plane carries that is spec
+  work, not implementation detail.
 - **Reps, Teitelbaum & Demers (1983).** Reverse-transitive-dependency propagation supplies the
   invalidation relation: the AFFECTED set (§4.3) and the unchanged-value cutoff (§4.1). True
   `O(|AFFECTED|)` optimality and characteristic graphs are recorded as **not reached** in pure
   evaluation — a finding that travels with the content rather than being re-opened by the move.
-
-No code in this repository realizes either claim yet. They are recorded because the first content is
-answerable to them, and a claim stated up front cannot be quietly swapped for a weaker one later.
