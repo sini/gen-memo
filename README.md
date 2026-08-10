@@ -39,7 +39,7 @@ documentation to match.
   implicit residue bucket. Assigning gen-memo a stratum is therefore a design decision, not
   scaffolding. The buckets are five — `substrate`, `modules`, `aspects`, `framework`, `retiring` —
   and the plane is none of the middle three, nor `retiring`, which names a member leaving the roster
-  where the plane is the destination of three of those five retirements. The elimination therefore
+  where the plane is the destination of two of those five retirements. The elimination therefore
   still lands on "substrate by default", exactly the silent choice that declaration exists to
   forbid, so the stratum needs a ruling and does not get one here. gen-vars and gen-rebuild sit off
   the roster on the same footing.
