@@ -142,6 +142,10 @@ up front cannot be quietly swapped for a weaker one later. § Academic Provenanc
 reference spec — `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md`, which lives in the
 papers repo rather than here — is the canonical statement; this list restates it and adds nothing.
 
+That restatement crosses a repository boundary, so it is **not drift-checkable**. The canonical file
+sits on a separate history with no CI, and nothing on either side will notice if the two diverge.
+Keeping them in agreement is a manual obligation, not a gate.
+
 - **Mokhov, Mitchell & Peyton Jones (2018), *[Build Systems à la Carte](https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/)*.**
   The scheduler/rebuilder decomposition. gen-memo is the **rebuilder** dimension; the scheduler is
   Nix's own laziness, taken by the evaluator. In the paper's Table 2 the claimed cell is

@@ -112,6 +112,14 @@ The plane claims the **rebuilder** half of the build-systems decomposition, and 
 in the papers repo by ruling. Its § Academic Provenance is canonical; this section restates it and
 adds nothing, and where the two disagree that one is right.
 
+**That is a boundary, not just a path.** The canonical statement is no longer co-located with this
+sheet, no longer versioned alongside it, and **no longer drift-checkable from here**: the papers repo
+is a separate history with no CI whatsoever — it has no `.github` directory at all, against two
+tracked entries under one in gen-memo. Nothing in this repository can notice if the restatement below
+drifts from canon, and nothing over there can notice either. Keeping the two in agreement is a manual
+obligation carried by whoever edits either, not a check that will fail. Before relying on this
+section, read the canonical file.
+
 **Claimed, unrealized** — the verb is neither *Implements* nor *Informed by*. Nothing in this
 repository implements anything, so *Implements* would be false on its face; *Informed by* would
 understate what the first content is answerable to. The claim is recorded up front so it cannot be
