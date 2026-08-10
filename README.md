@@ -125,8 +125,8 @@ nix-unit --flake ./ci#tests.purity       # a single suite
 ```
 
 The surface suite is a **tripwire, not a wall**: when the first export lands it fails, and the author
-updates it alongside `AGENTS.md` and `REFERENCE.md` in the same change. That is the point — the
-library cannot widen silently.
+updates it alongside `AGENTS.md` and the canonical reference spec in the same change. That is the
+point — the library cannot widen silently.
 
 `nix-unit` collects only cells named `test-*`; a cell that loses the prefix disappears from the
 nix-unit run, which still reports green. `nix flake check` — what CI runs — backstops this: gen's
@@ -138,8 +138,9 @@ asserter does not filter on the prefix, so it still catches a broken un-prefixed
 **Claimed, unrealized.** No code in this repository realizes either claim — so the relationship is
 neither *Implements*, which would be false on its face for an empty library, nor *Informed by*,
 which understates what the first content is answerable to. They are recorded because a claim stated
-up front cannot be quietly swapped for a weaker one later. `REFERENCE.md` § Academic Provenance is
-the canonical statement; this list restates it and adds nothing.
+up front cannot be quietly swapped for a weaker one later. § Academic Provenance in the canonical
+reference spec — `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md`, which lives in the
+papers repo rather than here — is the canonical statement; this list restates it and adds nothing.
 
 - **Mokhov, Mitchell & Peyton Jones (2018), *[Build Systems à la Carte](https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/)*.**
   The scheduler/rebuilder decomposition. gen-memo is the **rebuilder** dimension; the scheduler is

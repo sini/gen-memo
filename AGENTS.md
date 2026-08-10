@@ -63,8 +63,9 @@ and gen-algebra ship the same shape. When the plane acquires dependencies, `defa
 function whose defaults fetch the flake-locked revs, per the gen root-file convention.
 
 `ci/tests/surface.nix` asserts the empty surface, so **the first export arrives as a failing test**.
-That is the intended behaviour: it obliges the author to state the new surface here and in
-`REFERENCE.md` in the same change, rather than widening the library silently.
+That is the intended behaviour: it obliges the author to state the new surface here and in the
+canonical reference (`papers/den-architecture/gen-specs/gen-memo/REFERENCE.md`) in the same change,
+rather than widening the library silently.
 
 ## Entry points by task
 
@@ -77,7 +78,8 @@ While the surface is empty the tasks are about the repository, not the library.
 | Get a shell with the locked nix-unit, plus `ci` / `fmt` / `repl` commands | `nix develop ./ci` (or `direnv allow` — `.envrc` is `use flake ./ci`) |
 | Open the REPL | `nix repl --impure --file ci/repl.nix` |
 | Format | `cd ci && nix fmt -- --ci` |
-| Add the first export | Write it in `lib/`, then update `ci/tests/surface.nix`, this sheet's **Exports** section, and `REFERENCE.md` — the surface test fails until you do |
+| Add the first export | Write it in `lib/`, then update `ci/tests/surface.nix`, this sheet's **Exports** section, and `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md` — the surface test fails until you do |
+| Read or amend the reference spec | `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md` — it is **not** in this repo; specs live in the papers repo |
 | Find where the plane's content lives *today* | `gen-rebuild` (store, trace, dirty cone), `gen-resolve` (`lib/override.nix`, the warm half of `lib/resolve.nix`), `gen-flake` (compose warm/override/trace) |
 | Learn the plane's obligations before writing any of it | The execution-engine ADR (the plane's definition and what retires into it) and the gen-flake dissolution ADR (what arrives from there, and the two hedges that travel as spec inputs rather than as code) |
 
@@ -90,6 +92,8 @@ in. Commands are given so each is re-runnable rather than trusted.
 |---|---|
 | **`AGENTS.md` and `.envrc` both match a GLOBAL gitignore** — a plain `git add` silently adds neither. `git add -f` is needed on the **first** add only; once tracked they stage normally | `git check-ignore -v --no-index AGENTS.md .envrc README.md .gitignore` in a sibling lib reports `~/.config/git/ignore:22:/AGENTS.md` and `~/.config/git/ignore:18:.envrc`, and reports **nothing** for `README.md` / `.gitignore` — so the predicate discriminates rather than matching everything. The `.envrc` rule is the less obvious of the two |
 | **`git check-ignore` WITHOUT `--no-index` is a false negative**: it skips tracked paths, so it reports clean for exactly the files whose rule you are trying to confirm | Same two paths in a repo where both are tracked: without `--no-index`, empty output and **exit 1**; with it, both rules named and exit 0. Never confirm an ignore rule with `core.excludesfile` either — an empty value there proves nothing |
+| **A cross-repo conformance sweep must ask `git ls-files`, never `test -e`** — because of the rule above, a globally-ignored file can sit on disk *untracked*, which is present to the filesystem and absent to every clone. The two predicates give different answers and only the git one means "the library ships this" | Measured over the 23 sibling `gen-*` repos, same run: `test -e .envrc` ⇒ **14** present, `git ls-files .envrc` ⇒ **13**. The single discriminating repo is `gen-rebuild`, which has an `.envrc` on disk that `git ls-files` does not report. Controls in the same run: `git ls-files zzz-nope.md` ⇒ 0/24, `git ls-files flake.nix` ⇒ 24/24, so the predicate both discriminates and is live |
+| **`ci/repl.nix` must ship even though this library is empty** — the hub's shared devshell hardcodes a `repl` command pointing at it, so omitting the file ships a devshell command that is broken on invocation. This is the reason to keep it, and it does not depend on how many siblings happen to have one | `gen/ci/flakeModule.nix:158-164` defines `{ name = "repl"; command = ''nix repl --impure --file "$FLAKE_ROOT/ci/repl.nix"''; }`, inherited by every library that takes `mkCi`. Tracked in 13 of the 23 siblings by `git ls-files`, but the count is not the argument |
 | **nix-unit collects only cells named `test-*`. A cell that loses the prefix vanishes from the nix-unit run, which reports GREEN** — the count moves 5/5 → 4/4. It is **backstopped by `nix flake check`**, which is the command CI actually runs: `checks.default` is gen's homegrown asserter and does not filter on the prefix, so it still collects and asserts the cell. The exposure is real for nix-unit and only for nix-unit | Armed with the prefix dropped **and** the expectation broken (`test-lib-exports-nothing` → `lib-exports-nothing`, `expected = [ "sentinel" ]`), one tree, both oracles: `nix-unit --flake ./ci#tests` ⇒ `🎉 4/4 successful`, **exit 0** — the cell is simply gone; `nix flake check` from `ci/` ⇒ **exit 1**, `error: FAIL surface.lib-exports-nothing: got [], expected ["sentinel"]`. Still reconcile declared-vs-collected **both ways** rather than reading the nix-unit count: `grep -rhoE '\btest-[a-z0-9-]+' ci/tests/ \| sort` against the run's own names, through `comm -23` and `comm -13`. On the armed run the first arm named `test-lib-exports-nothing`; on a clean run both are empty |
 | **An untracked file under `ci/tests/` is invisible to the flake — including a deliberately failing one.** New test files must be `git add`ed before any `nix` invocation, or the run is green about a tree that does not contain them | A probe file asserting `expr = 1; expected = 2;` was written to `ci/tests/` and left untracked: `🎉 5/5 successful`, exit 0. Positive control, same file, same run afterwards: `git add` it and the suite reports `😢 5/6`, exit 1, naming `staging.test-untracked-file-is-invisible`. The green was invisibility, not absence |
 | **`nix flake check` and nix-unit are different oracles.** `checks.default` is a homegrown asserter, and nix-unit's `expectedError` is unassertable — so a guard cannot be tested for its own firing, and no check whose failure cannot be observed belongs in this suite | Both were armed here. Breaking one expectation: `nix flake check` (cwd `ci/`, the workflow's own command) exits **1** with `error: FAIL surface.test-lib-exports-nothing: got [], expected ["sentinel"]`; `nix-unit --flake ./ci#tests` exits **1** with `😢 4/5`. Both catch a wrong value; neither can assert that a *throw* happened |
@@ -103,8 +107,10 @@ in. Commands are given so each is re-runnable rather than trusted.
 
 The plane claims the **rebuilder** half of the build-systems decomposition, and only that half.
 
-**`REFERENCE.md` § Academic Provenance is canonical.** This section restates it and adds nothing; if
-the two disagree, that one is right.
+**The canonical reference spec is not in this repository.** It is
+`papers/den-architecture/gen-specs/gen-memo/REFERENCE.md` — the reference spec, and every spec, lives
+in the papers repo by ruling. Its § Academic Provenance is canonical; this section restates it and
+adds nothing, and where the two disagree that one is right.
 
 **Claimed, unrealized** — the verb is neither *Implements* nor *Informed by*. Nothing in this
 repository implements anything, so *Implements* would be false on its face; *Informed by* would
