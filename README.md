@@ -32,8 +32,10 @@ documentation to match.
 **Not here, and deliberately:**
 
 - **Any plane or engine content.** The scope↔plane interface — what the evaluator exposes (node
-  hashes, edge sets, traces) — is a named, unsettled design item. An export written ahead of it
-  would fix that interface by accident.
+  hashes, edge sets, traces) — is now SETTLED and built in the evaluator: the plane returns a
+  `Decision` carrying no values, and reads the evaluation through a restricted facade. What still
+  keeps content out of this repository is the roster stratum below, not the interface. An export
+  written ahead of that ruling would take the silent choice the declaration exists to forbid.
 - **Hub roster membership and a stratum.** `gen/lib/mkGenLibs.nix`'s stratum declaration is total
   and explicit by design: a member with no entry there is a build error, never a member of an
   implicit residue bucket. Assigning gen-memo a stratum is therefore a design decision, not
@@ -152,10 +154,16 @@ Keeping them in agreement is a manual obligation, not a gate.
   **suspending** (§4.1.3) × **verifying traces** (§4.2.2) — deliberately not the paper's own Nix row,
   `nix = suspending dctRebuilder`, which is deep constructive traces (§4.2.4) and does not support
   the early cutoff the invalidation claim below needs. gen-rebuild realizes a verifying trace today,
-  and that is the content destined to move here. **Open precondition:** a Mokhov rebuilder consults
-  build information that "persists from one invocation of the build system to the next" (§3.1), and
-  a pure Nix evaluation has no cross-invocation persistence — how the plane carries that is spec
-  work, not implementation detail.
+  and that is the content destined to move here. **The claim is NARROWED, and the narrowing is
+  written here rather than left to be inferred from what gets built.** §4.2.2's *cross-build* memory
+  is **not** what this plane has: a Mokhov rebuilder consults build information that "persists from
+  one invocation of the build system to the next" (§3.1), §4.2.2 calls the verifying trace that
+  memory, and a pure Nix evaluation has no cross-invocation persistence. **The plane's memory is the
+  prior evaluation's own accessor, live inside the same evaluation**, and its scope is
+  intra-evaluation reuse — the override cone, and reuse across the many targets composed within one
+  evaluation. What survives the narrowing is the rest of the attribution: the verifying-trace
+  *shape*, the rebuilder/scheduler decomposition, and the reuse decision itself. What does not is
+  persistence across invocations, in any form, and nothing here may re-assert it.
 - **Reps, Teitelbaum & Demers (1983).** Reverse-transitive-dependency propagation supplies the
   invalidation relation: the AFFECTED set (§4.3) and the unchanged-value cutoff (§4.1). True
   `O(|AFFECTED|)` optimality and characteristic graphs are recorded as **not reached** in pure

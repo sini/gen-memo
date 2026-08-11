@@ -10,10 +10,13 @@ the result and visible only in the work avoided.
 **This repository is a SHELL. The library exports nothing.** `lib/default.nix` is `{ }`, and
 `ci/tests/surface.nix` holds it there. The content this plane will hold is named but not written: the
 warm fold and override cone that currently live in gen-resolve, the dirty-cone propagation that
-currently lives in gen-rebuild, and gen-flake's compose warm/override/trace arm. None of it has moved,
-because the interface it needs — what the evaluator exposes to the plane (node hashes, edge sets,
-traces) — is a named, unsettled design item. **Read that as a fact about this repo, not as work
-waiting to be picked up by whoever opens it.**
+currently lives in gen-rebuild, and gen-flake's compose warm/override/trace arm. None of it has moved.
+The interface it needs — what the evaluator exposes to the plane (node hashes, edge sets, traces) —
+is **settled and built in the evaluator**: the plane returns a `Decision` of two total functions and
+no values, reads through a restricted facade of exactly `get` / `nodeIds` / `resolutional`, and never
+receives a structural value from a prior evaluation. What still holds the content out is the ROSTER
+STRATUM below, which is a ruling this repository does not get to make for itself. **Read that as a
+fact about this repo, not as work waiting to be picked up by whoever opens it.**
 
 **Not in the hub roster.** `gen/lib/mkGenLibs.nix` has no `memo` entry and gen-memo has no stratum.
 That is deliberate, not an oversight: the roster's stratum declaration is total and explicit by
@@ -140,14 +143,35 @@ quietly exchanged for a weaker one once code arrives.
   true `O(|AFFECTED|)` optimality and characteristic graphs as **not reached** in pure evaluation;
   that finding travels with the content and is not re-opened by the move.
 
-**Open precondition, and it is load-bearing.** A Mokhov rebuilder is *defined* by consulting
+**The Mokhov memory claim is NARROWED, in writing.** A Mokhov rebuilder is *defined* by consulting
 persistent build information — §3.1's store "also contains information maintained by the build
 system itself, which persists from one invocation of the build system to the next — its 'memory'",
 and §4.2.2 says the verifying trace *is* that memory. **A pure Nix evaluation has no
-cross-invocation persistence.** How the plane carries that information is part of its spec, not a
-detail of its implementation, and it is unsettled. gen-rebuild records the matching limit on the RTD
-side and this repository carries that forward; the Mokhov-side one is the precondition that governs
-here.
+cross-invocation persistence.** That was carried here as an unsettled precondition; it is now
+settled, and settled *against* the wide claim: **cross-build memory is NOT what is built.** The
+plane's memory is the prior evaluation's own accessor, live inside the same evaluation, and its
+scope is intra-evaluation reuse — the override cone, and reuse across the many targets composed
+within one evaluation. The narrowing is recorded at the same change that fixes the interface,
+because a claim stated up front cannot be quietly exchanged for a weaker one once code arrives, and
+a narrowing discovered later by reading the code is exactly that exchange.
+
+**What survives, and what does not.** Surviving: the verifying-trace *shape*, the
+rebuilder/scheduler decomposition, and the reuse decision itself. Not surviving: persistence across
+invocations, in any form. No part of this repository, and no library that takes its content, may
+re-assert it.
+
+**The growth path is NAMED, and it arrives owing an instrument.** Two shapes would restore
+persistence — a materialised carrier the caller supplies as an ordinary input, and
+import-from-derivation — and neither is built. Recording them is not a licence to take them: under
+either, the PRIOR'S IDENTITY becomes an input, so a prior taken from a *different program* serves
+wrong values however correct the cleanliness predicate is. No predicate the plane computes detects
+that — the values are internally consistent and simply belong to another program — and the
+byte-parity oracle does not cover it either, because it fixes the program across both runs and
+*presumes* a matching prior. **A prior-provenance instrument is owed with the growth path, and
+neither shape may be taken without one.** Restoring persistence would also not by itself restore
+the Mokhov claim: a future revision that takes the growth path re-derives this paragraph rather than
+deleting it. gen-rebuild records the matching limit on the RTD side and this repository carries that
+forward.
 
 **The definition, not a citation.** The plane's correctness condition is the **byte-parity oracle**:
 a plane output must be byte-identical to a cold evaluation. It is a definition rather than a test
