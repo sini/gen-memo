@@ -7,55 +7,48 @@ decides **reuse**. Its definition is a byte-parity oracle against a cold evaluat
 must be byte-identical to what a cold run produces — so the plane is correct exactly when it is
 invisible in the result and visible only in the work avoided.
 
-> **This repository is a scaffold. The library exports nothing yet.**
-> `lib/default.nix` is `{ }`. The plane's content is named but unwritten, because the interface it
-> needs — what the evaluator exposes to the plane — is still an open design item. The shell exists so
-> the ruled moves that were gated on it have somewhere to land. See
-> [Status](#status-what-is-here-and-what-is-not).
+It answers one question — *given the last evaluation, must key K be recomputed?* — and performs the
+minimal recompute plus reuse. In the Mokhov decomposition it is the **rebuilder** dimension alone;
+the scheduler is Nix's own laziness, which the evaluator already takes.
+
+**nixpkgs-lib-free.** `lib/` depends on gen-prelude and gen-graph, both pure and nixpkgs-lib-free,
+and on no `<nixpkgs>`. A dedicated `purity` suite pins that as a checked property.
 
 ## Table of Contents
 
-- [Status](#status-what-is-here-and-what-is-not)
+- [Overview](#overview)
 - [The name](#the-name)
 - [Gen Ecosystem](#gen-ecosystem)
 - [Design Principles](#design-principles)
 - [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+- [Edge Convention](#edge-convention)
+- [Scope and Soundness](#scope-and-soundness)
 - [Testing](#testing)
 - [Theoretical Foundations](#theoretical-foundations)
+- [Limitations](#limitations)
 
-## Status — what is here, and what is not
+## Overview
 
-**Here:** the repository shell — flake, standalone entry, CI wired to the shared gen runner, the
-purity invariant, and a surface tripwire that fails the moment an export appears without the
-documentation to match.
+| Term | Definition |
+| --- | --- |
+| Store | flat relocatable id-keyed result map `{ <id> = value; }` — plain values, not thunks closed over an evaluation |
+| Trace | per-key `{ deps; hash }` verifying record |
+| Cone | the dependent cone of `x` — everyone who transitively depends on it |
+| Dirty set | changed ids together with their dependent cones (the cheap over-approximation) |
+| Affected set | the exact subset whose hash actually moved, discovered by the propagation |
+| Splice | `priorStore // fix-of-cone` — recompute the cone, reuse the rest |
 
-**Not here, and deliberately:**
-
-- **Any plane or engine content.** The scope↔plane interface — what the evaluator exposes (node
-  hashes, edge sets, traces) — is now SETTLED and built in the evaluator: the plane returns a
-  `Decision` carrying no values, and reads the evaluation through a restricted facade. What still
-  keeps content out of this repository is the roster stratum below, not the interface. An export
-  written ahead of that ruling would take the silent choice the declaration exists to forbid.
-- **Hub roster membership and a stratum.** `gen/lib/mkGenLibs.nix`'s stratum declaration is total
-  and explicit by design: a member with no entry there is a build error, never a member of an
-  implicit residue bucket. Assigning gen-memo a stratum is therefore a design decision, not
-  scaffolding. The buckets are five — `substrate`, `modules`, `aspects`, `framework`, `retiring` —
-  and the plane is none of the middle three, nor `retiring`, which names a member leaving the roster
-  where the plane is the destination of two of those five retirements. The elimination therefore
-  still lands on "substrate by default", exactly the silent choice that declaration exists to
-  forbid, so the stratum needs a ruling and does not get one here. gen-vars and gen-rebuild sit off
-  the roster on the same footing.
-- **Migrated content.** The warm fold and override cone (today in
-  [gen-resolve](https://github.com/sini/gen-resolve)), the dirty-cone propagation (today in
-  [gen-rebuild](https://github.com/sini/gen-rebuild)), and gen-flake's compose warm/override/trace
-  arm are all destined here and none have moved. Each is its own sequenced piece of work.
+The flatness and relocatability of the store are **this library's own design claims about its own
+store**, stated in its own voice. They are not attributed to any paper; see
+[Theoretical Foundations](#theoretical-foundations).
 
 ## The name
 
 The plane is named for its **contract**, not its mechanism. `memo` names the reuse decision — defined
-by byte-parity against a cold run — while the mechanisms assigned to it (the warm fold and override
-cone, the dirty-cone propagation) stay free to evolve without staling the name. "Memoization" is the
-vocabulary the module system already promises and this plane discharges.
+by byte-parity against a cold run — while the mechanisms assigned to it stay free to evolve without
+staling the name. "Memoization" is the vocabulary the module system already promises and this plane
+discharges.
 
 The runner-up, `gen-delta`, was rejected on the permanent δ homonym in shared spec space. Recorded so
 it is not re-proposed.
@@ -66,29 +59,29 @@ it is not re-proposed.
 |---------|------|
 | [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base |
 | [gen-scope](https://github.com/sini/gen-scope) | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces |
-| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from |
-| [gen-rebuild](https://github.com/sini/gen-rebuild) | The rebuilder core as it exists today: result store, verifying trace, dirty propagation — **this plane's content, not yet moved** |
-| [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule + cold/warm fold — its **warm** half and override cone are destined here; the schedule and cold path are not |
-| [gen-flake](https://github.com/sini/gen-flake) | The composition boundary — its compose warm/override/trace arm is destined here |
+| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door |
+| [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule and cold fold — consumes this plane's `build`; its own warm half and override cone are destined here |
 | [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions |
 | **gen-memo** | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold) |
 
 ## Design Principles
 
 - **The plane never evaluates.** It decides *whether* to recompute; it never *is* the recompute.
-  Evaluation belongs to the evaluator, which is kept thin and sole.
-- **The plane does not schedule.** In the Mokhov decomposition this is the **rebuilder** dimension
-  alone. The scheduler is Nix's own laziness, which the evaluator already takes — writing one here
-  would duplicate the language runtime.
+  Evaluation belongs to the evaluator, which is kept thin and sole. The node-eval arrives as a
+  caller-supplied `recompute`.
+- **The plane does not schedule.** The scheduler is Nix's own laziness; writing one here would
+  duplicate the language runtime.
+- **The plane reads a cone; it never computes one.** Reverse reachability and the SCC partition are
+  gen-graph's, consumed through its published surfaces and never re-implemented here.
 - **Byte-parity is the definition, not a test target.** A plane that is fast and not byte-parity is
   not a faster plane; it is a wrong one.
 - **A plane that accumulates its own evaluation state has failed.** It observes the evaluator's graph
   and decides against it. It does not become a second place where results live and drift — a "cache"
   that is not defined by the parity oracle is that failure under another name.
-- **Reads are derived from the graph, never declared.** Hand-declared read surfaces across this stack
-  were measured dead or under-scoped; the plane does not add another.
-- **nixpkgs-lib-free.** `lib/` depends on no `nixpkgs.lib`; nixpkgs enters only in `ci/`, as the test
-  harness and formatter. `ci/tests/purity.nix` pins this as a checked property.
+- **Loops are iterative and their accumulators are forced.** Nix does not reuse a tail call's frame,
+  so a recursive loop's descent depth is its round count and it aborts uncatchably; an unforced
+  accumulator field chains a thunk per round and overflows a different stack. Both are constructions
+  here, not conventions.
 
 ## Quick Start
 
@@ -97,74 +90,193 @@ it is not re-proposed.
 ```nix
 {
   inputs.gen-memo.url = "github:sini/gen-memo";
-  # gen-memo declares no inputs — a consumer's lock gains no transitive dependency.
 }
 ```
 
-Then `gen-memo.lib` is the `genMemo` attrset. It is `{ }` at this revision.
+Then `gen-memo.lib` is the `genMemo` attrset.
 
 ### Standalone (non-flake)
 
 ```nix
-let genMemo = import (fetchTarball "https://github.com/sini/gen-memo/archive/main.tar.gz");
-in genMemo
+import (fetchTarball "https://github.com/sini/gen-memo/archive/main.tar.gz") {
+  prelude = /* gen-prelude lib */;
+  graph = /* gen-graph lib */;
+}
 ```
 
-The standalone entry is the lib **value**, not a function, because gen-memo declares no inputs — the
-same shape gen-prelude and gen-algebra ship. It becomes a function of its dependencies when it
-acquires any.
+The standalone entry is a function of the library's dependencies, per the gen root-file convention.
+
+### A first build and override
+
+```nix
+let
+  ctx = genMemo.build {
+    accessor = someGraphAccessor;          # the topology oracle
+    recompute = acc: store: id: /* … */;   # the node-eval
+    hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
+  };
+  after = genMemo.override ctx "someNode" { newData = 1; };
+in
+after.store                                # the prior store, spliced
+```
+
+`examples/dag` is a runnable version of exactly this, including the poisoned-recompute proof that
+untouched nodes are never re-evaluated.
+
+## API Reference
+
+24 exports, in five groups.
+
+**Build and reuse decision**
+
+| Export | What it does |
+| --- | --- |
+| `build` | Full evaluation into a store and a verifying trace. Pre-checks acyclicity and throws a *located*, `tryEval`-catchable blame on a cycle. With a `fixpoint` argument it relaxes the check and solves stratified over the condensation |
+| `needsEval` | Whether a node must be recomputed, before any cutoff |
+| `earlyCutoff` | Whether a recomputed value's hash moved, after recompute |
+| `verify` | Whether a node's trace is still valid — deps unchanged and all dep hashes clean |
+
+Three predicates deciding at three different times; that is the plane's precision story, and they
+are not the same predicate under three names.
+
+**Cones**
+
+| Export | What it does |
+| --- | --- |
+| `affected` / `impactOf` | The dependent cone of one id |
+| `dirtySet` | The cheap over-approximation: changed ids together with their cones |
+| `affectedSet` | The exact subset whose hash actually moved, post-filtered from the propagation |
+
+**Change and propagate**
+
+| Export | What it does |
+| --- | --- |
+| `applyDelta` | Data change only: rewrite one node's data, mark it pending, recompute nothing |
+| `batch` | Fold `applyDelta` over several deltas |
+| `propagate` | Drain the pending set to quiescence over the union cone |
+| `override` | The fused convenience — propagate after applyDelta |
+| `force` / `forceCtx` | Pull semantics: drain, then read a value (or the quiescent context) |
+| `propagateEager` | The cut-heavy fast path: rank-ordered push that recomputes only enqueued nodes |
+
+**Topology change**
+
+| Export | What it does |
+| --- | --- |
+| `mkAccessor` | Rebuild a full accessor record |
+| `retract` | Delete a node and splice it out of its dependents |
+| `applyEdgeDelta` | Replace a node's declared edge set, sub-building any newly reachable producers |
+
+**Cycles and provenance**
+
+| Export | What it does |
+| --- | --- |
+| `runScc` | Solve one strongly connected component to its least fixed point |
+| `restabilize` | The cyclic-capable analogue of `override` |
+| `support` / `supportDirect` | The transitive (or immediate) declared producers of a node |
+| `why` | The verdict an override would produce for a node: recomputed, cutoff or unaffected |
+| `whyNot` | The same as a total record — `{ reason; at }` for every verdict |
+
+The internal hash guards (`hashGuarded`, `hashEq`, `hashMoved`) are **not** on this surface. They are
+imported directly by the files that need them; the evaluator this plane decides for is owed no hash
+surface at all.
+
+## Edge Convention
+
+`accessor.edges id` is **the ids that `id` depends on** — consumer to producer. A dependent cone is
+therefore reverse reachability over those edges.
+
+## Scope and Soundness
+
+- **`override` is a DATA-change operation.** It replaces one node's data; edges are fixed. Its
+  soundness claim is "data-change override equals a full rebuild", not unconditional soundness.
+  Topology changes go through `retract` / `applyEdgeDelta`, which rebuild the accessor and re-run a
+  located cycle check.
+- **Store equality is over hashable values.** A node whose value carries a function is sound by
+  being always-dirty, not by comparing equal.
+- **The cyclic path is outside the acyclic envelope.** Per-SCC convergence rests on the consumer's
+  unchecked monotonicity and finite-height obligations; the only runtime divergence guard is the
+  consumer-declared per-member `maxIter`, which refuses with a catchable located blame.
 
 ## Testing
-
-Two suites under `ci/`: `purity` (the nixpkgs-lib-free invariant over `lib/**.nix` + `flake.nix` +
-`default.nix`, carrying its own positive control so the absence claim cannot pass by a dead
-predicate) and `surface` (the empty-export tripwire, plus the standalone-entry/lib agreement).
 
 ```bash
 nix flake check ./ci                     # what CI runs
 nix-unit --flake ./ci#tests              # run everything
-nix-unit --flake ./ci#tests.purity       # a single suite
+nix-unit --flake ./ci#tests.byte-parity  # a single suite
 ```
 
-The surface suite is a **tripwire, not a wall**: when the first export lands it fails, and the author
-updates it alongside `AGENTS.md` and the canonical reference spec in the same change. That is the
-point — the library cannot widen silently.
+18 suites. Beyond the migrated content's own, two are the plane's oracles:
+
+- **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
+  forced to nothing-is-clean, compared on `drvPath` where the output is a derivation and on the value
+  otherwise. It carries its own live control, because a comparator that reported parity for
+  everything would pass every other cell in the file.
+- **`fleet`** — the measurement lab's Arm R: a shared producer with dependent hosts, a localized
+  single-host edit, the byte gate plus the poisoned-recompute proof, and the `>= 0.60` saving floor.
+  Which half of that floor migrated and which did not is stated in the suite itself.
 
 `nix-unit` collects only cells named `test-*`; a cell that loses the prefix disappears from the
 nix-unit run, which still reports green. `nix flake check` — what CI runs — backstops this: gen's
-asserter does not filter on the prefix, so it still catches a broken un-prefixed cell (exit 1).
-`AGENTS.md` carries both armings and the both-ways reconciliation command.
+asserter does not filter on the prefix. `AGENTS.md` carries both armings and the both-ways
+reconciliation command.
 
 ## Theoretical Foundations
 
-**Claimed, unrealized.** No code in this repository realizes either claim — so the relationship is
-neither *Implements*, which would be false on its face for an empty library, nor *Informed by*,
-which understates what the first content is answerable to. They are recorded because a claim stated
-up front cannot be quietly swapped for a weaker one later. § Academic Provenance in the canonical
-reference spec — `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md`, which lives in the
-papers repo rather than here — is the canonical statement; this list restates it and adds nothing.
-
-That restatement crosses a repository boundary, so it is **not drift-checkable**. The canonical file
-sits on a separate history with no CI, and nothing on either side will notice if the two diverge.
-Keeping them in agreement is a manual obligation, not a gate.
+**★ CITATION PROVENANCE.** Mokhov 2018 is in the archive and the claims made against it here were
+read at that source. **Reps, Teitelbaum & Demers 1983 and Acar 2002 are not.** Every RTD and Acar
+attribution in this library is reported from the retiring library's own documentation rather than
+verified against the primary, and each travels with the hedge its author attached. Nothing here
+stands in for reading the primary.
 
 - **Mokhov, Mitchell & Peyton Jones (2018), *[Build Systems à la Carte](https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/)*.**
   The scheduler/rebuilder decomposition. gen-memo is the **rebuilder** dimension; the scheduler is
   Nix's own laziness, taken by the evaluator. In the paper's Table 2 the claimed cell is
   **suspending** (§4.1.3) × **verifying traces** (§4.2.2) — deliberately not the paper's own Nix row,
   `nix = suspending dctRebuilder`, which is deep constructive traces (§4.2.4) and does not support
-  the early cutoff the invalidation claim below needs. gen-rebuild realizes a verifying trace today,
-  and that is the content destined to move here. **The claim is NARROWED, and the narrowing is
-  written here rather than left to be inferred from what gets built.** §4.2.2's *cross-build* memory
-  is **not** what this plane has: a Mokhov rebuilder consults build information that "persists from
-  one invocation of the build system to the next" (§3.1), §4.2.2 calls the verifying trace that
-  memory, and a pure Nix evaluation has no cross-invocation persistence. **The plane's memory is the
+  the early cutoff the invalidation claim needs.
+
+  **The memory claim is NARROWED, and the narrowing is written here rather than inferred from what
+  got built.** §4.2.2's *cross-build* memory is **not** what this plane has: a Mokhov rebuilder
+  consults build information that "persists from one invocation of the build system to the next"
+  (§3.1), and a pure Nix evaluation has no cross-invocation persistence. **The plane's memory is the
   prior evaluation's own accessor, live inside the same evaluation**, and its scope is
   intra-evaluation reuse — the override cone, and reuse across the many targets composed within one
-  evaluation. What survives the narrowing is the rest of the attribution: the verifying-trace
-  *shape*, the rebuilder/scheduler decomposition, and the reuse decision itself. What does not is
-  persistence across invocations, in any form, and nothing here may re-assert it.
+  evaluation. What survives is the verifying-trace *shape*, the rebuilder/scheduler decomposition,
+  and the reuse decision itself. What does not is persistence across invocations, in any form.
+
+  **The store's flatness and relocatability are NOT Mokhov's.** §3.1 defines the Store and states
+  neither property. They are this library's own claim about its own store, and are made in its own
+  voice everywhere they appear.
+
 - **Reps, Teitelbaum & Demers (1983).** Reverse-transitive-dependency propagation supplies the
   invalidation relation: the AFFECTED set (§4.3) and the unchanged-value cutoff (§4.1). True
   `O(|AFFECTED|)` optimality and characteristic graphs are recorded as **not reached** in pure
-  evaluation — a finding that travels with the content rather than being re-opened by the move.
+  evaluation — a finding that travelled with the content rather than being re-opened by the move.
+
+- **Acar (2002).** The change/propagate split is the paper's: `applyDelta` and `propagate` are its
+  two metafunctions, de-conflated here rather than fused. The *reverse-topological splice* is this
+  library's own mechanism and is not attributed to it.
+
+- **Arntzenius (2016), Datafun.** Reverse reachability, and the per-SCC least fixed point by
+  iterate-from-bottom on finite-height semilattices.
+
+- **Fleischer, Hendrickson & Pınar (2000)** by way of gen-graph, whose partition door supplies the
+  SCC quotient this library reads and does not compute.
+
+**The definition, not a citation.** The plane's correctness condition is the **byte-parity oracle**:
+a plane output must be byte-identical to a cold evaluation.
+
+## Limitations
+
+- **The store's admissible values are function-free AND ACYCLIC.** The null-hash rule records the
+  first partiality — Nix's hash is partial on function-bearing values, so those get `hash = null` and
+  are conservatively always-dirty. That rule has **no paper behind it**; it is an operational Nix
+  fact. The second partiality is not conservative: the guard's structural walk has no cycle guard, so
+  a **self-referential value aborts with a stack overflow that `tryEval` does not catch**. A Nix
+  derivation is self-referential (`drv.all`'s first element is the derivation itself), so a raw
+  derivation cannot be a node value today. `ci/tests/byte-parity.nix` records the measurement and
+  carries each node's `drvPath` instead.
+- **No cross-invocation persistence**, by design and by the narrowing above.
+- **`batch` layers its accessor overrides**, so N deltas leave an N-deep `nodeData` closure chain
+  paid on every later read. Forcing the accumulator does not flatten it; only re-expressing the
+  override as one data map would, and that is a change to what `applyDelta` means.
