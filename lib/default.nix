@@ -20,9 +20,9 @@
 # form, and no file below may re-assert it.
 #
 # ★ CITATION PROVENANCE, stated here once for every file below, because the alternative is each
-# file reading as if its citation had been checked. Every primary cited below IS in the papers
-# archive, and every coordinate was read AT THAT SOURCE rather than carried on the retiring
-# library's authority:
+# file reading as if its citation had been checked. Every primary cited below WITH A SECTION
+# COORDINATE is in the papers archive, and each such coordinate was located in that source rather
+# than carried on the retiring library's authority:
 #
 #   Mokhov 2018 — the scheduler/rebuilder decomposition, and §4.2.2's verifying trace.
 #   Reps–Teitelbaum–Demers 1983 — §4.3's AFFECTED set, together with the paper's own statement
@@ -34,10 +34,39 @@
 #     iterate-from-⊥ ascent the per-SCC solver performs.
 #   Radul 2009 — kick-out! and the support set. Sloane 2010 — circular reference attributes.
 #
+# ★★ THE EXCLUDED AXIS, NAMED IN THE SAME BREATH, because the sentence above is scoped and a
+# scoped sentence read as a universal is how the last one went wrong. FOUR NAMES CITED IN THIS
+# LIBRARY ARE NOT IN EITHER ARCHIVE TIER — Tarjan 1972 and Kosaraju/Sharir (build.nix, the
+# quotient-graph idiom), Magnusson–Hedin (restabilize.nix, circular reference attributes), and
+# Kleene (the ascent, named in build.nix and restabilize.nix). All four ⇒ 0 across `used/` and
+# `reference-catalog/`, with the eight archived names above as live controls in the same run.
+# **None of the four carries a section coordinate**, which is exactly why the scoping holds and
+# also exactly why it must be stated: they are attributions to a NAMED IDEA, unverifiable here,
+# and they are not to be read as checked. Tarjan is a recorded acquisition gap.
+#
+# ★★ AND A SECOND EXCLUDED AXIS, ON THE OTHER HALF OF THE SENTENCE. "Located in that source"
+# means BY CONTENT, not by heading, and for one primary that distinction is load-bearing: the
+# Acar extraction carries NO numbered section headings — its only headings are the title and
+# `## Page N` markers (47 of them) — so its §4.3/§4.4/§4.5/§7 digits CANNOT be confirmed against
+# it. Each was matched by the content the coordinate names; none by the digit. Treat every Acar
+# §-number here as content-verified and coordinate-UNVERIFIABLE at the current extraction.
+#
 # ★★ THREE CLAIMS ARE THIS LIBRARY'S OWN AND ARE ATTRIBUTED TO NO PAPER, in each case because the
 # cited section was read and does not contain them: the store's FLATNESS and RELOCATABILITY (not
 # in Mokhov §3.1), the REVERSE-TOPOLOGICAL SPLICE (not in the Acar paper), and "EAGER PUSH" (see
 # eager.nix — RTD supplies the topological order; the eager characterisation is ours).
+#
+# ★ THE SPLICE EXCLUSION'S GROUND, RESTATED BECAUSE ONE OF ITS SUPPORTING FIGURES WAS WRONG. The
+# exclusion rests on `topolog` ⇒ 0 and `reverse` ⇒ 0 in the Acar extraction, and BOTH still hold —
+# the term is not that paper's, and the conclusion is unchanged. What was wrong is a third figure
+# carried beside them: `order maintenance` was recorded as ⇒ 0, measured with a SPACE, and the
+# paper's surface is HYPHENATED — hyphen-tolerant it is ⇒ 7, including "a standard priority-queue
+# algorithm, and an Order-Maintenance [structure]" and "known as the Order-Maintenance Problem".
+# ⇒ THE PAPER'S EFFICIENT IMPLEMENTATION IS BUILT ON ORDER MAINTENANCE, and the retired figure
+# implied the opposite. A predicate that cannot match the surface it is aimed at returns an
+# absence indistinguishable from a finding, and a zero from one is worth nothing. (`virtual clock`
+# ⇒ 0 does survive the same hyphen-tolerant re-measurement: `virtual` and `clock` are absent from
+# the extraction outright.)
 #
 # ★ WHAT STAYS HEDGED is a claim about REACH rather than about provenance: RTD's true
 # `O(|AFFECTED|)` optimality and its characteristic graphs are NOT REACHED by this implementation

@@ -155,9 +155,24 @@ section, read the canonical file.
 below is realized in `lib/`; what varies is how well each attribution is backed, and that is a
 different axis from whether the code exists.
 
-**★ CITATION PROVENANCE.** Every primary cited **is** in the papers archive and every coordinate was
-read at that source, not carried on the retiring library's authority. `lib/default.nix` states this
-once for every file below it, with the coordinates enumerated.
+**★ CITATION PROVENANCE.** Every primary cited **with a section coordinate** is in the papers archive
+and each such coordinate was located in that source, not carried on the retiring library's authority.
+`lib/default.nix` states this once for every file below it, with the coordinates enumerated and both
+excluded axes named.
+
+**Excluded axis 1 — four cited names are in NEITHER archive tier:** Tarjan 1972, Kosaraju/Sharir,
+Magnusson–Hedin, Kleene ⇒ 0 across `used/` and `reference-catalog/`, against the eight archived names
+as live controls in the same run. None carries a section coordinate; each is an attribution to a named
+idea and is not to be read as checked.
+
+**Excluded axis 2 — "located in that source" means BY CONTENT, not by heading.** The Acar extraction
+has no numbered section headings (title + 47 `## Page N` markers only), so its §-digits are
+content-verified and **coordinate-unverifiable** at the current extraction.
+
+★ **The splice exclusion's ground, restated.** `topolog` ⇒ 0 and `reverse` ⇒ 0 both hold, so the
+conclusion stands. But `order maintenance` ⇒ 0, carried beside them, was measured with a **space**
+against a **hyphenated** surface: hyphen-tolerant it is ⇒ **7**, and the paper's efficient
+implementation is built on order maintenance. The retired figure implied the opposite.
 
 **Three claims are this library's own and are attributed to no paper** — in each case because the
 cited section was read and does not contain them: the store's flatness and relocatability (not in

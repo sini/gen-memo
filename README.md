@@ -222,12 +222,34 @@ reconciliation command.
 
 ## Theoretical Foundations
 
-**★ CITATION PROVENANCE.** Every primary this library cites **is** in the papers archive, and every
-coordinate below was read at that source rather than carried on the retiring library's authority.
+**★ CITATION PROVENANCE.** Every primary this library cites **with a section coordinate** is in the
+papers archive, and each such coordinate was located in that source rather than carried on the
+retiring library's authority.
+
+**The excluded axis, named in the same breath**, because a scoped sentence read as a universal is how
+the previous revision of this section went wrong. **Four names cited here are in neither archive
+tier** — Tarjan 1972 and Kosaraju/Sharir, Magnusson–Hedin, and Kleene — all ⇒ 0 across `used/` and
+`reference-catalog/`, with the eight archived names as live controls in the same run. None of the four
+carries a section coordinate, which is why the scoping holds and why it has to be said: they are
+attributions to a *named idea*, unverifiable here, and are not to be read as checked.
+
+**And "located in that source" means BY CONTENT, not by heading.** The Acar extraction carries no
+numbered section headings at all — its only headings are the title and 47 `## Page N` markers — so
+its §4.3/§4.4/§4.5/§7 digits cannot be confirmed against it. Each was matched by the content the
+coordinate names. Treat every Acar §-number here as content-verified and **coordinate-unverifiable**
+at the current extraction.
+
 Three claims are the library's own and are attributed to no paper, in each case because the cited
 section was read and does not contain them: the store's **flatness and relocatability** (not in
 Mokhov §3.1), the **reverse-topological splice** (not in the Acar paper), and **"eager push"** (RTD
 supplies the topological order; the eager characterisation is this library's).
+
+★ **The splice exclusion's ground, restated because one supporting figure was wrong.** It rests on
+`topolog` ⇒ 0 and `reverse` ⇒ 0, and both still hold, so the conclusion is unchanged. A third figure
+carried beside them was not: `order maintenance` ⇒ 0 was measured with a **space** against a
+**hyphenated** surface — hyphen-tolerant it is ⇒ **7**, and the paper's efficient implementation is
+*built on* an order-maintenance structure. A predicate that cannot match the surface it is aimed at
+returns an absence indistinguishable from a finding.
 
 What stays hedged is a claim about *reach*, not provenance: RTD's true `O(|AFFECTED|)` optimality
 and its characteristic graphs are **not reached** by this implementation in pure evaluation.
