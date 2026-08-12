@@ -92,6 +92,7 @@ in
           hashGuarded = null;
           hashEq = null;
           hashMoved = null;
+          project = null;
         } genMemo
       );
       expected = [ ];

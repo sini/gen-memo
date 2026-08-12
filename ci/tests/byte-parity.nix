@@ -24,21 +24,25 @@
 #   THE VALUE BRANCH is armed END-TO-END, through the plane: four decision paths, each compared
 #   against a cold build of the same edited input.
 #
-#   THE DERIVATION BRANCH is armed AT THE COMPARATOR, not through the plane, and the reason is a
-#   MEASURED DEFECT in the content this library received. `hash.nix`'s `containsFunction` walks a
-#   value structurally with no cycle guard, and a Nix derivation IS self-referential — `drv.all`'s
-#   first element is the derivation itself (measured: `(builtins.elemAt drv.all 0) == drv` is
-#   true). So a raw derivation handed to the hash guard descends forever and aborts with a stack
-#   overflow that `builtins.tryEval` DOES NOT CONTAIN (measured; live controls in the same run:
-#   the same predicate answers `true` on `{ a = x: x; }` and `false` on `{ a = 1; b = [ 2 3 ]; }`).
-#   No cell can pin an uncatchable abort — it takes the whole evaluation with it — so the defect is
-#   recorded here rather than asserted, and the plane arm below carries each node's drvPath, which
-#   is the derivation's evaluation identity and exactly what the comparator reads anyway.
+#   THE DERIVATION BRANCH is armed twice, and the second arming is what the first one was waiting
+#   for. `hash.nix`'s `containsFunction` walks a value structurally with no cycle guard, and a Nix
+#   derivation IS self-referential — `drv.all`'s first element is the derivation itself (measured:
+#   `(builtins.elemAt drv.all 0) == drv` is true) — so a raw derivation handed to the hash guard
+#   used to descend forever and abort with a stack overflow that `builtins.tryEval` DOES NOT
+#   CONTAIN. No cell can pin an uncatchable abort; it takes the whole evaluation with it. The
+#   admission projection removes that class at every depth by recognising the derivation shape
+#   BEFORE descending, so both armings now exist:
+#
+#     - AT THE COMPARATOR, on the suite's own `observe`: `test-comparator-reads-drvpath-not-value`.
+#     - THROUGH THE PLANE, on a node value holding a derivation — the shape a config value
+#       containing a package actually has: `test-drv-valued-nodes-parity-through-the-plane`, which
+#       compares on the plane's own projection and asserts the trace hash was really taken.
 #
 #   ⇒ The consequence, stated plainly rather than left to be inferred: the store's admissible
-#   values today are function-free AND acyclic, and a derivation is neither. The null-hash rule
-#   records the first partiality of Nix hashing; this is a second one, and it is not conservative
-#   the way the first is — it does not fall back to always-dirty, it aborts.
+#   values are function-free, and acyclic apart from derivations. The null-hash rule records the
+#   first partiality of Nix hashing; cyclicity is a second one, and it is not conservative the way
+#   the first is — it does not fall back to always-dirty, it aborts, which is why derivations are
+#   normalised at admission and the GENERAL cyclic class remains open.
 {
   genMemo,
   graph,
@@ -54,6 +58,11 @@ let
     batch
     restabilize
     ;
+
+  # The plane's own admission projection, imported the way the guards are — directly, because
+  # it is internal to hashing and not on the export surface. The derivation-valued arm below
+  # compares on it rather than on `observe`, which reads a bare drvPath string.
+  inherit (import ../../lib/hash.nix { }) project;
 
   # THE COMPARATOR. A derivation is compared on `drvPath` — its identity as a build — and anything
   # else on the value itself. `drvPath` and not `outPath`: a derivation's identity is fixed at
@@ -122,6 +131,19 @@ let
     acc: s: id:
     (mkDrv "gen-memo-parity-${id}" (map (d: s.${d}) (acc.edges id)) (acc.nodeData id).w).drvPath;
 
+  # ── THE DERIVATION ARM WITH A DERIVATION AS THE NODE VALUE, which is the shape the arm above
+  # could not take. A node value holding a derivation used to abort the trace's hash walk
+  # uncatchably, so that arm carries drvPath STRINGS and the comparator's derivation branch was
+  # armed in isolation rather than through the plane. The admission projection removes the abort,
+  # so the ordinary shape — a package sitting inside a config value — can now be driven end to
+  # end, and the comparison reads the projected store: the derivation's evaluation identity in a
+  # form that cannot compare equal to a plain string.
+  drvValueRecompute = acc: s: id: {
+    pkg = mkDrv "gen-memo-parity-value-${id}" (map (d: s.${d}.pkg.drvPath) (
+      acc.edges id
+    )) (acc.nodeData id).w;
+  };
+
   changedAccessor =
     accessor: changedId: newDecls:
     accessor
@@ -168,6 +190,18 @@ let
   };
   valueArgs = editArgs valueRecompute;
   drvArgs = editArgs drvPathRecompute;
+
+  drvValueCtx = build {
+    accessor = fleetAcc;
+    recompute = drvValueRecompute;
+    inherit hashOf;
+  };
+  drvValueWarm = override drvValueCtx "shared" { w = 100; };
+  drvValueCold = build {
+    accessor = changedAccessor fleetAcc "shared" { w = 100; };
+    recompute = drvValueRecompute;
+    inherit hashOf;
+  };
 
   # ── The cyclic arm: its cold side is a STRATIFIED build, so it is spelled out rather than
   # routed through `parity`. ──
@@ -370,6 +404,26 @@ in
         same = true;
         different = false;
         fallsThroughForPlainValues = true;
+      };
+    };
+
+    # ── AND THE SAME BRANCH THROUGH THE PLANE, which is what the header said was missing. Every
+    # node's value is an attrset holding a derivation; the warm arm is the override cone and the
+    # cold arm is a full build of the same edited input. `traceHashed` is the load-bearing half:
+    # a plane that nulled these hashes out would still show parity while having decided nothing,
+    # so the cell asserts the hash was actually taken over the projected value. The third arm is
+    # the instrument's own discrimination — the same comparator against the UNEDITED cold run
+    # must come back false.
+    test-drv-valued-nodes-parity-through-the-plane = {
+      expr = {
+        parity = project drvValueWarm.store == project drvValueCold.store;
+        traceHashed = drvValueCtx.trace.shared.hash != null;
+        discriminates = project drvValueWarm.store == project drvValueCtx.store;
+      };
+      expected = {
+        parity = true;
+        traceHashed = true;
+        discriminates = false;
       };
     };
   };

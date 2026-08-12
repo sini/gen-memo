@@ -367,14 +367,26 @@ a plane output must be byte-identical to a cold evaluation.
 
 ## Limitations
 
-- **The store's admissible values are function-free AND ACYCLIC.** The null-hash rule records the
-  first partiality — Nix's hash is partial on function-bearing values, so those get `hash = null` and
-  are conservatively always-dirty. That rule has **no paper behind it**; it is an operational Nix
-  fact. The second partiality is not conservative: the guard's structural walk has no cycle guard, so
-  a **self-referential value aborts with a stack overflow that `tryEval` does not catch**. A Nix
-  derivation is self-referential (`drv.all`'s first element is the derivation itself), so a raw
-  derivation cannot be a node value today. `ci/tests/byte-parity.nix` records the measurement and
-  carries each node's `drvPath` instead.
+- **The store's admissible values are function-free, and acyclic apart from derivations.** The
+  null-hash rule records the first partiality — Nix's hash is partial on function-bearing values, so
+  those get `hash = null` and are conservatively always-dirty. That rule has **no paper behind it**;
+  it is an operational Nix fact. The second partiality is not conservative: the guard's structural
+  walk has no cycle guard, so a **self-referential value aborts with a stack overflow that `tryEval`
+  does not catch**. A Nix derivation is self-referential (`drv.all`'s first element is the derivation
+  itself), and that class is **removed at every depth by the admission projection** — a shape test
+  applied before descending, which yields a tagged `{ __drvPath = …; }` record and never walks into
+  the derivation. A package inside a config value is the ordinary shape, so refusing it was never an
+  option; `ci/tests/byte-parity.nix` now drives derivation-valued nodes through the plane.
+- **The projection is not injective, and cannot be.** Its codomain is a subset of its domain, so a
+  value and its image can be distinct with the same image: an attrset written literally as
+  `{ __drvPath = "…"; }` still compares equal to a projected derivation. The tag **narrows** the
+  collision class — from any string equal to a `drvPath`, one ordinary edit away, to an attrset
+  carrying exactly the reserved key with exactly that value — and the residual direction is
+  false-clean, which is the unsound one.
+- **The GENERAL cyclic class is not rescued.** A plain self-referential attrset aborts the projection
+  itself, and no cell can pin that: the abort is uncatchable and would end the suite rather than fail
+  a case. A total acyclicity predicate is not constructible here — deciding it needs the descent that
+  aborts, and a depth-bounded walk would be a ceiling invented to bound a cost.
 - **No cross-invocation persistence**, by design and by the narrowing above.
 - **`batch` layers its accessor overrides**, so N deltas leave an N-deep `nodeData` closure chain
   paid on every later read. Forcing the accumulator does not flatten it; only re-expressing the
