@@ -20,19 +20,35 @@
 # form, and no file below may re-assert it.
 #
 # ★ CITATION PROVENANCE, stated here once for every file below, because the alternative is each
-# file reading as if its citation had been checked. Mokhov 2018 is in the archive and the claims
-# made against it here were read at that source. Reps–Teitelbaum–Demers 1983 and Acar 2002 ARE
-# NOT IN THE ARCHIVE: every RTD and Acar attribution below is REPORTED FROM THE RETIRED LIBRARY'S
-# OWN DOCUMENTATION rather than verified against the primary, and each travels with the hedge its
-# author attached — RTD's true `O(|AFFECTED|)` optimality and its characteristic graphs are stated
-# there as NOT REACHED in pure evaluation, and the reverse-topological splice is that library's own
-# mechanism rather than anything the Acar paper is known to state. Nothing here stands in for
-# reading the primary, and a later revision that acquires either paper re-derives these lines
-# instead of deleting this one.
+# file reading as if its citation had been checked. Every primary cited below IS in the papers
+# archive, and every coordinate was read AT THAT SOURCE rather than carried on the retiring
+# library's authority:
 #
-# ★ THE STORE'S FLATNESS AND RELOCATABILITY ARE THIS LIBRARY'S OWN DESIGN CLAIM ABOUT ITS OWN
-# STORE, in its own voice. They were previously attributed to Mokhov 2018 §3.1 and that section
-# contains neither property; the property is real and the attribution was not.
+#   Mokhov 2018 — the scheduler/rebuilder decomposition, and §4.2.2's verifying trace.
+#   Reps–Teitelbaum–Demers 1983 — §4.3's AFFECTED set, together with the paper's own statement
+#     that AFFECTED "is determined as a result of the updating process itself", which is exactly
+#     why the cheap cone is an over-approximation and the exact set is post-filtered from hashes.
+#     §5.3's NeedToBeEvaluated and the characteristic graphs are that paper's terms as well.
+#   Acar 2002 — the change/propagate split, genuinely the paper's pair of metafunctions.
+#   Arntzenius 2016 — Lemma 4, "Fixed points in finite-height pointed posets", whose proof is the
+#     iterate-from-⊥ ascent the per-SCC solver performs.
+#   Radul 2009 — kick-out! and the support set. Sloane 2010 — circular reference attributes.
+#
+# ★★ THREE CLAIMS ARE THIS LIBRARY'S OWN AND ARE ATTRIBUTED TO NO PAPER, in each case because the
+# cited section was read and does not contain them: the store's FLATNESS and RELOCATABILITY (not
+# in Mokhov §3.1), the REVERSE-TOPOLOGICAL SPLICE (not in the Acar paper), and "EAGER PUSH" (see
+# eager.nix — RTD supplies the topological order; the eager characterisation is ours).
+#
+# ★ WHAT STAYS HEDGED is a claim about REACH rather than about provenance: RTD's true
+# `O(|AFFECTED|)` optimality and its characteristic graphs are NOT REACHED by this implementation
+# in pure evaluation. That hedge is the retiring library's own, it is honest, and it travels.
+#
+# ★ A PREVIOUS REVISION OF THIS BLOCK SAID RTD AND ACAR WERE "NOT IN THE ARCHIVE". They are, in
+# `reference-catalog/` — a different tier from `used/`, and not the same claim. That sentence was
+# inherited from a document which scoped its own measurement correctly and then widened it in the
+# next clause, and it was repeated here without re-measuring. It is corrected in place rather than
+# quietly dropped, because a provenance block carrying an unverified claim is precisely the
+# failure this block exists to prevent.
 {
   prelude,
   graph,

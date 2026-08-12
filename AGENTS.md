@@ -155,12 +155,20 @@ section, read the canonical file.
 below is realized in `lib/`; what varies is how well each attribution is backed, and that is a
 different axis from whether the code exists.
 
-**★ CITATION PROVENANCE.** Mokhov 2018 is in the archive and the claims made against it here were
-read at that source. **Reps, Teitelbaum & Demers 1983 and Acar 2002 are not.** Every RTD and Acar
-attribution in this library is REPORTED FROM THE RETIRING LIBRARY'S OWN DOCUMENTATION rather than
-verified against the primary, and each travels with the hedge its author attached. `lib/default.nix`
-states this once for every file below it. Nothing here stands in for reading the primary, and a later
-revision that acquires either paper re-derives these lines rather than deleting them.
+**★ CITATION PROVENANCE.** Every primary cited **is** in the papers archive and every coordinate was
+read at that source, not carried on the retiring library's authority. `lib/default.nix` states this
+once for every file below it, with the coordinates enumerated.
+
+**Three claims are this library's own and are attributed to no paper** — in each case because the
+cited section was read and does not contain them: the store's flatness and relocatability (not in
+Mokhov §3.1), the reverse-topological splice (not in the Acar paper), and "eager push"
+(`lib/eager.nix` — RTD supplies the topological order, the eager characterisation is ours).
+
+**What stays hedged is REACH, not provenance:** RTD's true `O(|AFFECTED|)` optimality and its
+characteristic graphs are not reached in pure evaluation.
+
+★ An earlier revision said RTD 1983 and Acar 2002 were "not in the archive". They are, in
+`reference-catalog/` — a different tier from `used/`, and not the same claim.
 
 - **Mokhov, Mitchell & Peyton Jones (2018), *Build Systems à la Carte*** — the
   scheduler/rebuilder decomposition. This plane is the **rebuilder** dimension; the scheduler is
@@ -182,12 +190,15 @@ revision that acquires either paper re-derives these lines rather than deleting 
 - **Reps, Teitelbaum & Demers (1983)** — reverse-transitive-dependency propagation: the AFFECTED set
   (§4.3) and the unchanged-value cutoff (§4.1) supply the invalidation relation. True
   `O(|AFFECTED|)` optimality and characteristic graphs are recorded as **not reached** in pure
-  evaluation; that hedge travelled with the content and is not re-opened by the move. Reported, not
-  verified — see the provenance note above.
+  evaluation; that hedge travelled with the content and is not re-opened by the move. VERIFIED at
+  the primary: the paper states AFFECTED "is determined as a result of the updating process
+  itself", which is why the cheap cone is an over-approximation and the exact set is post-filtered;
+  `NeedToBeEvaluated` and the characteristic graphs are its own terms.
 
 - **Acar (2002)** — the change/propagate split is the paper's two metafunctions, de-conflated here
-  in `lib/drivers.nix` rather than fused. ★ The *reverse-topological splice* is this library's own
-  mechanism and is NOT attributed to it. Reported, not verified.
+  in `lib/drivers.nix` rather than fused. VERIFIED at the primary. ★ The *reverse-topological
+  splice* is NOT: the paper carries no occurrence of the term, so that mechanism is this library's
+  own and is attributed to no one.
 
 - **Arntzenius (2016), Datafun** — reverse reachability, and the per-SCC least fixed point by
   iterate-from-bottom on finite-height semilattices (`lib/restabilize.nix`).

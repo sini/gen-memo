@@ -222,11 +222,20 @@ reconciliation command.
 
 ## Theoretical Foundations
 
-**★ CITATION PROVENANCE.** Mokhov 2018 is in the archive and the claims made against it here were
-read at that source. **Reps, Teitelbaum & Demers 1983 and Acar 2002 are not.** Every RTD and Acar
-attribution in this library is reported from the retiring library's own documentation rather than
-verified against the primary, and each travels with the hedge its author attached. Nothing here
-stands in for reading the primary.
+**★ CITATION PROVENANCE.** Every primary this library cites **is** in the papers archive, and every
+coordinate below was read at that source rather than carried on the retiring library's authority.
+Three claims are the library's own and are attributed to no paper, in each case because the cited
+section was read and does not contain them: the store's **flatness and relocatability** (not in
+Mokhov §3.1), the **reverse-topological splice** (not in the Acar paper), and **"eager push"** (RTD
+supplies the topological order; the eager characterisation is this library's).
+
+What stays hedged is a claim about *reach*, not provenance: RTD's true `O(|AFFECTED|)` optimality
+and its characteristic graphs are **not reached** by this implementation in pure evaluation.
+
+★ An earlier revision of this section said RTD 1983 and Acar 2002 were "not in the archive". They
+are, in `reference-catalog/` — a different tier from `used/`, and not the same claim. The sentence
+was inherited from a document that scoped its own measurement correctly and widened it in the next
+clause, and repeated here without re-measuring.
 
 - **Mokhov, Mitchell & Peyton Jones (2018), *[Build Systems à la Carte](https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/)*.**
   The scheduler/rebuilder decomposition. gen-memo is the **rebuilder** dimension; the scheduler is
@@ -251,11 +260,15 @@ stands in for reading the primary.
 - **Reps, Teitelbaum & Demers (1983).** Reverse-transitive-dependency propagation supplies the
   invalidation relation: the AFFECTED set (§4.3) and the unchanged-value cutoff (§4.1). True
   `O(|AFFECTED|)` optimality and characteristic graphs are recorded as **not reached** in pure
-  evaluation — a finding that travelled with the content rather than being re-opened by the move.
+  evaluation — a finding about this implementation's reach that travelled with the content. The
+  attributions themselves are verified at the primary, including the paper's own point that
+  AFFECTED "is determined as a result of the updating process itself" — the reason the cheap cone
+  is an over-approximation and the exact set is post-filtered from hashes.
 
 - **Acar (2002).** The change/propagate split is the paper's: `applyDelta` and `propagate` are its
-  two metafunctions, de-conflated here rather than fused. The *reverse-topological splice* is this
-  library's own mechanism and is not attributed to it.
+  two metafunctions, de-conflated here rather than fused — verified at the primary. The
+  *reverse-topological splice* is not there at all, so that mechanism is this library's own and is
+  attributed to no one.
 
 - **Arntzenius (2016), Datafun.** Reverse reachability, and the per-SCC least fixed point by
   iterate-from-bottom on finite-height semilattices.
