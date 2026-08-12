@@ -17,11 +17,11 @@
   lib,
   genMemo,
   genScope,
+  engine,
   ...
 }:
 let
   inherit (genMemo) warmOverride;
-  engine = { inherit (genScope) evalWarm; };
 
   mkRoots =
     v:

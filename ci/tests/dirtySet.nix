@@ -2,10 +2,12 @@
   lib,
   genMemo,
   graph,
+  engine,
   ...
 }:
 let
-  inherit (genMemo) build dirtySet affected;
+  build = genMemo.build engine;
+  inherit (genMemo) dirtySet affected;
 
   mkCtx =
     accessor:

@@ -11,15 +11,14 @@
   genMemo,
   graph,
   mkStructuralCase,
+  engine,
   ...
 }:
 let
-  inherit (genMemo)
-    build
-    override
-    retract
-    applyEdgeDelta
-    ;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
+  retract = genMemo.retract engine;
+  applyEdgeDelta = genMemo.applyEdgeDelta engine;
 
   recompute =
     a: s: id:

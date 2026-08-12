@@ -108,17 +108,28 @@ The standalone entry is a function of the library's dependencies, per the gen ro
 
 ### A first build and override
 
+Every entry point that reaches a store takes the ENGINE first. The plane decides reuse and never
+evaluates, so it populates no store of its own: it hands the engine a domain, a base and a decision,
+and the engine produces the values. A caller that has an evaluator hands that; a caller that has
+none — a test, an example — hands the reference scheduler, which ships outside `lib/` at
+`reference/schedule.nix` precisely because it is not part of the plane.
+
 ```nix
 let
-  ctx = genMemo.build {
+  engine = import "${genMemo-src}/reference/schedule.nix" { prelude = gen-prelude.lib; };
+
+  ctx = genMemo.build engine {
     accessor = someGraphAccessor;          # the topology oracle
     recompute = acc: store: id: /* … */;   # the node-eval
     hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   };
-  after = genMemo.override ctx "someNode" { newData = 1; };
+  after = genMemo.override engine ctx "someNode" { newData = 1; };
 in
 after.store                                # the prior store, spliced
 ```
+
+The engine is never stored on the returned context — it is supplied at each entry, so nothing the
+plane carries forward is an evaluator.
 
 `examples/dag` is a runnable version of exactly this, including the poisoned-recompute proof that
 untouched nodes are never re-evaluated.
@@ -130,13 +141,17 @@ evaluator is passed in rather than depended on:
 
 ```nix
 let
-  after = genMemo.warmOverride { inherit (genScope) evalWarm; } ctx {
+  after = genMemo.warmOverride (engine // { inherit (genScope) evalWarm; }) ctx {
     id = "someHost";
     newDecls = { class = "db"; };
   };
 in
 after.eval.get "someHost" "resolved"       # re-derived; everything outside the cone is reused
 ```
+
+One engine record, two capabilities: `evalWarm` produces the warm evaluation, and `schedule`
+populates the memo context beside it. They travel together because they are one thing — the
+evaluation environment the caller already has.
 
 `ctx` is a resolved context — roots, the attribute set, the accessor and a prior evaluation. The
 plane reads that prior through the evaluator's restricted facade, decides, and hands the decision
@@ -146,11 +161,17 @@ back; the evaluator does every recomputation.
 
 27 exports, in six groups.
 
+**Which exports take the engine.** Every operation that reaches a store takes it as its FIRST
+argument: `build`, `override`, `propagate`, `force`, `forceCtx`, `retract`, `applyEdgeDelta`,
+`affectedSet`, and the two warm folds. The rest — the pure queries, the strategy predicates,
+`applyDelta`, `batch`, `runScc`, `restabilize`, `propagateEager`, `mkAccessor` — do not, because
+they populate no store.
+
 **Build and reuse decision**
 
 | Export | What it does |
 | --- | --- |
-| `build` | Full evaluation into a store and a verifying trace. Pre-checks acyclicity and throws a *located*, `tryEval`-catchable blame on a cycle. With a `fixpoint` argument it relaxes the check and solves stratified over the condensation |
+| `build` | Full evaluation into a store and a verifying trace, the store populated by the engine handed in. Pre-checks acyclicity and throws a *located*, `tryEval`-catchable blame on a cycle. With a `fixpoint` argument it relaxes the check and solves stratified over the condensation |
 | `needsEval` | Whether a node must be recomputed, before any cutoff |
 | `earlyCutoff` | Whether a recomputed value's hash moved, after recompute |
 | `verify` | Whether a node's trace is still valid — deps unchanged and all dep hashes clean |
@@ -383,6 +404,13 @@ a plane output must be byte-identical to a cold evaluation.
   collision class — from any string equal to a `drvPath`, one ordinary edit away, to an attrset
   carrying exactly the reserved key with exactly that value — and the residual direction is
   false-clean, which is the unsound one.
+- **The plane holds no store fix, and that is not yet the same as holding no evaluator.** A
+  self-referential store over the node set, passed into the caller's node computation, is gone from
+  `lib/` — the five sites that had one now hand the engine a domain, a base and a decision. But a
+  fold threading its own accumulator of resolved outputs across a traversal it drives is the same
+  construct by another spelling, and three remain: the condensation solve in `build.nix`, `runScc`
+  beneath it, and the rank-ordered drain in `eager.nix`. `ci/tests/purity.nix` scans for the first
+  shape and says in its own comment that it cannot see the second.
 - **The GENERAL cyclic class is not rescued.** A plain self-referential attrset aborts the projection
   itself, and no cell can pin that: the abort is uncatchable and would end the suite rather than fail
   a case. A total acyclicity predicate is not constructible here — deciding it needs the descent that

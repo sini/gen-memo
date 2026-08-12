@@ -83,16 +83,16 @@ rec {
   # propagate — drain pending.dirty to quiescence via union-cone fix.
   # Acar §4.3 drain-to-quiescence. The seeds are `pending.dirty`; we compute
   # the union-cone (all dependents reachable via forward deps), then splice it
-  # via prelude.fix with needsEval-gated recompute (exactly like P2 override but
-  # over a multi-seed union-cone instead of per-override cone). Re-hash ONLY
-  # affected nodes (post-filter from hashes).
+  # by handing the engine a needsEval-gated decision over it (exactly like P2
+  # override but over a multi-seed union-cone instead of per-override cone).
+  # Re-hash ONLY affected nodes (post-filter from hashes).
   #
   # SOUNDNESS GUARD (asserted here): edges are FIXED. A hash-equal node under
   # fixed edges yields hash-equal dependents, so any early-cutoff is sound.
   # Structural deltas (edge changes) break this guard; they are handled
   # separately (lib/structural.nix).
   propagate =
-    ctx:
+    engine: ctx:
     let
       pending = ctx.pending or { dirty = [ ]; };
       seeds = pending.dirty;
@@ -122,39 +122,36 @@ rec {
         seedSet = prelude.genAttrs seeds (_: true);
         newHashOf = id: hashGuarded hashOf builtStore.${id};
 
-        # Multi-seed splice: single prelude.fix over the union-cone.
+        # THE DECISION over the union-cone, computed here and applied by the engine.
         # Reuse nodes with no moved-hash deps; recompute those that do (or are changed).
+        #
+        # EVERY seed is a forced recompute, not just the first. needsEval's
+        # `id == changedId` clause fires for a SINGLE changed input; a batch has N
+        # changed inputs (Acar §4.3: each δ ⊕ σ dirties its own node), so a seed whose
+        # OWN data changed must recompute even when its dep hashes did not move (its
+        # value comes from the new nodeData, not from a moved dependency). Gating on
+        # only `prelude.head seeds` would reuse the other seeds' STALE values — an
+        # unsound early-cutoff (RTD §5.3 only licenses reuse for nodes whose inputs are
+        # ALL unchanged). The dependents (non-seed cone nodes) still ride the hash-moved
+        # gate, seeded at the head — they recompute iff a cone dep's hash moved.
+        mustEval =
+          id:
+          (seedSet ? ${id})
+          || needsEval {
+            inherit trace;
+            coneSet = unionSet;
+            inherit newHashOf accessor';
+          } (prelude.head seeds) id;
+
         builtStore =
           ctx.store
-          // prelude.fix (
-            s:
-            prelude.genAttrs unionCone (
-              id:
-              let
-                spliced = ctx.store // s;
-                # EVERY seed is a forced recompute, not just the first. needsEval's
-                # `id == changedId` clause fires for a SINGLE changed input; a batch
-                # has N changed inputs (Acar §4.3: each δ ⊕ σ dirties its own node),
-                # so a seed whose OWN data changed must recompute even when its dep
-                # hashes did not move (its value comes from the new nodeData, not from
-                # a moved dependency). Gating on only `prelude.head seeds` would reuse the
-                # other seeds' STALE values — an unsound early-cutoff (RTD §5.3 only
-                # licenses reuse for nodes whose inputs are ALL unchanged).
-                isSeed = seedSet ? ${id};
-                # The dependents (non-seed cone nodes) still ride the hash-moved gate,
-                # seeded at the head — they recompute iff a cone dep's hash moved.
-                seedForPredicate = prelude.head seeds;
-                mustEval =
-                  isSeed
-                  || needsEval {
-                    inherit trace;
-                    coneSet = unionSet;
-                    inherit newHashOf accessor';
-                  } seedForPredicate id;
-              in
-              if mustEval then recompute accessor' spliced id else ctx.store.${id}
-            )
-          );
+          // engine.schedule {
+            accessor = accessor';
+            domain = unionCone;
+            base = ctx.store;
+            inherit recompute;
+            isClean = id: !(mustEval id);
+          };
 
         # Re-hash ONLY affected nodes (post-filter from hashes).
         # Reused nodes keep their prior trace entry byte-identical.
@@ -184,18 +181,18 @@ rec {
   # then reads the value. This is crude full-drain semantics (G1 gap: not
   # selective per-edge repair).
   force =
-    ctx: id:
+    engine: ctx: id:
     let
-      quiescent = propagate ctx;
+      quiescent = propagate engine ctx;
     in
     quiescent.store.${id};
 
   # forceCtx — pull-semantics returning quiescent ctx (loop-safe).
   # Drain once, reuse the quiescent ctx for efficiency.
   forceCtx =
-    ctx: id:
+    engine: ctx: id:
     let
-      quiescent = propagate ctx;
+      quiescent = propagate engine ctx;
     in
     {
       value = quiescent.store.${id};
@@ -211,6 +208,6 @@ rec {
   # — deltas commute when targets disjoint; single union-cone fix reaches same
   # fixed point as chained fixes.
   override =
-    ctx: changedId: newDecls:
-    propagate (applyDelta ctx changedId newDecls);
+    engine: ctx: changedId: newDecls:
+    propagate engine (applyDelta ctx changedId newDecls);
 }

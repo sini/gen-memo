@@ -19,28 +19,36 @@ The interface to the evaluator is **settled and built in the evaluator**: the pl
 `get` / `nodeIds` / `resolutional`, and never receives a structural value from a prior evaluation.
 **THE TWO MIGRATIONS SIT ON OPPOSITE SIDES OF THAT INTERFACE AND THE SHEET MUST NOT AVERAGE THEM.**
 The warm fold IS expressed on it — `warmDecision` returns exactly that record, and the fold hands it
-to the evaluator through the facade. The rebuilder content **is not**: it predates the interface and
-is consumed the way it always was, through a caller-supplied `recompute` and an accessor, and
-re-expressing it remains outstanding.
+to the evaluator through the facade. The rebuilder content is consumed the way it always was, through
+a caller-supplied `recompute` and an accessor, but it no longer POPULATES anything itself.
 
-★ **AND THE SHARPEST FORM OF THAT, because it is a live claim against this repository rather than a
-tidy-up note.** `lib/build.nix`'s store is `prelude.fix (s: genAttrs accessor.nodes (id: recompute accessor s id))` — a self-referential store bound over the node set and passed INTO the caller's
-function. Under the engine spec's own two-part test for what evaluates, that is an evaluating knot
-living inside the plane, and its §5.2 states in terms that an implementer who moves such a `fix` into
-the plane has failed the construction test whatever the tests say. It is recorded here rather than
-argued away: the warm fold added none, and removing the ones that are here is the re-expression above.
+★ **THE FIVE STORE FIXES ARE GONE, AND WHAT REPLACED THEM IS THE SAME MOVE THE WARM FOLD MAKES.**
+`lib/build.nix`'s store was `prelude.fix (s: genAttrs accessor.nodes (id: recompute accessor s id))`
+— a self-referential store bound over the node set and passed INTO the caller's function, which is
+an evaluating knot living inside a layer whose whole type is a decision. Five such sites existed
+(`build.nix:89`, `structural.nix:91`, `structural.nix:235`, `affectedSet.nix:47`, `drivers.nix:129`).
+All five now call `engine.schedule { accessor; domain; base; recompute; isClean; }`: the plane
+supplies the DECISION and the engine binds the knot and produces the values. Mokhov's decomposition
+is the ground — a scheduler orders tasks and produces the store, a rebuilder decides whether a task
+runs at all, and this library is the rebuilder half; Nix's laziness is already the scheduler, so a
+second one here was never the plane's to hold.
 
-★★ **AND THE COUNT IS FIVE, NOT ONE — stated because a residual named at the wrong size is a residual
-a later executor discharges partly and then measures an absence no disposition produced.** The
-paragraph above first named `build.nix` alone, and a sweep of the whole `lib/` (`prelude.fix` ⇒ 19
-occurrences across 5 files; live control `genAttrs` ⇒ 32; negative control ⇒ 0) returns **five
-executable D1-shaped sites**: `build.nix:89`, `structural.nix:91`, `structural.nix:235`,
-`affectedSet.nix:47`, `drivers.nix:129` — the spec's own six, modulo the file reorganisation this
-library performed on arrival. **All five, one design.** The carrier is `den-hoag-ss0k`, which holds
-the list and the sweep; re-derive both at the fix revision rather than trusting these coordinates.
+★★ **WHAT THAT DOES NOT ESTABLISH, and the scope matters because the token count is the tempting
+thing to quote.** `prelude.fix` in `lib/` is now **zero** (`ci/tests/purity.nix`
+`test-plane-binds-no-store-fix`, with the reference scheduler as the live control on the same
+predicate in the same run). That is a LEXICAL fact. The construction test has a second arm — a fold
+threading its own accumulator of resolved outputs across a traversal it drives — and **three of those
+remain**: the condensation solve in `build.nix`, `runScc` beneath it, and the rank-ordered drain in
+`eager.nix`. The cell says so in its own comment. Do not read the zero as "the plane holds no
+evaluator"; read it as "the plane binds no store fix", which is what was measured.
+
+★ **AND THE ENGINE IS NOT STORED ON THE CONTEXT.** It is supplied at every entry — `build engine { … }`, `override engine ctx …` — and appears in no returned record, so nothing the plane carries
+forward is an evaluator. The reference scheduler ships at `reference/schedule.nix`, deliberately
+outside `lib/`: `lib/` does not import it, `lib/default.nix` does not fold it in, and a caller with
+a real evaluator hands that instead.
 
 **The evaluator is a PARAMETER, never an input.** `flake.nix` declares two inputs and neither is an
-evaluator. The warm fold takes `{ evalWarm }` at the call and calls it; a fold that is handed an
+evaluator. The warm fold takes the engine at the call and calls it; a fold that is handed an
 evaluator is a CALLER of one, which is why it can live here without inverting the direction. `ci/`
 does pin gen-scope — a fold that is handed an evaluator can only be tested by handing it one, and a
 stub would make those suites an oracle for the stub.
@@ -92,6 +100,13 @@ Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function
 
 **27 exports, in six groups.**
 
+★ **TEN OF THEM TAKE THE ENGINE FIRST**, because they reach a store and the plane populates none of
+its own: `build` · `affectedSet` · `propagate` · `override` · `force` · `forceCtx` · `retract` ·
+`applyEdgeDelta` · `warmOverride` · `warmResolve`. The other seventeen do not — they populate
+nothing. `applyDelta`, `batch`, `runScc`, `restabilize` and `propagateEager` are in the second list
+deliberately: the first two only rewrite data, and the last three drive their own accumulator rather
+than a store fix, which is the residue named above rather than a reason they are exempt.
+
 | Group | Exports |
 |---|---|
 | Build and reuse decision | `build` · `needsEval` · `earlyCutoff` · `verify` |
@@ -128,10 +143,10 @@ library's surface silently.
 
 | Task | Reach for |
 |---|---|
-| Full evaluation into a store and trace | `build { accessor; recompute; hashOf; fixpoint ? null }` — `lib/build.nix`. `fixpoint` switches on the cyclic path |
-| Re-evaluate after a data change | `override ctx id newDecls` (`lib/drivers.nix`, the fused propagate-after-applyDelta). Cyclic graphs: `restabilize` |
+| Full evaluation into a store and trace | `build engine { accessor; recompute; hashOf; fixpoint ? null }` — `lib/build.nix`. `fixpoint` switches on the cyclic path. `engine.schedule` populates the store; `reference/schedule.nix` is the one to hand in when the caller has no evaluator |
+| Re-evaluate after a data change | `override engine ctx id newDecls` (`lib/drivers.nix`, the fused propagate-after-applyDelta). Cyclic graphs: `restabilize` |
 | Re-evaluate after a localized, cut-heavy edit | `propagateEager ctx changes` — `lib/eager.nix`. Opt-in; `propagate` stays the general default |
-| Change the topology | `retract` / `applyEdgeDelta` — `lib/structural.nix`. `override` is data-change only and cannot express it |
+| Change the topology | `retract engine ctx …` / `applyEdgeDelta engine ctx …` — `lib/structural.nix`. `override` is data-change only and cannot express it |
 | Ask why a node was or was not recomputed | `why` / `whyNot` — `lib/provenance.nix`. `whyNot` is total over all three verdicts |
 | See it run end to end | `nix eval -f examples/dag` — the cone, the reuse, the poisoned-recompute proof and the located cycle blame, as one record |
 | Run the suite | `nix flake check ./ci` — the command CI runs (`.github/workflows/ci.yml`, `working-directory: ci`) |

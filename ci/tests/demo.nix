@@ -1,9 +1,9 @@
 # Surfaces the B demo (examples/dag) as a ci test so `nix flake check` verifies
 # the thesis end-to-end. The demo logic lives in examples/dag/demo.nix; here we
 # inject genMemo purely (no getFlake) and assert its result record.
-{ genMemo, ... }:
+{ genMemo, engine, ... }:
 let
-  demo = import ../../examples/dag/demo.nix { inherit genMemo; };
+  demo = import ../../examples/dag/demo.nix { inherit genMemo engine; };
 in
 {
   flake.tests.demo = {

@@ -2,10 +2,12 @@
   lib,
   genMemo,
   graph,
+  engine,
   ...
 }:
 let
-  inherit (genMemo) build override;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
 
   # a depends on b depends on c (edges a=["b"], b=["c"], c=[]) — consumer→producer.
   accessor = graph.mkGraph {

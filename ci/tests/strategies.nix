@@ -2,11 +2,12 @@
   lib,
   genMemo,
   graph,
+  engine,
   ...
 }:
 let
+  build = genMemo.build engine;
   inherit (genMemo)
-    build
     verify
     earlyCutoff
     needsEval

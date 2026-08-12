@@ -3,15 +3,13 @@
   genMemo,
   graph,
   mkCyclicCase,
+  engine,
   ...
 }:
 let
-  inherit (genMemo)
-    build
-    override
-    runScc
-    restabilize
-    ;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
+  inherit (genMemo) runScc restabilize;
 
   # --- Fixture 1: genuine-join reachability SCC (Arntzenius Lemma-4 ascent) ---
   # 2-node cycle a<->b. Per-node lattice = powerset of {a,b} under union.

@@ -10,11 +10,12 @@
   genMemo,
   graph,
   mkCase,
+  engine,
   ...
 }:
 let
+  build = genMemo.build engine;
   inherit (genMemo)
-    build
     support
     why
     whyNot

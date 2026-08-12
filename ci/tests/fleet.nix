@@ -36,14 +36,12 @@
   genMemo,
   graph,
   lib,
+  engine,
   ...
 }:
 let
-  inherit (genMemo)
-    build
-    propagateEager
-    dirtySet
-    ;
+  build = genMemo.build engine;
+  inherit (genMemo) propagateEager dirtySet;
 
   hosts = [
     "bitstream"

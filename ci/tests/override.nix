@@ -3,15 +3,14 @@
   genMemo,
   graph,
   mkCase,
+  engine,
   ...
 }:
 let
-  inherit (genMemo)
-    build
-    override
-    dirtySet
-    affectedSet
-    ;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
+  affectedSet = genMemo.affectedSet engine;
+  inherit (genMemo) dirtySet;
 
   # --- soundness property: override == from-scratch rebuild, over many seeds ---
   seeds = lib.range 1 120;

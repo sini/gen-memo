@@ -1,12 +1,17 @@
 # warm — the override cone as a reuse DECISION, and the fold that carries it to an evaluator.
 #
-# THE EVALUATOR IS HANDED IN, NEVER TAKEN AS A DEPENDENCY. The fold receives `evalWarm` as an
+# THE EVALUATOR IS HANDED IN, NEVER TAKEN AS A DEPENDENCY. The fold receives the engine as an
 # argument and calls it; this library declares no evaluator input, because the plane decides for an
 # evaluator it is given and taking one as a dependency would invert the direction the whole design
 # rests on. What the fold does with it is CALL it — assemble the edited roots, a decision and a
 # prior, and let the evaluator produce every value. A caller of an evaluator is not an evaluator: it
 # binds no self-referential store of its own and produces no node value by applying a caller's
 # computation. The evaluator handed in is the sole recompute engine.
+#
+# The engine carries two capabilities and this fold uses both: `evalWarm`, which produces the warm
+# evaluation, and `schedule`, which the memo ctx below needs because `build` takes an engine for
+# exactly the same reason this fold does. They are one record because they are one thing — the
+# evaluation environment the caller already has.
 #
 # THE DECISION IS THE INTERFACE, AND IT IS EXPORTED APART FROM THE FOLD. `warmDecision` is the whole
 # of what this plane contributes to a warm evaluation: two total functions, `isClean` and
@@ -92,8 +97,7 @@ let
   # and hand the evaluator ONE warm pass. Batching is not an optimisation bolted onto the single
   # case: the union of the cones is a single cone, so N edits cost one decision and one evaluation.
   warmSplice =
-    { evalWarm }:
-    ctx: edits:
+    engine: ctx: edits:
     assert
       (builtins.all (id: builtins.hasAttr id ctx.roots) (builtins.attrNames edits))
       || throw "gen-memo.warm: edit target(s) must be root nodes — ${
@@ -124,7 +128,7 @@ let
         accessor = accessor';
       } ids;
 
-      eval' = evalWarm {
+      eval' = engine.evalWarm {
         roots = roots';
         inherit (ctx) attributes parseParent;
         inherit prior decision;
@@ -146,7 +150,7 @@ let
       # growth path rather than shipped scope: taking it means handing the plane a prior it did not
       # produce, which no instrument here can tell from a matching one, and it may not be taken
       # until one exists.
-      builtCtx' = build {
+      builtCtx' = build engine {
         accessor = accessor';
         recompute =
           _acc: _store: nid:

@@ -5,18 +5,32 @@
 # its own store. Mokhov 2018 §3.1 defines the Store and states neither property.
 # What is Mokhov's here is §4.2.2's verifying trace (per-key `{ deps; hash }`) and
 # §2.1/§4.1 acyclicity (cyclic deps not allowed ⇒ each task executed at most
-# once). Dependency-order resolution is call-by-need via `prelude.fix` — Nix's own
-# laziness, not a scheduler of ours.
+# once). Dependency-order resolution is call-by-need — Nix's own laziness, not a
+# scheduler of ours.
+#
+# ★★ AND BECAUSE IT IS NOT A SCHEDULER OF OURS, THE STORE IS POPULATED BY AN ENGINE
+# HANDED IN, WHICH IS WHAT THE FIRST ARGUMENT IS FOR. Mokhov's decomposition splits a
+# build system into a SCHEDULER, which orders the tasks and produces the store, and a
+# REBUILDER, which decides whether a task must run at all. This library is the
+# rebuilder half. A store-fix bound HERE — a self-referential store over the node set,
+# passed into the caller's `recompute` — would make the plane produce values rather
+# than decide about them, which is the one thing a decision layer may not do, and it
+# would stand a second scheduler beside the evaluator's in a design whose premise is
+# that Nix's laziness already is the scheduler. So `build` takes the engine and CALLS
+# it, supplying the domain, the base and a decision, exactly as the warm fold takes
+# `evalWarm` and calls that. A caller of an evaluator is not an evaluator.
 #
 # Consumes a gen-graph accessor (the topology oracle) and a caller-supplied
 # `recompute` (the node-eval, `accessor -> store -> id -> value`). Pre-checks
 # acyclicity via graph.cycles and throws a *located* blame on a cycle — catchable
 # via builtins.tryEval, never Nix's uncatchable infinite recursion inside the
-# prelude.fix loop. Returns a BuiltCtx threading everything `override` needs to splice
-# incrementally.
+# scheduler's loop; the precheck is the rebuilder's, and the termination it buys is
+# the scheduler's. Returns a BuiltCtx threading everything `override` needs to splice
+# incrementally. The engine is NOT among the threaded fields — it is supplied at every
+# entry and stored nowhere, so nothing the plane carries forward is an evaluator.
 #
 # Optional `fixpoint` param (default null): when null, build is exactly the
-# acyclic behaviour above — throw-on-any-cycle, `prelude.fix` store, no `fixpoint`
+# acyclic behaviour above — throw-on-any-cycle, one scheduled store, no `fixpoint`
 # key in the returned ctx. When present, build relaxes the precheck (a cycle is
 # allowed iff every cyclic node carries a declared lattice) and computes the
 # store STRATIFIED bottom-up over the condensation (quotient) graph:
@@ -28,8 +42,8 @@
 #   - `cond.bottomUp` is PRODUCERS-FIRST (a consumer SCC appears after every SCC
 #     it depends on), so each stratum reads already-CONVERGED lower strata out of
 #     the accumulator. This is the build-domain-restriction: solve over the
-#     ascending prefix only. It is what AVOIDS the bare-`prelude.fix` splice
-#     divergence — a single `prelude.fix` over all nodes dispatching `id ∈ scc ?
+#     ascending prefix only. It is what AVOIDS the bare-splice divergence — a
+#     single scheduled store over all nodes dispatching `id ∈ scc ?
 #     runScc : recompute` re-invokes runScc once per MEMBER and can read a
 #     not-yet-converged peer SCC, a self-referential thunk black-hole that
 #     escapes builtins.tryEval (Nix uncatchable infinite recursion). The
@@ -48,6 +62,7 @@ let
   inherit (import ./restabilize.nix { inherit prelude graph; }) runScc;
 
   build =
+    engine:
     {
       accessor,
       recompute,
@@ -67,7 +82,7 @@ let
           hash = hashGuarded hashOf store.${id};
         });
 
-      # --- acyclic path: throw-on-any-cycle, one prelude.fix store. --------------
+      # --- acyclic path: throw-on-any-cycle, one scheduled store. ----------------
       acyclic =
         let
           # Located cycle blame: throw-on-any-cycle (Mokhov 2018 §2.1/§4.1, cyclic
@@ -83,10 +98,18 @@ let
               path = graph.pathsBetween accessor a b;
             };
 
-          # The flat relocatable store (this library's own property, see the header):
-          # prelude.fix resolves deps in dependency order via call-by-need; it
-          # terminates because the precheck guarantees acyclicity.
-          store = prelude.fix (s: prelude.genAttrs accessor.nodes (id: recompute accessor s id));
+          # The flat relocatable store (this library's own property, see the header).
+          # The DECISION is `nothing is clean` — a cold build consults no prior, which is
+          # the same thing the byte-parity oracle means by its cold arm — so `base` is
+          # empty and every node is recomputed. The engine resolves deps in dependency
+          # order by call-by-need; it terminates because the precheck above guarantees
+          # acyclicity.
+          store = engine.schedule {
+            inherit accessor recompute;
+            domain = accessor.nodes;
+            base = { };
+            isClean = _: false;
+          };
           trace = traceFor store;
         in
         if cyclic != [ ] then
@@ -148,8 +171,15 @@ let
                   }
                 else
                   # Acyclic singleton: recompute reading acc (lower strata) as
-                  # externals. Byte-identical to the acyclic path's prelude.fix value
+                  # externals. Byte-identical to the acyclic path's scheduled value
                   # (deps already in acc, walked in dependency order).
+                  #
+                  # ★ THIS STRATUM FOLD IS NOT ROUTED THROUGH THE ENGINE, and the
+                  # residue is named rather than left to be noticed: it threads its own
+                  # accumulator of resolved outputs across a traversal it drives, which
+                  # is the same thing a store-fix is by a different construction. The
+                  # bottom-up solve over the condensation, and `runScc` beneath it, are
+                  # the cyclic half's outstanding re-expression.
                   acc // prelude.genAttrs members (m: recompute accessor acc m);
             in
             # The single loop-carried field, forced per stratum. Every reader of `acc`

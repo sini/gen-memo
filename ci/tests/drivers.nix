@@ -10,18 +10,16 @@
   genMemo,
   graph,
   mkCase,
+  engine,
   ...
 }:
 let
-  inherit (genMemo)
-    build
-    override
-    applyDelta
-    batch
-    propagate
-    force
-    forceCtx
-    ;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
+  propagate = genMemo.propagate engine;
+  force = genMemo.force engine;
+  forceCtx = genMemo.forceCtx engine;
+  inherit (genMemo) applyDelta batch;
 
   # ----- hand-built chain a -> b -> c (consumer→producer; `a` depends on `b`) --
   # node value = own weight + Σ dep values. ctx.store: c=100, b=110, a=111.

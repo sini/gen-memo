@@ -24,11 +24,11 @@
   lib,
   genMemo,
   genScope,
+  engine,
   ...
 }:
 let
   inherit (genMemo) warmOverride;
-  engine = { inherit (genScope) evalWarm; };
 
   modp = a: b: a - b * (a / b);
   range = n: builtins.genList (x: x) n;

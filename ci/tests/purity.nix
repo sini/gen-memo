@@ -63,6 +63,27 @@ let
   controlViolations = lib.filter (
     tok: genPrelude.hasInfix tok "let x = evalModules { }; in x"
   ) forbidden;
+
+  # THE PLANE BINDS NO STORE FIX, scanned over the same comment-stripped sources. A
+  # self-referential store over the node set, passed into the caller's node computation, is what
+  # makes a construct an evaluator rather than a decision layer — so the plane hands a domain, a
+  # base and a decision to an engine and the engine binds the knot.
+  #
+  # ★ WHAT THIS CELL CANNOT SEE, said here so its green is not read as wider than it is: it is a
+  # TOKEN scan, and a store fix has other spellings. A fold threading its own accumulator of
+  # resolved outputs across a traversal it drives is the same thing by a different construction,
+  # and two of those remain in this library — the condensation solve in `build.nix`, and the
+  # rank-ordered drain in `eager.nix`, with `runScc` beneath the first. This scan is a tripwire
+  # against the knot coming back in the shape it left in, not a proof that none is present.
+  knotToken = "prelude.fix";
+  knotSites = map (src: src.name) (lib.filter (src: genPrelude.hasInfix knotToken src.code) sources);
+
+  # And its own live control: the SAME token and the SAME predicate over the reference scheduler,
+  # which is where the knot now lives. Without this, a typo in the token would report the plane
+  # clean of a construct the scan could never have matched.
+  knotControlFires = genPrelude.hasInfix knotToken (
+    stripComments (builtins.readFile ../../reference/schedule.nix)
+  );
 in
 {
   flake.tests.purity = {
@@ -82,6 +103,16 @@ in
     test-forbidden-token-scan-is-live = {
       expr = controlViolations;
       expected = [ "evalModules" ];
+    };
+
+    test-plane-binds-no-store-fix = {
+      expr = knotSites;
+      expected = [ ];
+    };
+
+    test-store-fix-scan-is-live = {
+      expr = knotControlFires;
+      expected = true;
     };
   };
 }

@@ -72,14 +72,19 @@ let
       throw "gen-memo: structural delta closed a cycle: ${builtins.toJSON blame}";
 
   # spliceStore — reverse-cone recompute over a base store + obsolete prune.
-  # `base` is the store the prelude.fix reads through (already pruned of any dead key);
+  # `base` is the store the engine reads through (already pruned of any dead key);
   # `revCone` is the set of ids to recompute (the dependents whose values move).
-  # A revCone node reads its FRESH value from `s`; everything else falls through to
-  # `base` (the authoritative `base // s` form — bare `s` would miss non-cone
-  # deps). `keep` is the final node set: store keys NOT in keep are pruned
-  # (obsolete-node removal). Acar §4.5 splice-out.
+  # A revCone node reads its FRESH value from the in-progress store; everything else
+  # falls through to `base` — the authoritative merged view, since the cone alone
+  # would miss non-cone deps. `keep` is the final node set: store keys NOT in keep are
+  # pruned (obsolete-node removal). Acar §4.5 splice-out.
+  #
+  # A structural delta moves the topology, so nothing in the cone may be served from
+  # the prior store — the decision here is `nothing is clean`, and the whole cone is
+  # the domain.
   spliceStore =
     {
+      engine,
       accessor',
       base,
       revCone,
@@ -88,7 +93,13 @@ let
     }:
     let
       spliced =
-        base // prelude.fix (s: prelude.genAttrs revCone (id: recompute accessor' (base // s) id));
+        base
+        // engine.schedule {
+          accessor = accessor';
+          domain = revCone;
+          inherit base recompute;
+          isClean = _: false;
+        };
       keepSet = prelude.genAttrs keep (_: true);
     in
     prelude.filterAttrs (id: _: keepSet ? ${id}) spliced;
@@ -113,7 +124,7 @@ in
   #
   # NO cycle recheck: deletion only SHRINKS the graph, so it cannot create a cycle.
   retract =
-    ctx: deadId: retractPolicy:
+    engine: ctx: deadId: retractPolicy:
     let
       policy = if retractPolicy == null then "error" else retractPolicy;
       inherit (ctx) recompute hashOf accessor;
@@ -142,7 +153,7 @@ in
       # ambient read), rather than silently reading a STALE value.
       baseWithoutDead = removeAttrs ctx.store [ deadId ];
       store' = spliceStore {
-        inherit accessor' recompute;
+        inherit engine accessor' recompute;
         base = baseWithoutDead;
         inherit revCone;
         keep = nodes';
@@ -187,12 +198,12 @@ in
   #     (or whose forward closure adds nodes). z is a *dependency* of changedId,
   #     NOT a *dependent*, so the reverse cone never binds it ⇒ `recompute
   #     changedId`'s `s.z` would throw "missing". So the newly-reachable producer
-  #     subgraph is SUB-BUILT (a forward prelude.fix over accessor') and spliced into
-  #     the base BEFORE the reverse-cone fix.
+  #     subgraph is SUB-BUILT (a forward pass over accessor') and spliced into
+  #     the base BEFORE the reverse-cone splice.
   #   - reCycleCheck seeded at the touched node [changedId] (added edges can close
   #     a cycle the build-time precheck never saw); skipped when addedEdges == [].
   applyEdgeDelta =
-    ctx: changedId: newEdges:
+    engine: ctx: changedId: newEdges:
     let
       inherit (ctx) recompute hashOf accessor;
       newEdgesU = prelude.unique newEdges;
@@ -232,9 +243,16 @@ in
       # Reverse cone of changedId over the NEW accessor (added edges pull new
       # producers in as DEPS, not dependents; removed edges shrink the cone).
       revCone = prelude.unique ([ changedId ] ++ graph.dependentsOf checkedAccessor changedId);
-      producerStore = prelude.fix (
-        s: prelude.genAttrs newProducers (id: recompute checkedAccessor (ctx.store // s) id)
-      );
+      # The newly-reachable producers are new nodes: they have no prior value to be
+      # clean against, so the decision here is `nothing is clean` for the same reason
+      # the cone splice's is.
+      producerStore = engine.schedule {
+        accessor = checkedAccessor;
+        domain = newProducers;
+        base = ctx.store;
+        inherit recompute;
+        isClean = _: false;
+      };
 
       # Reverse-cone splice over (ctx.store ∪ producerStore): a revCone node reads
       # its fresh value from `s`; new producers + non-cone deps fall through to the
@@ -242,7 +260,12 @@ in
       base = ctx.store // producerStore;
       store' = spliceStore {
         accessor' = checkedAccessor;
-        inherit base recompute revCone;
+        inherit
+          engine
+          base
+          recompute
+          revCone
+          ;
         keep = nodes';
       };
 

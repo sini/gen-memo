@@ -6,7 +6,7 @@
 # set); `affectedSet` is the exact subset whose hash moved this rebuild.
 #
 # The chicken/egg (a value-change verdict needs the new value, which needs recompute,
-# which needs the AFFECTED set) is broken WITHOUT observing force-order: the prelude.fix
+# which needs the AFFECTED set) is broken WITHOUT observing force-order: the scheduled
 # DOMAIN is the over-approx cone (so reused deps fall through to ctx.store), each cone
 # node is gated on needsEval (RTD 1983 §5.3 NeedToBeEvaluated, PRE-cutoff), and
 # AFFECTED is POST-filtered from the resulting hashes. This is exactly override's
@@ -27,7 +27,7 @@ let
 in
 {
   affectedSet =
-    ctx:
+    engine: ctx:
     { accessor', changedIds }:
     let
       # Over-approx cone of all changed ids (edges fixed ⇒ cone is stable). O(1)
@@ -37,32 +37,41 @@ in
       changedSet = prelude.genAttrs changedIds (_: true);
       newHashOf = id: hashGuarded ctx.hashOf builtStore.${id};
 
-      # needsEval-gated splice (identical to override's): a cone node is recomputed
-      # iff it is a changed id, has a null hash, or has a moved-hash in-cone dep;
-      # otherwise its prior value is reused. needsEval takes a single changedId, so
-      # for the multi-id change a node mustEval iff ANY changed id forces it — which
-      # reuses the ONE strategies.needsEval predicate per changed id.
+      # THE DECISION, computed here and applied by the engine (identical to override's):
+      # a cone node is recomputed iff it is a changed id, has a null hash, or has a
+      # moved-hash in-cone dep; otherwise its prior value is reused. needsEval takes a
+      # single changedId, so for the multi-id change a node must recompute iff ANY
+      # changed id forces it — which reuses the ONE strategies.needsEval predicate per
+      # changed id rather than inlining a parallel one.
+      #
+      # ★ IT READS THE STORE THE ENGINE IS PRODUCING, AND THAT IS THE REBUILDER'S SHAPE
+      # RATHER THAN AN EVASION OF IT. Mokhov's rebuilder is handed the current value and
+      # decides from it; a verifying trace is a statement ABOUT values, so a decision
+      # that consults no value is not one. What the plane must not do is APPLY the
+      # caller's node computation, and it does not: `newHashOf` reaches the store only
+      # to hash it, the engine alone calls `recompute`, and reuse here is the ABSENCE of
+      # that call. The self-reference resolves for the same reason it always did — the
+      # hash of a node is demanded only after that node's value is.
+      mustEval =
+        id:
+        (changedSet ? ${id})
+        || prelude.any (
+          cid:
+          needsEval {
+            inherit (ctx) trace;
+            inherit coneSet newHashOf accessor';
+          } cid id
+        ) changedIds;
+
       builtStore =
         ctx.store
-        // prelude.fix (
-          s:
-          prelude.genAttrs cone (
-            id:
-            let
-              spliced = ctx.store // s;
-              mustEval =
-                (changedSet ? ${id})
-                || prelude.any (
-                  cid:
-                  needsEval {
-                    inherit (ctx) trace;
-                    inherit coneSet newHashOf accessor';
-                  } cid id
-                ) changedIds;
-            in
-            if mustEval then ctx.recompute accessor' spliced id else ctx.store.${id}
-          )
-        );
+        // engine.schedule {
+          accessor = accessor';
+          domain = cone;
+          base = ctx.store;
+          inherit (ctx) recompute;
+          isClean = id: !(mustEval id);
+        };
 
       # AFFECTED = post-filtered from hashes (the keys whose value actually moved).
       affected = builtins.filter (id: hashMoved (newHashOf id) (ctx.trace.${id}.hash or null)) cone;

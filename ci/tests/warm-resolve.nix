@@ -8,11 +8,11 @@
   lib,
   genMemo,
   genScope,
+  engine,
   ...
 }:
 let
   inherit (genMemo) warmOverride warmResolve;
-  engine = { inherit (genScope) evalWarm; };
 
   mkRoots =
     av: bv:

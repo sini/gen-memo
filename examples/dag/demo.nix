@@ -6,11 +6,13 @@
 # byte-for-byte; a cyclic variant yields a *located blame*, not Nix's uncatchable
 # infinite recursion.
 #
-# This is the function layer (takes genMemo) so the ci test can inject the lib
-# purely; examples/dag/default.nix wraps it with getFlake for `nix eval -f`.
-{ genMemo }:
+# This is the function layer (takes genMemo and the engine) so the ci test can inject
+# both purely; examples/dag/default.nix wraps it with getFlake for `nix eval -f`.
+{ genMemo, engine }:
 let
-  inherit (genMemo) build override dirtySet;
+  build = genMemo.build engine;
+  override = genMemo.override engine;
+  inherit (genMemo) dirtySet;
 
   # Hand-written accessor (the demo needs no gen-graph constructor; build wires
   # graph.cycles/dependentsOf in itself). Edge convention: edges id = deps of id.

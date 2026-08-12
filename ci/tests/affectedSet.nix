@@ -6,10 +6,13 @@
   lib,
   genMemo,
   graph,
+  engine,
   ...
 }:
 let
-  inherit (genMemo) build affectedSet dirtySet;
+  build = genMemo.build engine;
+  affectedSet = genMemo.affectedSet engine;
+  inherit (genMemo) dirtySet;
 
   recompute =
     a: s: id:

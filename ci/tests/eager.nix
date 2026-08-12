@@ -14,10 +14,12 @@
   genMemo,
   graph,
   mkCase,
+  engine,
   ...
 }:
 let
-  inherit (genMemo) build propagateEager dirtySet;
+  build = genMemo.build engine;
+  inherit (genMemo) propagateEager dirtySet;
 
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 

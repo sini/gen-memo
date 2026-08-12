@@ -1,6 +1,12 @@
-{ genMemo, graph, ... }:
+{
+  genMemo,
+  graph,
+  engine,
+  ...
+}:
 let
-  inherit (genMemo) build affected impactOf;
+  build = genMemo.build engine;
+  inherit (genMemo) affected impactOf;
 
   # chain: a->b->c->d (edges a=["b"], …) — a depends on b depends on c depends on d.
   ctx = build {
