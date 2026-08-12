@@ -28,7 +28,16 @@ tidy-up note.** `lib/build.nix`'s store is `prelude.fix (s: genAttrs accessor.no
 function. Under the engine spec's own two-part test for what evaluates, that is an evaluating knot
 living inside the plane, and its §5.2 states in terms that an implementer who moves such a `fix` into
 the plane has failed the construction test whatever the tests say. It is recorded here rather than
-argued away: the warm fold added none, and removing the one that is here is the re-expression above.
+argued away: the warm fold added none, and removing the ones that are here is the re-expression above.
+
+★★ **AND THE COUNT IS FIVE, NOT ONE — stated because a residual named at the wrong size is a residual
+a later executor discharges partly and then measures an absence no disposition produced.** The
+paragraph above first named `build.nix` alone, and a sweep of the whole `lib/` (`prelude.fix` ⇒ 19
+occurrences across 5 files; live control `genAttrs` ⇒ 32; negative control ⇒ 0) returns **five
+executable D1-shaped sites**: `build.nix:89`, `structural.nix:91`, `structural.nix:235`,
+`affectedSet.nix:47`, `drivers.nix:129` — the spec's own six, modulo the file reorganisation this
+library performed on arrival. **All five, one design.** The carrier is `den-hoag-ss0k`, which holds
+the list and the sweep; re-derive both at the fix revision rather than trusting these coordinates.
 
 **The evaluator is a PARAMETER, never an input.** `flake.nix` declares two inputs and neither is an
 evaluator. The warm fold takes `{ evalWarm }` at the call and calls it; a fold that is handed an
