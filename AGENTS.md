@@ -160,14 +160,22 @@ and each such coordinate was located in that source, not carried on the retiring
 `lib/default.nix` states this once for every file below it, with the coordinates enumerated and both
 excluded axes named.
 
-**Excluded axis 1 — four cited names are in NEITHER archive tier:** Tarjan 1972, Kosaraju/Sharir,
-Magnusson–Hedin, Kleene ⇒ 0 across `used/` and `reference-catalog/`, against the eight archived names
-as live controls in the same run. None carries a section coordinate; each is an attribution to a named
-idea and is not to be read as checked.
+**Excluded axis 1 — held as a PRIMARY is not the same fact as present in the archive**, and a filename
+sweep only measures the first. At CONTENT granularity, live controls + nonsense-token negative control
+in the same run: **Kosaraju/Sharir ⇒ 0 at both granularities** (genuinely absent); **Tarjan 1972** no
+primary but named in 3 archived works, one being Mokhov 2017 — a primary this ecosystem cites — and a
+recorded acquisition gap; **Kleene** no primary but named in 5; **Magnusson–Hedin** no primary but the
+construct is described in archived primaries on exactly the cited subject (Söderberg 2013 lists
+"Magnusson, E., Hedin, G.: Circular reference attributed grammars" and describes their fixed-point
+iteration; Hedin 2000 is a co-author primary), so it is checkable here and is **not an absence**.
+None carries a section coordinate. Collapsing these four into one "absent" list was a measurement
+stated wider than its instrument.
 
 **Excluded axis 2 — "located in that source" means BY CONTENT, not by heading.** The Acar extraction
-has no numbered section headings (title + 47 `## Page N` markers only), so its §-digits are
-content-verified and **coordinate-unverifiable** at the current extraction.
+has no numbered section headings (title + 47 `## Page N` markers only), so no §-digit can be confirmed
+against it. The rule is **total and deliberately not an enumeration**: every Acar §-number anywhere in
+this repository is content-verified and **coordinate-unverifiable**. An enumerated list stood here and
+was already wrong — it named §4.3/§4.4/§4.5/§7 and missed §8 (`structural.nix`).
 
 ★ **The splice exclusion's ground, restated.** `topolog` ⇒ 0 and `reverse` ⇒ 0 both hold, so the
 conclusion stands. But `order maintenance` ⇒ 0, carried beside them, was measured with a **space**

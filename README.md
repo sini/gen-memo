@@ -227,17 +227,31 @@ papers archive, and each such coordinate was located in that source rather than 
 retiring library's authority.
 
 **The excluded axis, named in the same breath**, because a scoped sentence read as a universal is how
-the previous revision of this section went wrong. **Four names cited here are in neither archive
-tier** — Tarjan 1972 and Kosaraju/Sharir, Magnusson–Hedin, and Kleene — all ⇒ 0 across `used/` and
-`reference-catalog/`, with the eight archived names as live controls in the same run. None of the four
-carries a section coordinate, which is why the scoping holds and why it has to be said: they are
-attributions to a *named idea*, unverifiable here, and are not to be read as checked.
+the previous revision of this section went wrong. Some cited names are held as **primaries** and some
+are not — and *not held as a primary* is **not the same fact** as *absent from the archive*. The
+second is what a filename sweep measures, and it is the weaker instrument. At **content** granularity
+across `used/` and `reference-catalog/`, with archived names as live controls and a nonsense token
+⇒ 0 as the negative control:
+
+| cited name | primary? | discussed in archived work |
+|---|---|---|
+| Kosaraju / Sharir | no | **⇒ 0 at both granularities** — genuinely absent, nothing checkable |
+| Tarjan 1972 | no | named in **3** archived works, one of them Mokhov 2017 — itself a primary this ecosystem cites. A recorded acquisition gap |
+| Kleene | no | named in **5** archived works |
+| Magnusson–Hedin | no | **the construct is described in archived primaries on exactly the cited subject** — Söderberg 2013 lists "Magnusson, E., Hedin, G.: Circular reference attributed grammars" and describes their fixed-point iteration; Hedin 2000 is a co-author primary on reference attribute grammars. Checkable here; not an absence |
+
+None of these carries a section coordinate, which is why the scoping holds and why it has to be said:
+they are attributions to a *named idea*. What that means differs per row — unverifiable for
+Kosaraju/Sharir, verifiable at one remove for the other three — and collapsing them into one "absent"
+list was itself a measurement stated wider than its instrument.
 
 **And "located in that source" means BY CONTENT, not by heading.** The Acar extraction carries no
-numbered section headings at all — its only headings are the title and 47 `## Page N` markers — so
-its §4.3/§4.4/§4.5/§7 digits cannot be confirmed against it. Each was matched by the content the
-coordinate names. Treat every Acar §-number here as content-verified and **coordinate-unverifiable**
-at the current extraction.
+numbered section headings at all — its only headings are the title and 47 `## Page N` markers — so no
+§-digit can be confirmed against it. The rule is **total, and deliberately not an enumeration**: every
+Acar §-number anywhere in this repository is content-verified and **coordinate-unverifiable** at the
+current extraction. An enumerated list stood here and was already wrong, naming §4.3/§4.4/§4.5/§7 and
+missing §8; a hand-maintained list of coordinates drifts from the files it describes the moment either
+moves, and a total rule cannot go stale.
 
 Three claims are the library's own and are attributed to no paper, in each case because the cited
 section was read and does not contain them: the store's **flatness and relocatability** (not in

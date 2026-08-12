@@ -35,21 +35,39 @@
 #   Radul 2009 — kick-out! and the support set. Sloane 2010 — circular reference attributes.
 #
 # ★★ THE EXCLUDED AXIS, NAMED IN THE SAME BREATH, because the sentence above is scoped and a
-# scoped sentence read as a universal is how the last one went wrong. FOUR NAMES CITED IN THIS
-# LIBRARY ARE NOT IN EITHER ARCHIVE TIER — Tarjan 1972 and Kosaraju/Sharir (build.nix, the
-# quotient-graph idiom), Magnusson–Hedin (restabilize.nix, circular reference attributes), and
-# Kleene (the ascent, named in build.nix and restabilize.nix). All four ⇒ 0 across `used/` and
-# `reference-catalog/`, with the eight archived names above as live controls in the same run.
-# **None of the four carries a section coordinate**, which is exactly why the scoping holds and
-# also exactly why it must be stated: they are attributions to a NAMED IDEA, unverifiable here,
-# and they are not to be read as checked. Tarjan is a recorded acquisition gap.
+# scoped sentence read as a universal is how the last one went wrong. Some names cited here are
+# held as PRIMARIES and some are not, and "not held as a primary" is NOT the same fact as "absent
+# from the archive" — the second is what a filename sweep measures and it is the weaker
+# instrument. Measured at CONTENT granularity across `used/` and `reference-catalog/`, with the
+# archived names above as live controls and a nonsense token ⇒ 0 as the negative control:
+#
+#   Kosaraju / Sharir — ⇒ 0 at BOTH granularities. Genuinely absent; nothing here is checkable.
+#   Tarjan 1972 — no primary, but NAMED in 3 archived works, one of them Mokhov 2017, itself a
+#     primary this ecosystem cites. A recorded acquisition gap.
+#   Kleene — no primary, but NAMED in 5 archived works.
+#   Magnusson–Hedin — no primary, but the CONSTRUCT IS DESCRIBED IN ARCHIVED PRIMARIES ON EXACTLY
+#     THE CITED SUBJECT: Söderberg 2013 names "Magnusson, E., Hedin, G.: Circular reference
+#     attributed grammars" in its bibliography and describes their fixed-point iteration in its
+#     text, and Hedin 2000 is a co-author primary on reference attribute grammars. This one is
+#     therefore CHECKABLE here and is not an absence at all.
+#
+# **None of these carries a section coordinate**, which is why the scoping above holds and equally
+# why it must be stated: they are attributions to a NAMED IDEA. What that means differs per row —
+# unverifiable for Kosaraju/Sharir, verifiable at one remove for the other three — and collapsing
+# the four into one "absent" list was itself a measurement stated wider than its instrument.
 #
 # ★★ AND A SECOND EXCLUDED AXIS, ON THE OTHER HALF OF THE SENTENCE. "Located in that source"
 # means BY CONTENT, not by heading, and for one primary that distinction is load-bearing: the
 # Acar extraction carries NO numbered section headings — its only headings are the title and
-# `## Page N` markers (47 of them) — so its §4.3/§4.4/§4.5/§7 digits CANNOT be confirmed against
-# it. Each was matched by the content the coordinate names; none by the digit. Treat every Acar
-# §-number here as content-verified and coordinate-UNVERIFIABLE at the current extraction.
+# `## Page N` markers (47 of them) — so no §-digit can be confirmed against it. Each was matched
+# by the content the coordinate names; none by the digit.
+#
+# THE RULE IS TOTAL AND IS DELIBERATELY NOT AN ENUMERATION: **every Acar §-number appearing
+# anywhere in this repository is content-verified and coordinate-UNVERIFIABLE at the current
+# extraction.** An enumerated list stood here and was already wrong — it named §4.3/§4.4/§4.5/§7
+# and missed §8 (structural.nix). A hand-maintained list of coordinates drifts from the files it
+# describes the moment either moves, which is the same failure as a hand-maintained pin table;
+# a total rule cannot go stale and needs no maintenance.
 #
 # ★★ THREE CLAIMS ARE THIS LIBRARY'S OWN AND ARE ATTRIBUTED TO NO PAPER, in each case because the
 # cited section was read and does not contain them: the store's FLATNESS and RELOCATABILITY (not
