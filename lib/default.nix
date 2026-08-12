@@ -120,6 +120,7 @@ let
     ./eager.nix
     ./structural.nix
     ./restabilize.nix
+    ./warm.nix
   ];
 
   # The fold REFUSES a collision rather than resolving it by list position — see merge.nix for

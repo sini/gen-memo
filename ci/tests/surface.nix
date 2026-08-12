@@ -30,11 +30,25 @@ let
 in
 {
   flake.tests.surface = {
-    # The 24 exports the plane's content arrived with — the same set the retiring library
-    # published, which is the point: the migration moved content, not surface. `hashGuarded` /
-    # `hashEq` / `hashMoved` are deliberately NOT here (see lib/hash.nix), and the shadowed
-    # `override` definition that the retiring library's fold left unreachable did not travel —
-    # the reached one did, so the count is unchanged either way.
+    # 27 exports. The first 24 arrived with the rebuilder content, unchanged in name — that
+    # migration moved content, not surface. `hashGuarded` / `hashEq` / `hashMoved` are deliberately
+    # NOT here (see lib/hash.nix), and the shadowed `override` definition that the retiring
+    # library's fold left unreachable did not travel — the reached one did, so the count was
+    # unchanged either way.
+    #
+    # The three `warm*` names are the second migration, and TWO OF THEM ARE RENAMES rather than the
+    # names their own library published. `override` was already taken here, by the store's fused
+    # `propagate ∘ applyDelta` — a different operation on a different object — and the module fold
+    # REFUSES a collision rather than resolving it by list position, so a name had to give. The
+    # prefix says which layer the fold operates at, which the bare name did not:
+    #
+    #   gen-resolve `override`     → `warmOverride`
+    #   gen-resolve `warmResolve`  → `warmResolve`   (unchanged)
+    #   —                          → `warmDecision`  (new: the DECISION, apart from the fold)
+    #
+    # `warmDecision` is the one addition. The fold's reuse decision was a local binding inside it
+    # and had no name on any surface; the interface the whole design rests on is two total functions
+    # and no values, and a surface that offers only the fold leaves that type unobservable.
     test-lib-exports-the-plane = {
       expr = builtins.attrNames genMemo;
       expected = [
@@ -60,6 +74,9 @@ in
         "support"
         "supportDirect"
         "verify"
+        "warmDecision"
+        "warmOverride"
+        "warmResolve"
         "why"
         "whyNot"
       ];
