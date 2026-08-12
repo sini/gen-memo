@@ -279,9 +279,14 @@ nix-unit --flake ./ci#tests.byte-parity  # a single suite
 18 suites. Beyond the migrated content's own, two are the plane's oracles:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
-  forced to nothing-is-clean, compared on `drvPath` where the output is a derivation and on the value
-  otherwise. It carries its own live control, because a comparator that reported parity for
-  everything would pass every other cell in the file.
+  forced to nothing-is-clean, compared on the tagged `__drvPath` record the admission projection
+  produces wherever the output holds a derivation, and on the value otherwise. **The comparator IS
+  that projection**, not a second implementation of it, and the sharing is load-bearing in two
+  directions: a comparator returning a bare `drvPath` string observes a derivation and a plain
+  string equal to that `drvPath` as the same value — a false-clean collision in the one instrument
+  whose whole claim is byte-parity — and a comparator re-implementing the projection could drift
+  from the one the plane hashes with. It carries its own live control, because a comparator that
+  reported parity for everything would pass every other cell in the file.
 - **`fleet`** — the measurement lab's Arm R: a shared producer with dependent hosts, a localized
   single-host edit, the byte gate plus the poisoned-recompute proof, and the `>= 0.60` saving floor.
   Which half of that floor migrated and which did not is stated in the suite itself.

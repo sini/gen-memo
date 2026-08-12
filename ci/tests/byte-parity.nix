@@ -6,10 +6,12 @@
 # that a cold evaluation cannot is a defect.
 #
 # THE INSTRUMENT, exactly: the same input evaluated twice, once with the decision forced to
-# NOTHING IS CLEAN, compared on `drvPath` where the output is a derivation and on the value
-# otherwise. Forcing the decision to nothing-is-clean is what `build` over the changed accessor
-# already is — it consults no prior and recomputes every node — so the cold arm is the decision
-# REMOVED rather than a second implementation of it.
+# NOTHING IS CLEAN, compared on the tagged `__drvPath` record the plane's own admission projection
+# produces wherever the output holds a derivation, and on the value otherwise — the comparator
+# below carries why the tagged record and not a bare drvPath string. Forcing the decision to
+# nothing-is-clean is what `build` over the changed accessor already is — it consults no prior and
+# recomputes every node — so the cold arm is the decision REMOVED rather than a second
+# implementation of it.
 #
 # WHAT THIS INSTRUMENT PRESUMES RATHER THAN ESTABLISHES: a matching prior. "The same input
 # evaluated twice" fixes the PROGRAM across the two runs; it does not check that the warm arm's
@@ -38,6 +40,10 @@
 #       containing a package actually has: `test-drv-valued-nodes-parity-through-the-plane`, which
 #       compares on the plane's own projection and asserts the trace hash was really taken.
 #
+#   ⇒ Those two arm ONE comparator at two levels rather than two comparators. `observe` IS the
+#   projection, so the isolated arming and the end-to-end one cannot drift apart into a suite
+#   that arms a shape the plane never produces.
+#
 #   ⇒ The consequence, stated plainly rather than left to be inferred: the store's admissible
 #   values are function-free, and acyclic apart from derivations. The null-hash rule records the
 #   first partiality of Nix hashing; cyclicity is a second one, and it is not conservative the way
@@ -57,14 +63,42 @@ let
   inherit (genMemo) propagateEager batch restabilize;
 
   # The plane's own admission projection, imported the way the guards are — directly, because
-  # it is internal to hashing and not on the export surface. The derivation-valued arm below
-  # compares on it rather than on `observe`, which reads a bare drvPath string.
+  # it is internal to hashing and not on the export surface. It is what the comparator below IS,
+  # and what the derivation-valued arm compares on.
   inherit (import ../../lib/hash.nix { }) project;
 
-  # THE COMPARATOR. A derivation is compared on `drvPath` — its identity as a build — and anything
-  # else on the value itself. `drvPath` and not `outPath`: a derivation's identity is fixed at
-  # evaluation while its output is fixed by running it, and this is a claim about evaluation.
-  observe = v: if builtins.isAttrs v && v ? drvPath then v.drvPath else v;
+  # THE COMPARATOR, and it is the plane's OWN admission projection rather than a second
+  # implementation of one. A derivation is compared on the tagged `__drvPath` record that
+  # projection produces — its identity as a build — and anything else on the value itself.
+  # `drvPath` and not `outPath`: a derivation's identity is fixed at evaluation while its output
+  # is fixed by running it, and this is a claim about evaluation.
+  #
+  # ★ THE TAG IS WHAT MAKES THE COMPARISON SOUND, and the direction is the whole of it. This
+  # comparator used to return a BARE drvPath string, under which a derivation and a plain string
+  # equal to that derivation's own drvPath observe to the IDENTICAL value — so the oracle read
+  # the swap of one for the other as UNCHANGED. That is a FALSE-CLEAN collision: the unsound
+  # direction for an instrument whose entire claim is byte-parity, and the opposite of the null
+  # rule's always-dirty. Reading the FIELD into a tagged record costs the comparison nothing —
+  # two derivations still separate exactly when their drvPaths differ, and plain values still
+  # fall through untouched.
+  #
+  # ★ IT ALSO READS AT EVERY DEPTH, which the bare form did not. That predicate tested the ROOT
+  # of a node value only, so a derivation one attribute down — a package inside a config value,
+  # which is the ordinary shape — was never observed at all. Recognising the derivation shape
+  # before descending is what makes the reach total rather than root-fixed.
+  #
+  # ★ AND IT IS THE SAME PROJECTION ON BOTH ARMS. The cold run and the warm one are normalised by
+  # the same function, so the comparison is between two values of the same shape rather than
+  # between a value and a stand-in. Sharing `project` is what holds that: a comparator that
+  # re-implemented the projection could drift from the one the plane hashes with, and the oracle
+  # would then be measuring a shape nothing produces.
+  #
+  # ★ WHAT THE TAG DOES NOT BUY, named here rather than left to be assumed: INJECTIVITY. It
+  # NARROWS the collision class — from any string equal to a drvPath, one ordinary edit away, to
+  # an attrset carrying exactly the reserved key with exactly that value — and `lib/hash.nix`
+  # carries the argument that no admission-time projection over Nix values can close it. This
+  # oracle inherits that residual and claims nothing beyond the narrowing.
+  observe = project;
   observeStore = store: lib.mapAttrs (_: observe) store;
 
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON (observe v));
@@ -378,16 +412,34 @@ in
       expected = false;
     };
 
-    # ── THE COMPARATOR'S DERIVATION BRANCH, armed directly (see the header for why not through
-    # the plane). Both directions, so a comparator that answered "equal" to everything and one
-    # that answered "unequal" to everything both fail. ──
+    # ── THE COMPARATOR'S DERIVATION BRANCH, armed directly; the cell below arms the same
+    # comparator through the plane. Both directions, so a comparator that answered "equal" to
+    # everything and one that answered "unequal" to everything both fail.
+    #
+    # ★ AND THE BARE-STRING COLLISION IS ARMED AS ITS OWN ARM, because the assertion this cell
+    # used to carry WAS that collision written down as the correct behaviour: `branchFired =
+    # observe d == d.drvPath`, expected true. A comparator returning a bare drvPath string
+    # satisfied it, and so a suite that could not fail on its subject's central defect reported
+    # green over it for as long as the defect stood. The arm is inverted rather than deleted, so
+    # what it now refuses is named where the pin used to be — and `equalsTheObservedString` is
+    # the collision in the shape the instrument actually meets it: both sides observed, which is
+    # what `observeStore` does to a warm arm and a cold one. ──
     test-comparator-reads-drvpath-not-value = {
       expr =
         let
           d = mkDrv "gen-memo-parity-control" [ ] 1;
         in
         {
-          branchFired = observe d == d.drvPath;
+          readsTheField = observe d == { __drvPath = d.drvPath; };
+          readsTheFieldAtDepth =
+            observe { pkg = d; } == {
+              pkg = {
+                __drvPath = d.drvPath;
+              };
+            };
+          equalsThePlainString = observe d == d.drvPath;
+          equalsTheObservedString = observe d == observe d.drvPath;
+          storeArmEqualsTheStringStore = observeStore { n = d; } == observeStore { n = d.drvPath; };
           isNotTheRecord = observe d != d;
           same =
             observe (mkDrv "gen-memo-parity-control" [ ] 1) == observe (mkDrv "gen-memo-parity-control" [ ] 1);
@@ -396,7 +448,11 @@ in
           fallsThroughForPlainValues = observe 41 == 41;
         };
       expected = {
-        branchFired = true;
+        readsTheField = true;
+        readsTheFieldAtDepth = true;
+        equalsThePlainString = false;
+        equalsTheObservedString = false;
+        storeArmEqualsTheStringStore = false;
         isNotTheRecord = true;
         same = true;
         different = false;
