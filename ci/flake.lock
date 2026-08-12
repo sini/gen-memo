@@ -716,6 +716,24 @@
         "type": "github"
       }
     },
+    "gen-graph_9": {
+      "inputs": {
+        "gen-prelude": "gen-prelude_59"
+      },
+      "locked": {
+        "lastModified": 1786486136,
+        "narHash": "sha256-okz6e+6XGWFdE09irVN6u3IKarugXU+s49gncYWN7pQ=",
+        "owner": "sini",
+        "repo": "gen-graph",
+        "rev": "aa9386761d5f497c85a5f4723d76867c575457bf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-graph",
+        "type": "github"
+      }
+    },
     "gen-link": {
       "inputs": {
         "gen-algebra": "gen-algebra_4",
@@ -1730,6 +1748,21 @@
         "type": "github"
       }
     },
+    "gen-prelude_59": {
+      "locked": {
+        "lastModified": 1786239838,
+        "narHash": "sha256-Z+fLq4FsOaBNyrtfEwhwwOmihSFnHe+Jf47VNsW9lZQ=",
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "rev": "da7056327e5f8312d73d51895039a1f319166cd4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "type": "github"
+      }
+    },
     "gen-prelude_6": {
       "locked": {
         "lastModified": 1783016618,
@@ -1737,6 +1770,21 @@
         "owner": "sini",
         "repo": "gen-prelude",
         "rev": "62c2500777dc6854b3777d47303d0858ce0f1bb1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "type": "github"
+      }
+    },
+    "gen-prelude_60": {
+      "locked": {
+        "lastModified": 1786239838,
+        "narHash": "sha256-Z+fLq4FsOaBNyrtfEwhwwOmihSFnHe+Jf47VNsW9lZQ=",
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "rev": "da7056327e5f8312d73d51895039a1f319166cd4",
         "type": "github"
       },
       "original": {
@@ -2595,6 +2643,8 @@
     "root": {
       "inputs": {
         "gen": "gen",
+        "gen-graph": "gen-graph_9",
+        "gen-prelude": "gen-prelude_60",
         "nixpkgs": "nixpkgs_3"
       }
     },

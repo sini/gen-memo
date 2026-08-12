@@ -1,9 +1,9 @@
 # gen-memo REPL — all exports in scope, plus the lib value itself as `genMemo`.
 #
-# The shell exports nothing yet, so the splice contributes no bindings and `genMemo` is `{ }`;
-# both stay correct as the surface fills in.
+# `getFlake` on the repo root resolves the library's own locked inputs, so the REPL sees exactly
+# what the flake output does rather than a hand-wired approximation of it.
 let
-  genMemo = import ../lib;
+  genMemo = (builtins.getFlake (toString ../.)).lib;
 in
 {
   inherit genMemo;

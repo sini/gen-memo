@@ -1,7 +1,10 @@
 # Standalone (non-flake) entry. Flake consumers should use the `.lib` output.
 #
-# gen-memo declares no inputs, so — as with gen-prelude and gen-algebra — the standalone entry is
-# the lib value itself rather than a function of its dependencies. When the plane acquires
-# dependencies this file becomes a function whose defaults fetch the flake-locked revs, per the
-# gen root-file convention.
-import ./lib
+# gen-memo now has dependencies, so — per the gen root-file convention — this entry is a function
+# of them rather than the lib value itself. The zero-input shape gen-prelude and gen-algebra ship
+# was correct only while the plane was a shell.
+{
+  prelude,
+  graph,
+}:
+import ./lib { inherit prelude graph; }
