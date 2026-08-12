@@ -94,10 +94,9 @@ let
   # would then be measuring a shape nothing produces.
   #
   # ★ WHAT THE TAG DOES NOT BUY, named here rather than left to be assumed: INJECTIVITY. It
-  # NARROWS the collision class — from any string equal to a drvPath, one ordinary edit away, to
-  # an attrset carrying exactly the reserved key with exactly that value — and `lib/hash.nix`
-  # carries the argument that no admission-time projection over Nix values can close it. This
-  # oracle inherits that residual and claims nothing beyond the narrowing.
+  # NARROWS the collision class rather than closing it, and `lib/hash.nix` carries the argument
+  # that no admission-time projection over Nix values can close it. This oracle inherits that
+  # residual and claims nothing beyond the narrowing.
   observe = project;
   observeStore = store: lib.mapAttrs (_: observe) store;
 
