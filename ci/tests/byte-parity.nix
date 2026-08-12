@@ -202,6 +202,7 @@ let
     lattices = lib.genAttrs [ "p" "q" ] (_: {
       bottom = 0;
       join = a: b: if a > b then a else b;
+      maxIter = 100;
     });
   };
   cyclicRecompute =

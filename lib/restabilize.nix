@@ -30,6 +30,13 @@
 #     CONSUMER-DECLARED ITERATION BOUND, not a ceiling the ascent is known to
 #     have: a lattice that would converge at maxIter + 1 is refused, and the
 #     refusal names the still-moving members rather than claiming divergence.
+#   - ★★ AND IT IS REQUIRED, WITH NO ENGINE-SUPPLIED DEFAULT. The bound is only
+#     honest while it is the consumer's own assertion about their own lattice
+#     ("mine converges within N, else refuse me"). A default would have the engine
+#     assert a bound about a lattice it knows nothing about — neither monotonicity
+#     nor height is checkable here — and then blame the consumer at a number the
+#     consumer never supplied. An absent declaration is therefore a build error
+#     naming the members that owe one, not a silent 100.
 #   - This is OUTSIDE the rebuilder's acyclic envelope (build.nix prechecks
 #     acyclicity and forbids cycles); runScc is the cyclic-stratum solver that
 #     the acyclic build cannot express.
@@ -48,7 +55,7 @@ let
   #   recompute,           # accessor -> store -> id -> value (the node-eval)
   #   scc,                 # [id] — the SCC member ids (M)
   #   higherStrata,        # { <id> = value } — already-solved lower-stratum results
-  #   lattices,            # per-NODE { bottom; join; eq ? (==); widen ? null; maxIter ? 100; }
+  #   lattices,            # per-NODE { bottom; join; maxIter; eq ? (==); widen ? null; }
   # } -> { <id> = value }   # the fixed-point iterate for each SCC member
   runScc =
     {
@@ -65,7 +72,15 @@ let
       eqOf = m: lattices.${m}.eq or (a: b: a == b);
 
       # The declared iteration bound: the largest per-member maxIter in the component.
-      maxI = prelude.foldl' (acc: m: prelude.max acc (lattices.${m}.maxIter or 100)) 0 M;
+      # Every member must declare one — see the header. The members that do not are the
+      # blame, by name, so the refusal is about the declaration and not about the ascent.
+      undeclaredBound = prelude.filter (m: !(lattices.${m} ? maxIter)) M;
+      undeclaredBoundBlame = {
+        why = "undeclared-maxiter";
+        nodes = undeclaredBound;
+        scc = M;
+      };
+      maxI = prelude.foldl' (acc: m: prelude.max acc lattices.${m}.maxIter) 0 M;
 
       # One ascent step. In-SCC deps read the current iterate (prev); externals read
       # store / higherStrata. The // merge gives `recompute` the unified view.
@@ -141,7 +156,9 @@ let
         };
     in
     # Bound-overrun blame: a tryEval-CATCHABLE thrown blame, never Nix infinite recursion.
-    if final.settled then
+    if undeclaredBound != [ ] then
+      throw "gen-memo: cyclic member declares no maxIter: ${builtins.toJSON undeclaredBoundBlame}"
+    else if final.settled then
       final.values
     else
       throw "gen-memo: fixpoint did not converge: ${builtins.toJSON blame}";

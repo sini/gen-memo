@@ -17,7 +17,7 @@
 # CONVERGENCE is guaranteed for EVERY seed: `recompute` is a MAX-fold (max of the
 # node's own weight and all its dep values). max is monotone and bounded by the
 # global maximum weight ⇒ runScc ascends a finite chain and quiesces well under
-# maxIter = 100. The 120-seed property therefore never triggers an uncatchable
+# the declared maxIter = 100. The 120-seed property therefore never triggers an uncatchable
 # runScc divergence — the soundness gate measures fixed-point-EQUALITY, not
 # termination luck.
 { lib, graph, ... }:
@@ -99,6 +99,7 @@ let
           bottom = 0;
           join = _prev: v: v;
           eq = (a: b: a == b);
+          maxIter = 100;
         });
       };
 

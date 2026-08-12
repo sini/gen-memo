@@ -36,6 +36,7 @@ let
     bottom = [ ];
     join = x: y: lib.sort builtins.lessThan (lib.unique (x ++ y));
     eq = (a: b: a == b);
+    maxIter = 100;
   };
   reachLattices = {
     a = setLattice;
@@ -86,6 +87,7 @@ let
     bottom = 0;
     join = _prev: v: v; # OVERWRITE: a no-op "join", not a semilattice join.
     eq = (a: b: a == b);
+    maxIter = 100;
   };
   agreeLattices = {
     a = overwriteLattice;
@@ -108,6 +110,27 @@ let
     ];
     lattices = agreeLattices;
   };
+
+  # --- Fixture 2b: the iteration bound is REQUIRED of every member ---
+  # Fixture 2's SCC, its lattices and its ascent, with ONE member's `maxIter`
+  # removed. The ascent itself is untouched, so a refusal here is caused by the
+  # missing declaration and by nothing else — and the undeclared member is varied
+  # over both members, because a check that only ever looks at the first would
+  # answer the same on the fixture that has one.
+  boundRun =
+    latticesArg:
+    runScc {
+      accessor = agreeAccessor;
+      store = { };
+      higherStrata = { };
+      recompute = agreeRecompute;
+      scc = [
+        "a"
+        "b"
+      ];
+      lattices = latticesArg;
+    };
+  dropBound = m: agreeLattices // { ${m} = removeAttrs agreeLattices.${m} [ "maxIter" ]; };
 
   # --- Fixture 3: divergence -> located blame, tryEval false ---
   # 1-member self-loop x->x, recompute x = s.x + 1 (strictly increasing, never
@@ -173,12 +196,14 @@ let
       bottom = 0;
       join = _: v: v;
       eq = (a: b: a == b);
+      maxIter = 100;
     };
     # q: overwrite, but eq is mod-10 congruence. 13 and 23 are eq under it.
     q = {
       bottom = 0;
       join = _: v: v;
       eq = (a: b: lib.mod a 10 == lib.mod b 10);
+      maxIter = 100;
     };
   };
   # p -> 7 (constant). q: bottom 0 -> reads p (0) +13 = 13 -> reads p (7) +13 = 20?
@@ -282,6 +307,7 @@ let
       bottom = 0;
       join = _: v: v;
       eq = (a: b: a == b);
+      maxIter = 100;
     });
   };
   # restabilize ctx: built WITH a fixpoint (acyclic ⇒ all singleton strata).
@@ -363,6 +389,7 @@ let
       bottom = 0;
       join = _: v: v;
       eq = (a: b: a == b);
+      maxIter = 100;
     });
   };
   mixedCtx = build {
@@ -454,6 +481,30 @@ in
     };
     test-agree-b = {
       expr = agreeResult.b;
+      expected = 5;
+    };
+
+    # --- Fixture 2b: an undeclared iteration bound is a build error, per member ---
+    # The refusal is a THROWN blame naming the members that owe a declaration, so it
+    # is catchable; an engine-supplied default would instead make these two cells pass
+    # silently at a number no consumer wrote.
+    test-undeclared-bound-refuses-a = {
+      expr = (builtins.tryEval (builtins.deepSeq (boundRun (dropBound "a")) true)).success;
+      expected = false;
+    };
+    test-undeclared-bound-refuses-b = {
+      expr = (builtins.tryEval (builtins.deepSeq (boundRun (dropBound "b")) true)).success;
+      expected = false;
+    };
+    # THE LIVE CONTROL, same predicate, same fixture, same run: with both bounds
+    # declared the identical ascent runs to quiescence. Without it, a runScc that
+    # refused everything would satisfy the two cells above.
+    test-declared-bound-still-runs = {
+      expr = (builtins.tryEval (builtins.deepSeq (boundRun agreeLattices) true)).success;
+      expected = true;
+    };
+    test-declared-bound-value-unchanged = {
+      expr = (boundRun agreeLattices).a;
       expected = 5;
     };
 

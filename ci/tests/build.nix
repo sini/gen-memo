@@ -207,6 +207,7 @@ let
       bottom = 0;
       join = _prev: v: v;
       eq = a: b: a == b;
+      maxIter = 100;
     });
   };
 

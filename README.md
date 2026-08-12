@@ -241,6 +241,11 @@ therefore reverse reachability over those edges.
 - **The cyclic path is outside the acyclic envelope.** Per-SCC convergence rests on the consumer's
   unchecked monotonicity and finite-height obligations; the only runtime divergence guard is the
   consumer-declared per-member `maxIter`, which refuses with a catchable located blame.
+- **`maxIter` is required of every cyclic member and has no default.** The bound is honest only as
+  the consumer's own assertion about their own lattice; supplying one here would have the engine
+  assert a bound about a lattice it cannot inspect — neither monotonicity nor height is checkable —
+  and then blame the consumer at a number the consumer never wrote. A member with no `maxIter` is a
+  build error naming the members that owe one, not a silent fallback.
 
 ## Testing
 
