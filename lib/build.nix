@@ -9,7 +9,7 @@
 # scheduler of ours.
 #
 # ★★ AND BECAUSE IT IS NOT A SCHEDULER OF OURS, THE STORE IS POPULATED BY AN ENGINE
-# HANDED IN, WHICH IS WHAT THE FIRST ARGUMENT IS FOR. Mokhov's decomposition splits a
+# HANDED IN, WHICH IS WHAT THE FIRST ARGUMENT IS FOR. Mokhov 2018 §5 (Fig. 5) splits a
 # build system into a SCHEDULER, which orders the tasks and produces the store, and a
 # REBUILDER, which decides whether a task must run at all. This library is the
 # rebuilder half. A store-fix bound HERE — a self-referential store over the node set,

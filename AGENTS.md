@@ -36,11 +36,26 @@ second one here was never the plane's to hold.
 ★★ **WHAT THAT DOES NOT ESTABLISH, and the scope matters because the token count is the tempting
 thing to quote.** `prelude.fix` in `lib/` is now **zero** (`ci/tests/purity.nix`
 `test-plane-binds-no-store-fix`, with the reference scheduler as the live control on the same
-predicate in the same run). That is a LEXICAL fact. The construction test has a second arm — a fold
-threading its own accumulator of resolved outputs across a traversal it drives — and **three of those
-remain**: the condensation solve in `build.nix`, `runScc` beneath it, and the rank-ordered drain in
-`eager.nix`. The cell says so in its own comment. Do not read the zero as "the plane holds no
-evaluator"; read it as "the plane binds no store fix", which is what was measured.
+predicate in the same run). That is a LEXICAL fact about ONE SPELLING, and it is bounded in two
+directions that must be read with it.
+
+**FIRST, the construction test's second arm is undischarged, and the residue is FOUR sites, not the
+three an earlier form of this paragraph named.** A fold threading its own accumulator of resolved
+outputs across a traversal it drives is the same construct differently spelled, and all four are
+here (coordinates at `53df68d`): **`build.nix:155-190`** the bottom-up condensation solve ·
+**`restabilize.nix:134-139`** `runScc`'s ascent beneath it · **`restabilize.nix:240-271`**
+`restabilize`'s OWN cone solve, which is a **separate fold** from `runScc` and is the one the
+earlier count dropped · **`eager.nix:71-75`** the rank-ordered eager drain. Do not read the zero as
+"the plane holds no evaluator"; read it as "the plane binds no store fix", which is what was
+measured.
+
+**SECOND, the token arm does not close the IMPORT ROUTE, and that is the likelier way the knot comes
+back.** A `lib/` file writing `import ../reference/schedule.nix` and calling `schedule` itself has
+the knot back with **no `prelude.fix` token anywhere in `lib/`** — measured by planting exactly that
+and watching `test-plane-binds-no-store-fix` stay green. Reaching the reference scheduler from
+inside the plane is what would make it the plane's; being handed it at the call is what makes it the
+caller's. `test-plane-does-not-import-the-reference-scheduler` scans the path, with the library's
+real `./hash.nix` imports as its live control.
 
 ★ **AND THE ENGINE IS NOT STORED ON THE CONTEXT.** It is supplied at every entry — `build engine { … }`, `override engine ctx …` — and appears in no returned record, so nothing the plane carries
 forward is an evaluator. The reference scheduler ships at `reference/schedule.nix`, deliberately

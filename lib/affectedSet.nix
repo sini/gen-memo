@@ -45,8 +45,8 @@ in
       # changed id rather than inlining a parallel one.
       #
       # ★ IT READS THE STORE THE ENGINE IS PRODUCING, AND THAT IS THE REBUILDER'S SHAPE
-      # RATHER THAN AN EVASION OF IT. Mokhov's rebuilder is handed the current value and
-      # decides from it; a verifying trace is a statement ABOUT values, so a decision
+      # RATHER THAN AN EVASION OF IT. Mokhov 2018 §5 (Fig. 5): the rebuilder is handed the
+      # current value and decides from it; a verifying trace is a statement ABOUT values, so a decision
       # that consults no value is not one. What the plane must not do is APPLY the
       # caller's node computation, and it does not: `newHashOf` reaches the store only
       # to hash it, the engine alone calls `recompute`, and reuse here is the ABSENCE of

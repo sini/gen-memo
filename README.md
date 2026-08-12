@@ -408,9 +408,18 @@ a plane output must be byte-identical to a cold evaluation.
   self-referential store over the node set, passed into the caller's node computation, is gone from
   `lib/` — the five sites that had one now hand the engine a domain, a base and a decision. But a
   fold threading its own accumulator of resolved outputs across a traversal it drives is the same
-  construct by another spelling, and three remain: the condensation solve in `build.nix`, `runScc`
-  beneath it, and the rank-ordered drain in `eager.nix`. `ci/tests/purity.nix` scans for the first
-  shape and says in its own comment that it cannot see the second.
+  construct by another spelling, and **four** remain (coordinates at the rev that landed the
+  re-expression): `build.nix:155-190`, the bottom-up condensation solve; `restabilize.nix:134-139`,
+  `runScc`'s ascent beneath it; `restabilize.nix:240-271`, `restabilize`'s own cone solve, a
+  separate fold from `runScc`; and `eager.nix:71-75`, the rank-ordered eager drain.
+  `ci/tests/purity.nix` scans for the first shape and says in its own comment that it cannot see
+  this one.
+- **The store-fix scan does not close the import route either, so it is scanned separately.** A
+  `lib/` file writing `import ../reference/schedule.nix` and calling `schedule` itself would have
+  the knot back with no `prelude.fix` token anywhere in `lib/` — measured, that plant leaves the
+  token arm green. Reaching the reference scheduler from inside the plane is what would make it the
+  plane's; being handed it at the call is what makes it the caller's. The path has its own cell,
+  with the library's real `./hash.nix` imports as the live control.
 - **The GENERAL cyclic class is not rescued.** A plain self-referential attrset aborts the projection
   itself, and no cell can pin that: the abort is uncatchable and would end the suite rather than fail
   a case. A total acyclicity predicate is not constructible here — deciding it needs the descent that

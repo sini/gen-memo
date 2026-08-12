@@ -1,8 +1,8 @@
 # THE SCHEDULER — the caller's side of the seam, deliberately NOT part of the plane.
 #
-# Mokhov 2018 decomposes a build system into a SCHEDULER, which decides the order tasks run in
-# and produces the resulting store, and a REBUILDER, which decides whether a task must run at
-# all. gen-memo is the rebuilder half and only that half: it produces a decision, and something
+# Mokhov 2018 §5 (Fig. 5) decomposes a build system into a SCHEDULER, which decides the order
+# tasks run in and produces the resulting store, and a REBUILDER, which decides whether a task must
+# run at all. gen-memo is the rebuilder half and only that half: it produces a decision, and something
 # else applies it. In this ecosystem the scheduler is Nix's own laziness, which the evaluator
 # already takes — so the plane needs no scheduler of its own, and what it needs instead is for
 # whoever calls it to bring one.

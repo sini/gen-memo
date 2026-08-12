@@ -69,12 +69,19 @@ let
   # makes a construct an evaluator rather than a decision layer — so the plane hands a domain, a
   # base and a decision to an engine and the engine binds the knot.
   #
-  # ★ WHAT THIS CELL CANNOT SEE, said here so its green is not read as wider than it is: it is a
-  # TOKEN scan, and a store fix has other spellings. A fold threading its own accumulator of
-  # resolved outputs across a traversal it drives is the same thing by a different construction,
-  # and two of those remain in this library — the condensation solve in `build.nix`, and the
-  # rank-ordered drain in `eager.nix`, with `runScc` beneath the first. This scan is a tripwire
-  # against the knot coming back in the shape it left in, not a proof that none is present.
+  # ★ WHAT THIS TOKEN ARM CANNOT SEE, said here so its green is not read as wider than it is.
+  # A store fix has other spellings, and the residue is FOUR sites, not the two an earlier form of
+  # this comment named. A fold threading its own accumulator of resolved outputs across a traversal
+  # it drives is the same construct by a different construction, and all four are in this library
+  # (coordinates at the rev that added this cell):
+  #
+  #   1. `build.nix:155-190`        — the bottom-up condensation solve
+  #   2. `restabilize.nix:134-139`  — `runScc`'s ascent, beneath the first
+  #   3. `restabilize.nix:240-271`  — `restabilize`'s OWN cone solve, a separate fold from 2
+  #   4. `eager.nix:71-75`          — the rank-ordered eager drain
+  #
+  # This scan is a tripwire against the knot coming back in the shape it left in, not a proof that
+  # none is present.
   knotToken = "prelude.fix";
   knotSites = map (src: src.name) (lib.filter (src: genPrelude.hasInfix knotToken src.code) sources);
 
@@ -83,6 +90,25 @@ let
   # clean of a construct the scan could never have matched.
   knotControlFires = genPrelude.hasInfix knotToken (
     stripComments (builtins.readFile ../../reference/schedule.nix)
+  );
+
+  # ★ THE IMPORT ROUTE, which the token arm above does NOT close and which is the likelier way the
+  # knot comes back. A `lib/` file that writes `import ../reference/schedule.nix` and calls
+  # `schedule` itself has the knot back with no `prelude.fix` token anywhere in `lib/` — measured,
+  # that plant leaves the token arm entirely green. Reaching the reference scheduler from inside
+  # the plane is what would make it the plane's; being handed it at the call is what makes it the
+  # caller's. So the path is scanned as well.
+  importToken = "reference/";
+  importSites = map (src: src.name) (
+    lib.filter (src: genPrelude.hasInfix importToken src.code) sources
+  );
+
+  # Its live control is an import the library REALLY MAKES, so the predicate is shown to match an
+  # import path in this corpus rather than merely to return empty. `./hash.nix` is imported
+  # directly by the files that need the guards, which is the same syntactic shape a smuggled
+  # `../reference/schedule.nix` would take.
+  importControlSites = map (src: src.name) (
+    lib.filter (src: genPrelude.hasInfix "./hash.nix" src.code) sources
   );
 in
 {
@@ -113,6 +139,29 @@ in
     test-store-fix-scan-is-live = {
       expr = knotControlFires;
       expected = true;
+    };
+
+    # The plane does not REACH the reference scheduler; it is handed one. Closing the import route
+    # the token arm above leaves open.
+    test-plane-does-not-import-the-reference-scheduler = {
+      expr = importSites;
+      expected = [ ];
+    };
+
+    # The import predicate matches a real import in this corpus, so the empty result above is a
+    # finding rather than a predicate that could never have fired. Asserted as the exact file list
+    # rather than as non-emptiness: a new direct importer of the guards should be seen, not absorbed.
+    test-import-route-scan-is-live = {
+      expr = importControlSites;
+      expected = [
+        "lib/affectedSet.nix"
+        "lib/build.nix"
+        "lib/drivers.nix"
+        "lib/eager.nix"
+        "lib/restabilize.nix"
+        "lib/strategies.nix"
+        "lib/structural.nix"
+      ];
     };
   };
 }
