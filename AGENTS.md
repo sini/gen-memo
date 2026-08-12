@@ -7,20 +7,34 @@ The **incremental plane**: a decision layer over the evaluator that never evalua
 byte-identical to what a cold run produces — so the plane is correct exactly when it is invisible in
 the result and visible only in the work avoided.
 
-**The dirty-cone content has LANDED; two pieces have not.** What is here: the flat relocatable result
-store and its verifying trace, the three reuse predicates, the dirty cone and the exact affected set,
-the change/propagate split with its fused override, the cut-heavy eager push, the structural deltas,
-the provenance reads, and the per-SCC solver — 24 exports, arrived from the retiring rebuilder
-library whose shell and name retire with them. What is still elsewhere: the **warm fold and override
-cone** in gen-resolve, and gen-flake's **compose warm/override/trace** arm. Each is its own sequenced
-piece of work.
+**Two migrations have LANDED; one piece has not.** What is here: the flat relocatable result store
+and its verifying trace, the three reuse predicates, the dirty cone and the exact affected set, the
+change/propagate split with its fused override, the cut-heavy eager push, the structural deltas, the
+provenance reads and the per-SCC solver — 24 exports from the retiring rebuilder library, whose
+shell and name retire with them; and the **warm fold and override cone** from gen-resolve, three
+exports more. What is still elsewhere: gen-flake's **compose warm/override/trace** arm.
 
 The interface to the evaluator is **settled and built in the evaluator**: the plane returns a
 `Decision` of two total functions and no values, reads through a restricted facade of exactly
 `get` / `nodeIds` / `resolutional`, and never receives a structural value from a prior evaluation.
-The content here predates that interface and is consumed the way it always was — a caller-supplied
-`recompute` and an accessor — so re-expressing it onto the `Decision` facade is outstanding work and
-not something this sheet claims is done.
+**THE TWO MIGRATIONS SIT ON OPPOSITE SIDES OF THAT INTERFACE AND THE SHEET MUST NOT AVERAGE THEM.**
+The warm fold IS expressed on it — `warmDecision` returns exactly that record, and the fold hands it
+to the evaluator through the facade. The rebuilder content **is not**: it predates the interface and
+is consumed the way it always was, through a caller-supplied `recompute` and an accessor, and
+re-expressing it remains outstanding.
+
+★ **AND THE SHARPEST FORM OF THAT, because it is a live claim against this repository rather than a
+tidy-up note.** `lib/build.nix`'s store is `prelude.fix (s: genAttrs accessor.nodes (id: recompute accessor s id))` — a self-referential store bound over the node set and passed INTO the caller's
+function. Under the engine spec's own two-part test for what evaluates, that is an evaluating knot
+living inside the plane, and its §5.2 states in terms that an implementer who moves such a `fix` into
+the plane has failed the construction test whatever the tests say. It is recorded here rather than
+argued away: the warm fold added none, and removing the one that is here is the re-expression above.
+
+**The evaluator is a PARAMETER, never an input.** `flake.nix` declares two inputs and neither is an
+evaluator. The warm fold takes `{ evalWarm }` at the call and calls it; a fold that is handed an
+evaluator is a CALLER of one, which is why it can live here without inverting the direction. `ci/`
+does pin gen-scope — a fold that is handed an evaluator can only be tested by handing it one, and a
+stub would make those suites an oracle for the stub.
 
 **Not in the hub roster.** `gen/lib/mkGenLibs.nix` has no `memo` entry and gen-memo has no stratum.
 That is deliberate, not an oversight: the roster's stratum declaration is total and explicit by
@@ -46,7 +60,8 @@ is always to write a small local version of something a row below rather than co
 |---|---|
 | **Evaluating anything at all** — forcing a node, computing a value | `gen-scope` — "gen-scope: demand-driven attribute grammar evaluator over algebraic scope graphs". The sole evaluator, kept thin. The plane decides *whether* to recompute; it never *is* the recompute. A caller-supplied `recompute` is the shape this takes |
 | **Scheduling** — deciding what to compute and in what order | Nix's own laziness, which the evaluator already takes. In the Mokhov decomposition this library is the **rebuilder half alone**; the scheduler half is not a gen library at all, and writing one here would duplicate the language runtime |
-| The static attribute-dependency schedule, and the **cold** fold | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)". Only its **warm** fold and override cone are destined for the plane; the schedule and the cold path are not |
+| The static attribute-dependency schedule, and the **cold** fold | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)". Its **warm** fold and override cone have moved here; the schedule and the cold path have not, and their destinations are the query-gate home and the evaluator respectively — neither is this library |
+| The equation record — `stratum`, `readsAttrs`, `kind` | `gen-resolve`, and it did NOT travel with the fold. The warm fold takes the ATTRIBUTE SET, not the equations: what may be reused is decided from the evaluator's own resolutional vocabulary, and a declared stratum answering the same question one library away is the classifier that supersession removed |
 | Result store, verifying traces, dirty propagation | **This library.** They arrived from the retiring rebuilder core, whose shell and name retire with them; the origin repository is history rather than a place to read the current definition |
 | Flake composition, and the warm/override/trace arm built on it | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem". Its compose warm/override/trace is destined here and was explicitly gated on this repository existing; gen-flake dissolves and its repo orphans as reference. `diff.nix` stays in the orphaned repo — its two hedges (function-equality blindness in `dropFns`; the four-reserved-names group misclassification) are named inputs to the plane's failure-attribution spec, not code to copy |
 | Graph traversal, reverse reachability, the SCC partition — the dependent cone and the quotient as **algorithms** | `gen-graph` — "gen-graph: accessor-based graph query combinators". The plane *reads* a cone and *reads* a partition through the one published door; neither traversal is re-implemented here. `dependentsOf` / `reachableFrom` / `coneRank` / `directDependents` / `condensation` are all consumed, never mirrored |
@@ -66,7 +81,7 @@ byte-parity oracle is that failure, whatever it is named.
 Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function** of
 `{ prelude, graph }`, per the gen root-file convention, since the plane now has dependencies.
 
-**24 exports, in five groups.**
+**27 exports, in six groups.**
 
 | Group | Exports |
 |---|---|
@@ -75,6 +90,15 @@ Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function
 | Change and propagate | `applyDelta` · `batch` · `propagate` · `override` · `force` · `forceCtx` · `propagateEager` |
 | Topology change | `mkAccessor` · `retract` · `applyEdgeDelta` |
 | Cycles and provenance | `runScc` · `restabilize` · `support` · `supportDirect` · `why` · `whyNot` |
+| The warm fold | `warmDecision` · `warmOverride` · `warmResolve` |
+
+**TWO OF THE WARM NAMES ARE RENAMES, and the sheet says so because the retiring library published
+them under other names.** `override` was already taken here, by the store's fused
+`propagate ∘ applyDelta` — a different operation on a different object — and the module fold REFUSES
+a collision rather than resolving it by list position, so a name had to give:
+gen-resolve's `override` → `warmOverride`; its `warmResolve` → `warmResolve`, unchanged.
+`warmDecision` is the one ADDITION: the fold's reuse decision was a local binding with no name on any
+surface, and the interface the design rests on is two total functions and no values.
 
 `needsEval` / `earlyCutoff` / `verify` decide at three DIFFERENT times — before recompute, after
 recompute, and against the stored trace. They are not one predicate under three names, and collapsing

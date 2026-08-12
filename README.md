@@ -60,7 +60,7 @@ it is not re-proposed.
 | [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base |
 | [gen-scope](https://github.com/sini/gen-scope) | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces |
 | [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door |
-| [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule and cold fold — consumes this plane's `build`; its own warm half and override cone are destined here |
+| [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule and cold fold — consumes this plane's `build`. Its warm half and override cone **have arrived**; the cold fold and the schedule have not, and their destinations are the evaluator and the query-gate home, not here |
 | [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions |
 | **gen-memo** | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold) |
 
@@ -123,9 +123,28 @@ after.store                                # the prior store, spliced
 `examples/dag` is a runnable version of exactly this, including the poisoned-recompute proof that
 untouched nodes are never re-evaluated.
 
+### A first warm override
+
+The fold above works over the plane's own store. The warm fold works over an EVALUATION, and the
+evaluator is passed in rather than depended on:
+
+```nix
+let
+  after = genMemo.warmOverride { inherit (genScope) evalWarm; } ctx {
+    id = "someHost";
+    newDecls = { class = "db"; };
+  };
+in
+after.eval.get "someHost" "resolved"       # re-derived; everything outside the cone is reused
+```
+
+`ctx` is a resolved context — roots, the attribute set, the accessor and a prior evaluation. The
+plane reads that prior through the evaluator's restricted facade, decides, and hands the decision
+back; the evaluator does every recomputation.
+
 ## API Reference
 
-24 exports, in five groups.
+27 exports, in six groups.
 
 **Build and reuse decision**
 
@@ -166,6 +185,24 @@ are not the same predicate under three names.
 | `retract` | Delete a node and splice it out of its dependents |
 | `applyEdgeDelta` | Replace a node's declared edge set, sub-building any newly reachable producers |
 
+**The warm fold — reuse decided for an evaluator**
+
+| Export | What it does |
+| --- | --- |
+| `warmDecision` | The decision itself: `isClean` (the complement of the dirty cone) and `reusable` (the evaluator's own resolutional vocabulary). Two total functions and no values |
+| `warmOverride` | Splice one node's declaration, decide, and hand the evaluator one warm pass |
+| `warmResolve` | The batch form: N edits, one union cone, one pass |
+
+**The evaluator is a PARAMETER, not a dependency.** This library declares no evaluator input; the
+fold takes `{ evalWarm }` and calls it. So the call reads
+`warmOverride { inherit (genScope) evalWarm; } ctx { id, newDecls }`, and what comes back is the
+context re-evaluated under the decision — every value in it produced by the evaluator, none by the
+plane.
+
+`warmDecision` is exported apart from the fold on purpose. It is the whole of what the plane
+contributes, and a surface that offered only the fold would leave the interface the design rests on
+unobservable.
+
 **Cycles and provenance**
 
 | Export | What it does |
@@ -191,6 +228,14 @@ therefore reverse reachability over those edges.
   soundness claim is "data-change override equals a full rebuild", not unconditional soundness.
   Topology changes go through `retract` / `applyEdgeDelta`, which rebuild the accessor and re-run a
   located cycle check.
+- **`warmOverride` is a data-change operation too, and refuses the other kind BY NAME.** It decides
+  reuse from a cone read over the topology as it stands, so an edit carrying an edge key throws
+  rather than being served a decision computed against a shape that no longer holds.
+- **The warm fold's soundness rests on the caller's declared edge relation OVER-DECLARING cross-node
+  reads.** A consumer that reads another node's attribute without declaring the edge sits outside
+  the cone, is judged clean, and is served its stale prior. That is not a defect in the cone; it is
+  what an under-declared relation means, and `ci/tests/warm-override-cross-node.nix` witnesses both
+  branches rather than only the agreeable one.
 - **Store equality is over hashable values.** A node whose value carries a function is sound by
   being always-dirty, not by comparing equal.
 - **The cyclic path is outside the acyclic envelope.** Per-SCC convergence rests on the consumer's
