@@ -28,7 +28,7 @@ a caller-supplied `recompute` and an accessor, but it no longer POPULATES anythi
 an evaluating knot living inside a layer whose whole type is a decision. Five such sites existed
 (`build.nix:89`, `structural.nix:91`, `structural.nix:235`, `affectedSet.nix:47`, `drivers.nix:129`).
 All five now call `engine.schedule { accessor; domain; base; recompute; isClean; }`: the plane
-supplies the DECISION and the engine binds the knot and produces the values. Mokhov's decomposition
+supplies the DECISION and the engine binds the knot and produces the values. Mokhov 2018 §5 (Fig. 5)
 is the ground — a scheduler orders tasks and produces the store, a rebuilder decides whether a task
 runs at all, and this library is the rebuilder half; Nix's laziness is already the scheduler, so a
 second one here was never the plane's to hold.

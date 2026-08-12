@@ -174,12 +174,10 @@ let
                   # externals. Byte-identical to the acyclic path's scheduled value
                   # (deps already in acc, walked in dependency order).
                   #
-                  # ★ THIS STRATUM FOLD IS NOT ROUTED THROUGH THE ENGINE, and the
-                  # residue is named rather than left to be noticed: it threads its own
-                  # accumulator of resolved outputs across a traversal it drives, which
-                  # is the same thing a store-fix is by a different construction. The
-                  # bottom-up solve over the condensation, and `runScc` beneath it, are
-                  # the cyclic half's outstanding re-expression.
+                  # ★ THIS STRATUM FOLD IS NOT ROUTED THROUGH THE ENGINE: it threads its
+                  # own accumulator of resolved outputs across a traversal it drives,
+                  # which is the same thing a store-fix is by a different construction.
+                  # One of FOUR such folds; `ci/tests/purity.nix` enumerates them.
                   acc // prelude.genAttrs members (m: recompute accessor acc m);
             in
             # The single loop-carried field, forced per stratum. Every reader of `acc`
