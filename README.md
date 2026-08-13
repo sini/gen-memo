@@ -233,6 +233,7 @@ unobservable.
 | `support` / `supportDirect` | The transitive (or immediate) declared producers of a node |
 | `why` | The verdict an override would produce for a node: recomputed, cutoff or unaffected |
 | `whyNot` | The same as a total record — `{ reason; at }` for every verdict |
+| `whyFor` / `whyNotFor` | The same two questions curried on the change: one cone bound, spent over many nodes |
 
 The internal hash guards (`hashGuarded`, `hashEq`, `hashMoved`) are **not** on this surface. They are
 imported directly by the files that need them; the evaluator this plane decides for is owed no hash

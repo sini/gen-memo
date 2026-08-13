@@ -30,7 +30,7 @@ let
 in
 {
   flake.tests.surface = {
-    # 27 exports. The first 24 arrived with the rebuilder content, unchanged in name — that
+    # 29 exports. The first 24 arrived with the rebuilder content, unchanged in name — that
     # migration moved content, not surface. `hashGuarded` / `hashEq` / `hashMoved` are deliberately
     # NOT here (see lib/hash.nix), and the shadowed `override` definition that the retiring
     # library's fold left unreachable did not travel — the reached one did, so the count was
@@ -49,6 +49,11 @@ in
     # `warmDecision` is the one addition. The fold's reuse decision was a local binding inside it
     # and had no name on any surface; the interface the whole design rests on is two total functions
     # and no values, and a surface that offers only the fold leaves that type unobservable.
+    #
+    # `whyFor` / `whyNotFor` are the two after those: the amortized duals of the provenance queries,
+    # curried on the change so a caller asking many ids binds the cone once. They are a WIDENING and
+    # not a replacement — `why` / `whyNot` keep their per-call contract, which is why the surface
+    # grows by two rather than changing under two existing names.
     test-lib-exports-the-plane = {
       expr = builtins.attrNames genMemo;
       expected = [
@@ -78,7 +83,9 @@ in
         "warmOverride"
         "warmResolve"
         "why"
+        "whyFor"
         "whyNot"
+        "whyNotFor"
       ];
     };
 
