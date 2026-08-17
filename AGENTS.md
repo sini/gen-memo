@@ -364,9 +364,20 @@ number).
 
 ★ THE CHARACTER CLASS IS `[A-Za-z0-9-]`, NOT `[a-z0-9-]`, and the difference is not cosmetic. Cell
 names here contain capitals — `test-whyNot-…`, `test-affectedSet-…`, `test-hashEq-…` — and the
-lower-case-only form truncates each at the capital, so it reports **257** names against the correct
-**296**. A reconciliation run with it shows 12 spurious mismatches on one side and hides 51 real ones
-on the other.
+lower-case-only form truncates each at the capital. Substitute the wrong class into the `declared`
+command above and reconcile against the same `collected` file to see what it costs:
+
+```sh
+grep -rhoE '\btest-[a-z0-9-]+' ci/tests/ | sort -u > /tmp/declared-lc   # the WRONG class
+wc -l < /tmp/declared-lc                              # 257 names, against the correct 296
+comm -23 /tmp/declared-lc /tmp/collected | wc -l      # 12 — mismatches it invents
+comm -13 /tmp/declared-lc /tmp/collected | wc -l      # 51 — mismatches it hides
+```
+
+Each number is that command's output at this revision. Re-derive them here rather than computing
+them: an earlier form of this note published "25 spurious mismatches", which was the arithmetic
+difference between two published totals and not a reconciliation result at all — a figure whose noun
+was wrong, and the two directions it stood for are not even equal to each other.
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with
 `working-directory: ci`):
