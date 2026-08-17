@@ -130,9 +130,14 @@ let
   # a mistyped token and a read pointed at another file red either way. What neither form sees is a
   # read replaced by a constant carrying the token while this label is kept — that stays green here
   # exactly as it did before. The label is written beside the path rather than derived from it,
-  # because deriving it would render a store path, which is what the label rule forbids. Pinning
-  # that residue needs a content axis for this subject, as the library subject has, and this cell
-  # is not it.
+  # because deriving it would render a store path, which is what the label rule forbids.
+  #
+  # ★ THAT RESIDUE IS NOW CLOSED, by `test-store-fix-control-carries-its-file` below. This sentence
+  # read "Pinning that residue needs a content axis for this subject, as the library subject has,
+  # and this cell is not it." — the content axis exists now, and it is NOT shaped as the library
+  # subject's: a proper subset of the MANIFEST is uninstantiable here, because this manifest is one
+  # file and a singleton's only proper subset is empty. The axis is a declared token vocabulary
+  # instead, and the paragraph on `knotControlVocab` states why.
   knotControlSources =
     map
       (s: {
@@ -148,6 +153,50 @@ let
   knotControlSites = map (s: s.name) (
     lib.filter (s: genPrelude.hasInfix knotToken s.code) knotControlSources
   );
+
+  # THE CONTROL'S CONTENT AXIS (§4's C4b, n=1 case). The membership cell above names the file; this
+  # names what the file CONTAINS, and without it the control has one axis where the only other
+  # subject in this suite READ FROM DISK — the library tree — has two. Measured before it existed:
+  # severing the read to a constant carrying the token, with the label kept, left `knotControlSites`
+  # reading exactly its expectation — green over a subject that was no longer on disk.
+  #
+  # WHY A VOCABULARY AND NOT A LABEL SUBSET. C4b's content axis is a proper subset OF THE MANIFEST,
+  # and this manifest is one file: the only proper subset of a singleton is empty, so the axis has no
+  # instance over files here. It moves to a declared token vocabulary, where the proper-subset
+  # property — and both of its directions — survive intact: a constant carrying less than the profile
+  # collapses the list, one carrying more swells it past the subset. The four tokens below that the
+  # file does NOT contain are what buy the swell direction; they are not padding.
+  #
+  # ★ `knotToken` IS THE FIRST ELEMENT BY CONSTRUCTION, never re-spelled. A mistyped token then reds
+  # this cell and the membership cell together, instead of leaving this one green over a token the
+  # other can no longer find.
+  #
+  # ★ THE SCAN IS BY LITERAL SUBSTRING, NOT BY PATTERN, and a future editor must keep it that way.
+  # `genPrelude.hasInfix` escapes its needle (`escapeRegex`, nixpkgs' twelve metacharacters), so the
+  # `.` in `prelude.fix` is a literal dot. Hand-rolling this with `builtins.split`/`match` on the raw
+  # token instead would make it a wildcard: measured, unescaped `split "prelude.fix"` MATCHES
+  # `preludeXfix`, while `hasInfix` does not.
+  #
+  # ★ WHAT THIS DOES NOT BUY, so its green is not read as wider than it is. It raises the cost of a
+  # forged subject from one token to this whole profile; it does not make forgery impossible. A
+  # constant reproducing all five carried tokens and none of the four absent still passes, as does a
+  # duplicated pipeline pointed at a copy — the stated limit, unchanged.
+  knotControlVocab = [
+    knotToken
+    "recompute"
+    "isClean"
+    "base // s"
+    "prelude.genAttrs"
+    "builtins.readFile"
+    "import ./"
+    "mkOption"
+    "evalModules"
+  ];
+  knotControlCarried =
+    let
+      code = (builtins.head knotControlSources).code;
+    in
+    lib.filter (t: genPrelude.hasInfix t code) knotControlVocab;
 
   # ★ THE IMPORT ROUTE, which the token arm above does NOT close and which is the likelier way the
   # knot comes back. A `lib/` file that writes `import ../reference/schedule.nix` and calls
@@ -378,6 +427,23 @@ in
     test-store-fix-scan-is-live = {
       expr = knotControlSites;
       expected = [ "reference/schedule.nix" ];
+    };
+
+    # The content half of the store-fix CONTROL's own subject pinning (§4's C4, n=1 case): the
+    # membership cell above pins WHICH file the control reads, this pins that the label carries its
+    # file's text. NOT `test-plane-binds-no-store-fix`'s §4a pair — that is
+    # `test-scan-subject-is-the-library-tree` + `test-scan-reads-are-live` over `sources`. This pair
+    # arms the CONTROL, which is what makes that cell's token able to fire at all.
+    # A proper subset of `knotControlVocab` — 5 of 9 — so a severed read reds it in both directions.
+    test-store-fix-control-carries-its-file = {
+      expr = knotControlCarried;
+      expected = [
+        "prelude.fix"
+        "recompute"
+        "isClean"
+        "base // s"
+        "prelude.genAttrs"
+      ];
     };
 
     # The plane does not REACH the reference scheduler; it is handed one. Closing the import route

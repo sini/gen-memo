@@ -358,7 +358,7 @@ comm -23 /tmp/declared /tmp/collected   # declared but not collected — the sil
 comm -13 /tmp/declared /tmp/collected   # collected but not declared
 ```
 
-Both are empty at this revision: 296 distinct names on each side, over a run of 298 cells (two names
+Both are empty at this revision: 300 distinct names on each side, over a run of 302 cells (two names
 recur across suites, which is why the reconciliation is on names and the run count is not the same
 number).
 
