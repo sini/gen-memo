@@ -113,6 +113,9 @@ let
 in
 {
   flake.tests.purity = {
+    # This `[ ]` is not self-supporting: its subject is read from disk, so it is non-vacuous
+    # exactly in composition with the subject-pinning cell asserted over the same `sources` value —
+    # `test-scan-subject-is-the-library-tree` below, which pins WHICH files the scan reads.
     test-library-source-is-nixpkgs-lib-free = {
       expr = violations;
       expected = [ ];
@@ -124,6 +127,48 @@ in
     test-scan-reads-non-empty-sources = {
       expr = sources != [ ] && lib.all (s: s.code != "") sources;
       expected = true;
+    };
+
+    # ★ THE SCAN'S SUBJECT, MEMBERSHIP HALF — the literal label list, asserted by identity rather
+    # than by count. Disconnection is an identity defect and non-emptiness is a cardinality
+    # predicate, so the two do not meet and the floor above cannot stand in for this: measured
+    # against the suite WITHOUT this cell, `nixFiles` cut to just the seven labels the import-route
+    # control names leaves every other cell here green while a live `lib.types` tether sits in one
+    # of the seven files that left the scan. This cell is the one that reds that cut.
+    #
+    # It is ONE HALF of the pair every absence cell in this file composes with. An absence cell
+    # asserts `expr == [ ]`, and a scan of nothing produces nothing — so this is what makes
+    # `test-library-source-is-nixpkgs-lib-free`'s `[ ]`, `test-plane-binds-no-store-fix`'s `[ ]`
+    # and `test-plane-does-not-import-the-reference-scheduler`'s `[ ]` evidence rather than
+    # artefacts of an empty subject. Each of those is satisfied by a degenerate subject alone.
+    #
+    # WHAT IT IS SILENT ON: content. A `read` handing every entry one fixed string satisfies this
+    # cell exactly — names are all it pins, and the other half of the pair is what pins those.
+    #
+    # `reference/schedule.nix` is NOT a member, by construction rather than by omission: it is read
+    # by the store-fix control below, which is a different subject, not by the library scan.
+    # Joining it would move this list to 17 and widen the library cell's subject past `lib/**` plus
+    # the two roots, which is more than that cell claims.
+    test-scan-subject-is-the-library-tree = {
+      expr = map (s: s.name) sources;
+      expected = [
+        "lib/affected.nix"
+        "lib/affectedSet.nix"
+        "lib/build.nix"
+        "lib/default.nix"
+        "lib/dirtySet.nix"
+        "lib/drivers.nix"
+        "lib/eager.nix"
+        "lib/hash.nix"
+        "lib/merge.nix"
+        "lib/provenance.nix"
+        "lib/restabilize.nix"
+        "lib/strategies.nix"
+        "lib/structural.nix"
+        "lib/warm.nix"
+        "flake.nix"
+        "default.nix"
+      ];
     };
 
     test-forbidden-token-scan-is-live = {
