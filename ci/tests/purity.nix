@@ -118,8 +118,35 @@ let
   # And its own live control: the SAME token and the SAME predicate over the reference scheduler,
   # which is where the knot now lives. Without this, a typo in the token would report the plane
   # clean of a construct the scan could never have matched.
-  knotControlFires = genPrelude.hasInfix knotToken (
-    stripComments (builtins.readFile ../../reference/schedule.nix)
+  #
+  # Asserted as the exact LABEL LIST, which is this file's idiom for every other control in it —
+  # the forbidden-token control names its token, the import-route control names its seven files. A
+  # truth value fails as `false != true` and names nothing; this names the file whose control
+  # stopped firing, and a reader can open it. The subject is built through the same `raw` read as
+  # the library subject, so the control and the scan cannot drift onto different reading machinery.
+  #
+  # ★ WHAT THE LABEL FORM DOES NOT BUY, measured rather than assumed, so the green is not read as
+  # wider than it is. It catches the same mutations the truth value caught and reports them better:
+  # a mistyped token and a read pointed at another file red either way. What neither form sees is a
+  # read replaced by a constant carrying the token while this label is kept — that stays green here
+  # exactly as it did before. The label is written beside the path rather than derived from it,
+  # because deriving it would render a store path, which is what the label rule forbids. Pinning
+  # that residue needs a content axis for this subject, as the library subject has, and this cell
+  # is not it.
+  knotControlSources =
+    map
+      (s: {
+        inherit (s) name;
+        code = stripComments s.text;
+      })
+      (raw [
+        {
+          name = "reference/schedule.nix";
+          path = ../../reference/schedule.nix;
+        }
+      ]);
+  knotControlSites = map (s: s.name) (
+    lib.filter (s: genPrelude.hasInfix knotToken s.code) knotControlSources
   );
 
   # ★ THE IMPORT ROUTE, which the token arm above does NOT close and which is the likelier way the
@@ -349,8 +376,8 @@ in
     };
 
     test-store-fix-scan-is-live = {
-      expr = knotControlFires;
-      expected = true;
+      expr = knotControlSites;
+      expected = [ "reference/schedule.nix" ];
     };
 
     # The plane does not REACH the reference scheduler; it is handed one. Closing the import route
