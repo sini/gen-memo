@@ -110,12 +110,20 @@ let
   importControlSites = map (src: src.name) (
     lib.filter (src: genPrelude.hasInfix "./hash.nix" src.code) sources
   );
+
+  # The token for the content half of the subject pinning below. Chosen because it is a PROPER
+  # subset of the manifest and spans both branches of `sources`, which is what lets the cell
+  # discriminate a constant-returning read in both directions.
+  liveToken = "prelude";
+  liveReads = map (s: s.name) (lib.filter (s: genPrelude.hasInfix liveToken s.code) sources);
 in
 {
   flake.tests.purity = {
     # This `[ ]` is not self-supporting: its subject is read from disk, so it is non-vacuous
-    # exactly in composition with the subject-pinning cell asserted over the same `sources` value —
-    # `test-scan-subject-is-the-library-tree` below, which pins WHICH files the scan reads.
+    # exactly in composition with the subject-pinning pair asserted over the same `sources` value —
+    # `test-scan-subject-is-the-library-tree` for WHICH files the scan reads, and
+    # `test-scan-reads-are-live` for those files CARRYING THEIR TEXT. Neither alone: a scan of
+    # nothing and a scan of constant text both report this clean.
     test-library-source-is-nixpkgs-lib-free = {
       expr = violations;
       expected = [ ];
@@ -143,12 +151,13 @@ in
     # artefacts of an empty subject. Each of those is satisfied by a degenerate subject alone.
     #
     # WHAT IT IS SILENT ON: content. A `read` handing every entry one fixed string satisfies this
-    # cell exactly — names are all it pins, and the other half of the pair is what pins those.
+    # cell exactly — names are all it pins, and `test-scan-reads-are-live` below is what pins those.
     #
     # `reference/schedule.nix` is NOT a member, by construction rather than by omission: it is read
-    # by the store-fix control below, which is a different subject, not by the library scan.
-    # Joining it would move this list to 17 and widen the library cell's subject past `lib/**` plus
-    # the two roots, which is more than that cell claims.
+    # by the store-fix control below, which is a different subject, not by the library scan. It
+    # carries a prelude, so joining it would move this list to 17 AND the live-content list to 14,
+    # and widen the library cell's subject past `lib/**` plus the two roots, which is more than
+    # that cell claims.
     test-scan-subject-is-the-library-tree = {
       expr = map (s: s.name) sources;
       expected = [
@@ -164,6 +173,47 @@ in
         "lib/provenance.nix"
         "lib/restabilize.nix"
         "lib/strategies.nix"
+        "lib/structural.nix"
+        "lib/warm.nix"
+        "flake.nix"
+        "default.nix"
+      ];
+    };
+
+    # ★ THE SCAN'S SUBJECT, CONTENT HALF — the labels above carry their files' text, asserted as
+    # the exact list of sources that mention a prelude. The manifest cannot see this: a `read`
+    # handing every entry one fixed string leaves the names untouched and satisfies it exactly.
+    #
+    # It is the OTHER HALF of the pair every absence cell here composes with. A constant-returning
+    # read is invisible to `test-library-source-is-nixpkgs-lib-free`, to
+    # `test-plane-binds-no-store-fix` and to `test-plane-does-not-import-the-reference-scheduler` —
+    # each scans a subject with no forbidden token in it and reports clean — and this cell is what
+    # makes it visible to them.
+    #
+    # THE LIST IS A PROPER SUBSET OF THE MANIFEST, and that is what gives it teeth in BOTH
+    # directions. A constant carrying no prelude collapses this list toward empty; a constant
+    # carrying one swells it to all sixteen. A list asserted at FULL coverage would be satisfied by
+    # the second and would not discriminate it.
+    #
+    # `lib/affected.nix`, `lib/hash.nix` and `lib/strategies.nix` are outside the list by
+    # construction, not by accident: `affected.nix` takes `{ graph, ... }`, `hash.nix` takes
+    # `{ ... }` and reaches for `builtins.*` directly, and `strategies.nix` takes `{ ... }` and
+    # imports `./hash.nix`. None names a prelude because none uses one. What bounds that residue is
+    # `test-scan-reads-non-empty-sources` above: emptying one of those three files' `code` alone
+    # leaves this cell green — the label was never in the list — and the floor is the only cell
+    # that reds it.
+    test-scan-reads-are-live = {
+      expr = liveReads;
+      expected = [
+        "lib/affectedSet.nix"
+        "lib/build.nix"
+        "lib/default.nix"
+        "lib/dirtySet.nix"
+        "lib/drivers.nix"
+        "lib/eager.nix"
+        "lib/merge.nix"
+        "lib/provenance.nix"
+        "lib/restabilize.nix"
         "lib/structural.nix"
         "lib/warm.nix"
         "flake.nix"
