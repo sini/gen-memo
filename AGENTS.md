@@ -358,14 +358,14 @@ comm -23 /tmp/declared /tmp/collected   # declared but not collected — the sil
 comm -13 /tmp/declared /tmp/collected   # collected but not declared
 ```
 
-Both are empty at this revision: 293 distinct names on each side, over a run of 295 cells (two names
+Both are empty at this revision: 296 distinct names on each side, over a run of 298 cells (two names
 recur across suites, which is why the reconciliation is on names and the run count is not the same
 number).
 
 ★ THE CHARACTER CLASS IS `[A-Za-z0-9-]`, NOT `[a-z0-9-]`, and the difference is not cosmetic. Cell
 names here contain capitals — `test-whyNot-…`, `test-affectedSet-…`, `test-hashEq-…` — and the
-lower-case-only form truncates each at the capital, so it reports **254** names against the correct
-**293**. A reconciliation run with it shows 12 spurious mismatches on one side and hides 51 real ones
+lower-case-only form truncates each at the capital, so it reports **257** names against the correct
+**296**. A reconciliation run with it shows 12 spurious mismatches on one side and hides 51 real ones
 on the other.
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with

@@ -26,21 +26,51 @@ let
   # appended below — so an unqualified label makes a violation in the library indistinguishable
   # from one in the root entry, and the scan names a file that cannot be located.
   nixFiles = lib.filter (lib.hasSuffix ".nix") (lib.attrNames (builtins.readDir libDir));
-  sources =
-    map (name: {
-      name = "lib/${name}";
-      code = stripComments (builtins.readFile (libDir + "/${name}"));
-    }) nixFiles
+
+  # ★ THE READ IS SPLIT, so the strip's premise can be asserted over the text the strip actually
+  # received. One `readFile` per file feeds both lists, and `sources` is a TOTAL per-element
+  # function of `rawSources` — `name` passes through, `code = stripComments text` — so pinning
+  # `sources` pins `rawSources` up to the strip, and the premise arm below is asserted over the
+  # same read as the cells that pin that subject. Two independent reads would make the composition
+  # a hope rather than a construction.
+  raw =
+    entries:
+    map (e: {
+      inherit (e) name;
+      text = builtins.readFile e.path;
+    }) entries;
+
+  # THE SUBJECT: the library tree plus its two roots. `reference/schedule.nix` is deliberately NOT
+  # a member — it is the store-fix control's subject, not the library scan's, and joining it would
+  # widen the library cell past `lib/**` plus the two roots and move both published label lists
+  # (the manifest cell below carries that reasoning).
+  #
+  # What the exclusion costs, stated rather than glossed: that file is pinned by
+  # `test-store-fix-scan-is-live` ALONE, which is weaker than the pair every cell here composes
+  # with. A premise breach on the knot token's own line would red that cell for a reason a reader
+  # would misdiagnose as the reference scheduler having lost the knot.
+  rawSources =
+    raw (
+      map (name: {
+        name = "lib/${name}";
+        path = libDir + "/${name}";
+      }) nixFiles
+    )
     ++ [
       {
         name = "flake.nix";
-        code = stripComments (builtins.readFile ../../flake.nix);
+        text = builtins.readFile ../../flake.nix;
       }
       {
         name = "default.nix";
-        code = stripComments (builtins.readFile ../../default.nix);
+        text = builtins.readFile ../../default.nix;
       }
     ];
+
+  sources = map (s: {
+    inherit (s) name;
+    code = stripComments s.text;
+  }) rawSources;
 
   # Tokens that signal a nixpkgs-lib tether or the module-system (Korora-class) tier.
   forbidden = [
@@ -116,6 +146,51 @@ let
   # discriminate a constant-returning read in both directions.
   liveToken = "prelude";
   liveReads = map (s: s.name) (lib.filter (s: genPrelude.hasInfix liveToken s.code) sources);
+
+  # ★ THE STRIP'S PREMISE, asserted rather than assumed. `stripComments` cuts each line at its
+  # first `#`, which is sound only while no `#` in the scanned sources begins inside a string
+  # literal. Where one does, the strip silently truncates LIVE CODE from that point to the end of
+  # that line and the scanner goes blind there with no signal — per line, since the strip maps over
+  # lines independently, so the damage is bounded and still unannounced.
+  #
+  # The predicate is LINE-LOCAL and conservative in the fail-safe direction: it counts quotes
+  # before the first `#`, so a miscount over-reports and reds loudly rather than under-reporting
+  # silently. It is deliberately NOT a string-aware tokenizer — that would be a larger unverified
+  # instrument inside the oracle, needing its own premise-free proof, and its cheap form cannot see
+  # a `''` block at all. That blind spot is declared as a surface instead, below.
+  countQuotes = s: (lib.length (lib.splitString "\"" s)) - 1;
+  firstHashInString =
+    line:
+    let
+      parts = lib.splitString "#" line;
+    in
+    lib.length parts > 1 && lib.mod (countQuotes (lib.head parts)) 2 == 1;
+
+  premiseBreaches = lib.concatMap (
+    s:
+    lib.concatMap (x: lib.optional (firstHashInString x.line) "${s.name}: ${toString x.n}") (
+      lib.imap1 (n: line: { inherit n line; }) (lib.splitString "\n" s.text)
+    )
+  ) rawSources;
+
+  # The predicate's own live control, over two literal lines written inside this cell: one carrying
+  # a `#` inside a string, one an ordinary trailing comment. It proves the predicate FIRES and
+  # discriminates; it says nothing about what the predicate was pointed at.
+  premiseControlLines = [
+    {
+      name = "control: in-string hash";
+      line = ''url = "https://example.com/x#frag";'';
+    }
+    {
+      name = "control: ordinary comment";
+      line = "  x = 1; # an ordinary trailing comment";
+    }
+  ];
+  premiseControlHits = map (c: c.name) (lib.filter (c: firstHashInString c.line) premiseControlLines);
+
+  # The declared surface: files where the line-local predicate is NOT conclusive, because a `''`
+  # block can carry a `#` the quote parity above cannot see.
+  multilineStringFiles = map (s: s.name) (lib.filter (s: genPrelude.hasInfix "''" s.text) rawSources);
 in
 {
   flake.tests.purity = {
@@ -129,9 +204,17 @@ in
       expected = [ ];
     };
 
-    # The scan reaches real files with real content. A vacuous `sources` — an empty lib/, a
-    # readDir that found nothing — would report the invariant clean without testing it, so the
-    # non-emptiness is asserted rather than assumed. Stable as the library grows.
+    # THE RESIDUAL CONTENT BOUND. This cell is kept for a residue the pair below cannot reach, not
+    # because non-emptiness is evidence: the live-content list is a PROPER subset of the manifest by
+    # construction, so `lib/affected.nix`, `lib/hash.nix` and `lib/strategies.nix` — the three files
+    # that name no prelude — sit outside it. Emptying one of those three files' `code` ALONE leaves
+    # the manifest green (the names are unchanged) and the live-content cell green (that label was
+    # never in its list), and this is the only cell that reds it. Measured: `lib/hash.nix` code →
+    # `""` alone reds this cell and nothing else.
+    #
+    # ★ WHAT IT IS NOT: a guarantee that the scan is non-vacuous. A cardinality predicate cannot see
+    # an identity defect — a scan cut to half the library satisfies it with room to spare — and that
+    # is `test-scan-subject-is-the-library-tree`'s job, not this cell's.
     test-scan-reads-non-empty-sources = {
       expr = sources != [ ] && lib.all (s: s.code != "") sources;
       expected = true;
@@ -219,6 +302,40 @@ in
         "flake.nix"
         "default.nix"
       ];
+    };
+
+    # THE PREMISE THE STRIP RELIES ON: no `#` in the scanned sources begins inside a string
+    # literal. Asserted as the list of offending `file: line` coordinates, so a breach arrives as a
+    # loud red a reader can open rather than as a silently shortened line.
+    #
+    # ★ WHAT THIS CELL DOES NOT DO, said here so its green is not read as wider than it is: it does
+    # NOT red on a severed read. Its expectation is `[ ]`, and an emptied subject or one of constant
+    # text satisfies it exactly — a scan of nothing breaches no premise. It is non-vacuous ONLY in
+    # composition with `test-scan-subject-is-the-library-tree` and `test-scan-reads-are-live`,
+    # asserted over the same `rawSources` read, which is what makes this `[ ]` a finding about real
+    # text. The control below cannot supply that: its subject is a literal.
+    test-strip-premise-holds = {
+      expr = premiseBreaches;
+      expected = [ ];
+    };
+
+    # The predicate fires, and discriminates. Its subject is two literal lines written inside this
+    # cell, so it is UNSEVERABLE from the tree and therefore stands outside the composition rule
+    # above — it neither needs a pair nor could honour one. It proves this predicate can match an
+    # in-string `#` and does not match an ordinary comment; it says nothing whatever about what the
+    # predicate was pointed at, and it is NOT the arming for the cell above.
+    test-strip-premise-scan-is-live = {
+      expr = premiseControlHits;
+      expected = [ "control: in-string hash" ];
+    };
+
+    # The declared surface for the one blind spot the line-local predicate has: a `''` block can
+    # carry a `#` that quote parity cannot see. The scanned files containing `''` are written down
+    # rather than assumed away — empty here, so the FIRST arrival reds this cell and gets a reading,
+    # exactly as a new library file arrives as a red on the manifest.
+    test-strip-premise-multiline-strings = {
+      expr = multilineStringFiles;
+      expected = [ ];
     };
 
     test-forbidden-token-scan-is-live = {
