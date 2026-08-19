@@ -121,6 +121,7 @@ let
     ./structural.nix
     ./restabilize.nix
     ./warm.nix
+    ./warmTrace.nix
   ];
 
   # The fold REFUSES a collision rather than resolving it by list position — see merge.nix for

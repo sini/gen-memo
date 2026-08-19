@@ -30,7 +30,7 @@ let
 in
 {
   flake.tests.surface = {
-    # 29 exports. The first 24 arrived with the rebuilder content, unchanged in name — that
+    # 31 exports. The first 24 arrived with the rebuilder content, unchanged in name — that
     # migration moved content, not surface. `hashGuarded` / `hashEq` / `hashMoved` are deliberately
     # NOT here (see lib/hash.nix), and the shadowed `override` definition that the retiring
     # library's fold left unreachable did not travel — the reached one did, so the count was
@@ -54,6 +54,21 @@ in
     # curried on the change so a caller asking many ids binds the cone once. They are a WIDENING and
     # not a replacement — `why` / `whyNot` keep their per-call contract, which is why the surface
     # grows by two rather than changing under two existing names.
+    #
+    # `warmAdmits` / `warmTrace` are the third migration, and ONE OF THEM IS A RENAME for the same
+    # reason two of the first three were. The content arrived carrying a `trace` built from its
+    # evaluator's `warmDecision`, and that name was already taken here by the plane's OWN decision —
+    # two total functions over a declared node graph, which is a different record about a different
+    # object at a different granularity. The fold refuses a collision rather than resolving it by
+    # list position, so the observation took a name that cannot be read as the decision's synonym:
+    #
+    #   the observed evaluator's `warmDecision` → `warmTrace`
+    #   —                                       → `warmAdmits`  (new: the admission test, apart
+    #                                                            from the record it gates)
+    #
+    # `warmAdmits` is the addition, and it is the same split `warmDecision` was: the test lived
+    # inside its caller's `override` handle with no name on any surface, and a surface offering only
+    # the record leaves the predicate that decides whether there is one unobservable.
     test-lib-exports-the-plane = {
       expr = builtins.attrNames genMemo;
       expected = [
@@ -79,9 +94,11 @@ in
         "support"
         "supportDirect"
         "verify"
+        "warmAdmits"
         "warmDecision"
         "warmOverride"
         "warmResolve"
+        "warmTrace"
         "why"
         "whyFor"
         "whyNot"
