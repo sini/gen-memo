@@ -159,13 +159,13 @@ back; the evaluator does every recomputation.
 
 ## API Reference
 
-27 exports, in six groups.
+31 exports, in seven groups.
 
 **Which exports take the engine.** Every operation that reaches a store takes it as its FIRST
 argument: `build`, `override`, `propagate`, `force`, `forceCtx`, `retract`, `applyEdgeDelta`,
-`affectedSet`, and the two warm folds. The rest — the pure queries, the strategy predicates,
-`applyDelta`, `batch`, `runScc`, `restabilize`, `propagateEager`, `mkAccessor` — do not, because
-they populate no store.
+`affectedSet`, and the two warm folds. The rest — the pure queries, the strategy predicates, the
+two observations, `applyDelta`, `batch`, `runScc`, `restabilize`, `propagateEager`, `mkAccessor` —
+do not, because they populate no store.
 
 **Build and reuse decision**
 
@@ -224,6 +224,26 @@ plane.
 contributes, and a surface that offered only the fold would leave the interface the design rests on
 unobservable.
 
+**The observed decision — an evaluator's warm answer, watched rather than made**
+
+| Export | What it does |
+| --- | --- |
+| `warmAdmits` | Whether a caller's edit has the shape a warm pass may be asked for: its key set is exactly the one reuse-bearing argument named, so every other argument is unchanged by construction rather than by comparison |
+| `warmTrace` | The evaluator's published decision, narrowed to the five fields a consumer reads, attached only to a result that was reached through an edit |
+
+**These two OBSERVE; the group above DECIDES, and that split is why `warmTrace` is not called
+`warmDecision`.** `warmDecision` is this plane's own answer — two total functions over a declared
+node graph. `warmTrace` is a record about an answer some evaluator already gave, carried in that
+evaluator's own field names so a consumer reads the answer and not a translation of it. Neither
+function here calls an evaluator or names one: the reuse-bearing argument key is a parameter,
+because which key carries reuse is a fact about the caller's call surface and this library declares
+no evaluator input to learn it from.
+
+The admission test is syntactic over argument keys because the semantic test is unavailable, not
+because it is cheaper — in Nix `==` never reports two function values equal, not even one binding
+against itself, so for an argument carrying a function there is no equality that can witness
+"unchanged".
+
 **Cycles and provenance**
 
 | Export | What it does |
@@ -277,7 +297,7 @@ nix-unit --flake ./ci#tests              # run everything
 nix-unit --flake ./ci#tests.byte-parity  # a single suite
 ```
 
-18 suites. Beyond the migrated content's own, two are the plane's oracles:
+19 suites. Beyond the migrated content's own, two are the plane's oracles:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
   forced to nothing-is-clean, compared on the tagged `__drvPath` record the admission projection

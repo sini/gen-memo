@@ -113,14 +113,18 @@ byte-parity oracle is that failure, whatever it is named.
 Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function** of
 `{ prelude, graph }`, per the gen root-file convention, since the plane now has dependencies.
 
-**27 exports, in six groups.**
+**31 exports, in seven groups.**
 
 ★ **TEN OF THEM TAKE THE ENGINE FIRST**, because they reach a store and the plane populates none of
 its own: `build` · `affectedSet` · `propagate` · `override` · `force` · `forceCtx` · `retract` ·
-`applyEdgeDelta` · `warmOverride` · `warmResolve`. The other seventeen do not — they populate
+`applyEdgeDelta` · `warmOverride` · `warmResolve`. The other twenty-one do not — they populate
 nothing. `applyDelta`, `batch`, `runScc`, `restabilize` and `propagateEager` are in the second list
 deliberately: the first two only rewrite data, and the last three drive their own accumulator rather
 than a store fix, which is the residue named above rather than a reason they are exempt.
+
+★ **THE TABLE IS THE ENUMERATION AND THE COUNT IS READ OFF IT**, not carried beside it. A count that
+does not enumerate is what let this sheet stand at 27 while the surface was 29 — the two curried
+provenance duals had landed in the library and never reached this row.
 
 | Group | Exports |
 |---|---|
@@ -128,8 +132,9 @@ than a store fix, which is the residue named above rather than a reason they are
 | Cones | `affected` · `impactOf` · `dirtySet` · `affectedSet` |
 | Change and propagate | `applyDelta` · `batch` · `propagate` · `override` · `force` · `forceCtx` · `propagateEager` |
 | Topology change | `mkAccessor` · `retract` · `applyEdgeDelta` |
-| Cycles and provenance | `runScc` · `restabilize` · `support` · `supportDirect` · `why` · `whyNot` |
+| Cycles and provenance | `runScc` · `restabilize` · `support` · `supportDirect` · `why` · `whyNot` · `whyFor` · `whyNotFor` |
 | The warm fold | `warmDecision` · `warmOverride` · `warmResolve` |
+| The observed decision | `warmAdmits` · `warmTrace` |
 
 **TWO OF THE WARM NAMES ARE RENAMES, and the sheet says so because the retiring library published
 them under other names.** `override` was already taken here, by the store's fused
@@ -138,6 +143,21 @@ a collision rather than resolving it by list position, so a name had to give:
 gen-resolve's `override` → `warmOverride`; its `warmResolve` → `warmResolve`, unchanged.
 `warmDecision` is the one ADDITION: the fold's reuse decision was a local binding with no name on any
 surface, and the interface the design rests on is two total functions and no values.
+
+**AND THE THIRD MIGRATION REPEATS THE PATTERN EXACTLY ONCE MORE.** The observation content arrived
+carrying a `trace` built from its evaluator's own `warmDecision`, and that name was taken here by the
+plane's decision — a different record, about a different object, at a different granularity — so it
+landed as `warmTrace`: a name that cannot be read as the decision's synonym, which is the constraint
+a rename has to satisfy beyond merely not colliding. `warmAdmits` is that migration's one ADDITION,
+and for the same reason `warmDecision` was: the admission test lived inside its caller's override
+handle with no name on any surface, and a surface offering only the record leaves the predicate that
+decides whether there is one unobservable.
+
+★ **NEITHER OBSERVATION NAMES AN EVALUATOR OR AN EVALUATOR'S ARGUMENT.** The reuse-bearing argument
+key is a PARAMETER of `warmAdmits`, with no default, because which key of a caller's re-composition
+carries reuse is a fact about that caller's call surface. A plane that decides for an evaluator it is
+handed cannot hold that evaluator's argument names any more than it can hold its entry point, and a
+default would be that name smuggled in as a fallback.
 
 `needsEval` / `earlyCutoff` / `verify` decide at three DIFFERENT times — before recompute, after
 recompute, and against the stored trace. They are not one predicate under three names, and collapsing
@@ -358,7 +378,7 @@ comm -23 /tmp/declared /tmp/collected   # declared but not collected — the sil
 comm -13 /tmp/declared /tmp/collected   # collected but not declared
 ```
 
-Both are empty at this revision: 300 distinct names on each side, over a run of 302 cells (two names
+Both are empty at this revision: 309 distinct names on each side, over a run of 311 cells (two names
 recur across suites, which is why the reconciliation is on names and the run count is not the same
 number).
 
@@ -369,7 +389,7 @@ command above and reconcile against the same `collected` file to see what it cos
 
 ```sh
 grep -rhoE '\btest-[a-z0-9-]+' ci/tests/ | sort -u > /tmp/declared-lc   # the WRONG class
-wc -l < /tmp/declared-lc                              # 257 names, against the correct 296
+wc -l < /tmp/declared-lc                              # 270 names, against the correct 309
 comm -23 /tmp/declared-lc /tmp/collected | wc -l      # 12 — mismatches it invents
 comm -13 /tmp/declared-lc /tmp/collected | wc -l      # 51 — mismatches it hides
 ```
