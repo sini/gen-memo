@@ -32,7 +32,11 @@
 #   Acar 2002 — the change/propagate split, genuinely the paper's pair of metafunctions.
 #   Arntzenius 2016 — Lemma 4, "Fixed points in finite-height pointed posets", whose proof is the
 #     iterate-from-⊥ ascent the per-SCC solver performs.
-#   Radul 2009 — kick-out! and the support set. Sloane 2010 — circular reference attributes.
+#   Radul 2009 — kick-out! (§6.2), and ONLY that. The support set is NOT carried from him: that
+#     citation was name-only, was deleted at `lib/provenance.nix`, and the reason is recorded
+#     there — his §6.1 support set is a minimal-premise set under a TMS, ours is the structural
+#     declared-edge producer set from Acar §4.4 read backward.
+#   Sloane 2010 — circular reference attributes.
 #
 # ★★ THE EXCLUDED AXIS, NAMED IN THE SAME BREATH, because the sentence above is scoped and a
 # scoped sentence read as a universal is how the last one went wrong. Some names cited here are

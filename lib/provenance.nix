@@ -7,10 +7,19 @@
 #   support : the transitive declared PRODUCERS of a node — Acar 2002 adg (§4.4)
 #     read in the IN-EDGE / BACKWARD direction (the adg itself is forward
 #     source→target; support is the dual of `affected`). Reads the trace SNAPSHOT
-#     deps so it stays consistent with the committed override. Only NAME-faithful
-#     to Radul 2009 §6.1 support-set (no TMS, no merge-lattice, no worldviews —
-#     ours is the structural declared-edge producer set, not a minimal-premise set
-#     after a lattice merge).
+#     deps so it stays consistent with the committed override. Acar §4.4 read
+#     backward is the WHOLE of what this operator is; there is no second source.
+#
+#     ★ THE RADUL CITATION IS DELETED RATHER THAN QUALIFIED. It read "Only
+#     NAME-faithful to Radul 2009 §6.1 support-set (no TMS, no merge-lattice, no
+#     worldviews)" — and the disclaimer was accurate, which is exactly the problem:
+#     what it disclaimed away was the paper's object. Radul §6.1 is *Dependencies
+#     for Provenance*, whose support set is a minimal-premise set maintained by a
+#     TMS over a merge lattice; ours is the structural declared-edge producer set,
+#     computed by reachability and minimal in nothing. A citation whose own body
+#     says the cited mechanism is absent is not provenance for anything — it is a
+#     name borrowed for a word, and it survives compaction as a claim of descent
+#     nobody re-checks. `support` is a NAME COLLISION with Radul's, not a debt.
 #
 #   why : the verdict an override of `changedId` would produce for `id`. Acar 2002
 #     §7 read-rule, reframed: l∈C → recomputed, cmp-unchanged → cutoff, l∉C →
@@ -28,8 +37,11 @@
 #
 #   whyFor / whyNotFor : the AMORTIZED DUALS, curried on `changedId`. The membership
 #     decision is loop-invariant across the ids of one change, so a caller asking it
-#     of many ids binds the cone once (Arntzenius 2016 Datafun reverse reachability,
-#     via `dirtySet`) and spends it, instead of issuing one forward query per id.
+#     of many ids binds the cone once (via `dirtySet`) and spends it, instead of
+#     issuing one forward query per id. ★ This line cited "Arntzenius 2016 Datafun
+#     reverse reachability" and does not any more: `reverse` occurs 0 times in that
+#     paper (live controls in the same run: `monotone` 48, `semilattice` 41), and
+#     `reachability` once, in a motivating aside. The cone is gen-graph's operator.
 #     `why`/`whyNot` are UNCHANGED and keep the point query — the amortization is a
 #     decision the CALLER makes, never a cost imposed on the caller asking once.
 #

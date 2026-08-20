@@ -1,7 +1,9 @@
 # Tests for the provenance read layer — support / why / whyNot.
 #
 # support = transitive declared producers (Acar 2002 adg read backward / in-edge
-# direction; Radul 2009 §6.1 NAME-only). why = the recomputed/cutoff/unaffected
+# direction — and from that source alone; the Radul 2009 §6.1 name-only citation
+# that stood beside it is deleted, see `lib/provenance.nix`). why = the
+# recomputed/cutoff/unaffected
 # verdict an override of `changedId` would produce for `id` (Acar S7 read-rule:
 # l∈C → recomputed, cmp-unchanged → cutoff, l∉C → unaffected). whyNot = the thin
 # negative wrapper. The why⟺dirtySet 120-seed property is the soundness anchor.
