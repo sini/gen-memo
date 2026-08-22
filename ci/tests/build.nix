@@ -268,6 +268,35 @@ in
       expected = hashOf 111;
     };
 
+    # ★ THE RECORD'S FIELD SET, EXACTLY — the "and no more" half that the three cells above cannot
+    # reach. Re-sited here from the retiring gen-resolve suite, where it was
+    # `test-builtctx-cold-trace-shape`; the construct it oracles is `traceFor`, which lives in this
+    # repository's `lib/build.nix`.
+    #
+    # Every cell above reads a field that IS there, so none of them can observe a field that should
+    # NOT be. A trace record grown a fourth key — an internal memo, a provenance handle, whatever a
+    # later edit finds convenient — satisfies all three and still moves what a consumer reading
+    # `attrNames` sees. The verifying-trace shape (Mokhov 2018 §4.2.2) is deps AND hash and nothing
+    # else, so the negative half is part of the claim rather than a tidiness preference.
+    #
+    # Taken over EVERY key rather than one. `traceFor` builds the record through `genAttrs`, so the
+    # shape is uniform today; asserting it per node is what stops a later per-node variation from
+    # hiding behind whichever key a cell happened to name. `unique` collapses the uniform case to a
+    # single element, so the expectation states both halves at once — the field set, and that there
+    # is only one field set across the whole trace.
+    #
+    # SELF-ARMING, so it carries no separate non-emptiness floor: a trace of nothing collapses to
+    # `[ ]`, which is not the expectation, and a severed subject reds rather than passing vacuously.
+    test-trace-record-is-exactly-deps-and-hash = {
+      expr = lib.unique (map (id: builtins.attrNames ctx.trace.${id}) (builtins.attrNames ctx.trace));
+      expected = [
+        [
+          "deps"
+          "hash"
+        ]
+      ];
+    };
+
     # --- BuiltCtx threads accessor/recompute/hashOf for override ---
     test-ctx-threads-accessor = {
       expr = ctx.accessor.nodes == accessor.nodes;

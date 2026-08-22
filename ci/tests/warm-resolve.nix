@@ -5,7 +5,6 @@
 # The batch takes the edits themselves rather than a list of changed ids: a pure batch has to carry
 # the data-change payload, and a bare id list cannot.
 {
-  lib,
   genMemo,
   genScope,
   engine,

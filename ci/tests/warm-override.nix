@@ -16,7 +16,6 @@
 # descriptive. The cell that distinguishes a SERVED value from a recomputed one by its value alone
 # is in `warm-override-cross-node.nix`, where a stale read is observable.
 {
-  lib,
   genMemo,
   genScope,
   engine,

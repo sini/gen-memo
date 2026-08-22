@@ -14,7 +14,6 @@
 # an over-declaration contract with no cell for the under-declared case documents a rule whose
 # violation has never been observed.
 {
-  lib,
   genMemo,
   genScope,
   engine,

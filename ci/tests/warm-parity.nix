@@ -21,7 +21,6 @@
 # equality fails. `test-cone-consumer-is-armed` states that dependence as its own cell rather than
 # leaving it to be inferred from the parity result.
 {
-  lib,
   genMemo,
   genScope,
   engine,
