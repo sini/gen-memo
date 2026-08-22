@@ -32,6 +32,7 @@
   graph,
   mkCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -55,9 +56,9 @@ let
     };
 
   # chain a->b->c->d : edges a=[b], b=[c], c=[d], d=[] (consumer→producer).
-  chainCtx = mkCtx graph.fixtures.chain;
+  chainCtx = mkCtx (fx.planeOf graph.fixtures.chain);
   # diamond a->{b,c}->d : edges a=[b,c], b=[d], c=[d], d=[].
-  diamondCtx = mkCtx graph.fixtures.diamond;
+  diamondCtx = mkCtx (fx.planeOf graph.fixtures.diamond);
 
   # ===== the differential corpus: the anchor's own 120 seeds =====
   seeds = lib.range 1 120;
@@ -242,12 +243,12 @@ let
     coneSet: id: if coneSet ? ${id} then { verdict = "recomputed"; } else { verdict = "unaffected"; };
 
   originOmittedCone =
-    cell: lib.genAttrs (graph.dependentsOf cell.ctx.accessor cell.c.changedId) (_: true);
+    cell: lib.genAttrs (graph.dependentsOf (fx.graphOf cell.ctx.accessor) cell.c.changedId) (_: true);
   transposedCone =
     cell:
-    lib.genAttrs ([ cell.c.changedId ] ++ graph.reachableFrom cell.ctx.accessor cell.c.changedId) (
-      _: true
-    );
+    lib.genAttrs (
+      [ cell.c.changedId ] ++ graph.reachableFrom (fx.graphOf cell.ctx.accessor) cell.c.changedId
+    ) (_: true);
 
   controlMismatches =
     coneOf:

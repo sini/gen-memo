@@ -21,28 +21,29 @@
 #   - Forgy 1982 — `applyEdgeDelta` is `modify = delete + add` over a node's edge
 #     set (the change-token vocabulary; the rebuild mechanism is Acar/RTD).
 #
-# Edge convention: accessor.edges id = ids that id depends on (consumer→producer).
+# Dependency convention: accessor.dependencies id = ids that id depends on (consumer→producer).
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded;
+  inherit (import ./graph-view.nix { }) graphView;
 
   # mkAccessor — full accessor record rebuild (v2 §3.4). Mirrors registry.nix
-  # mkGraph: `edges` is wrapped with prelude.unique (the registry.nix:74 dedup), and
-  # `parent` is carried through. Unlike v1 override's partial `// { nodeData }`,
-  # structural ops move `nodes`/`edges`, so the whole record is rebuilt.
+  # mkGraph: `dependencies` is wrapped with prelude.unique (the registry.nix:74 dedup),
+  # and `parent` is carried through. Unlike v1 override's partial `// { nodeData }`,
+  # structural ops move `nodes`/`dependencies`, so the whole record is rebuilt.
   mkAccessor =
     {
-      edges,
+      dependencies,
       nodes,
       nodeData,
       parent,
     }:
     {
       inherit nodes nodeData parent;
-      edges = id: prelude.unique (edges id);
+      dependencies = id: prelude.unique (dependencies id);
     };
 
-  # reCycleCheck — STRUCTURAL self-reachability query over accessor'.edges, seeded
+  # reCycleCheck — STRUCTURAL self-reachability query over accessor'.dependencies, seeded
   # at `touched` (the nodes whose out-edges the delta changed). Any new cycle
   # routes through a touched node that is now self-reachable. Throws a LOCATED
   # blame (the build.nix shape: why="cycle"; cycle=[…]) — tryEval-catchable, never
@@ -52,7 +53,7 @@ let
   reCycleCheck =
     accessor': touched:
     let
-      selfReach = graph.selfReachable { inherit (accessor') edges; };
+      selfReach = graph.selfReachable (graphView accessor');
       offenders = builtins.filter selfReach touched;
       blame = {
         why = "cycle";
@@ -63,7 +64,7 @@ let
           let
             o = builtins.head offenders;
           in
-          graph.pathsBetween { inherit (accessor') edges; } o o;
+          graph.pathsBetween (graphView accessor') o o;
       };
     in
     if offenders == [ ] then
@@ -114,12 +115,12 @@ in
   #                         (some dependent still names it as a producer). The
   #                         conservative default: a declared reader of a deleted
   #                         producer is treated as a contract violation.
-  #   "recompute-without" — splice deadId out of every dependent's edge list and
-  #                         re-fold the dependent cone sans deadId. Soundness is
+  #   "recompute-without" — splice deadId out of every dependent's dependency list
+  #                         and re-fold the dependent cone sans deadId. Soundness is
   #                         claimed for structural (edge-folding) readers: a reader
-  #                         that sums over `accessor.edges id` simply drops the
+  #                         that sums over `accessor.dependencies id` simply drops the
   #                         deadId term. A reader that hard-reads deadId by NAME
-  #                         (outside the declared edges) is the unenforceable K5/H4
+  #                         (outside the declared relation) is the unenforceable K5/H4
   #                         ambient read — out of contract.
   #
   # NO cycle recheck: deletion only SHRINKS the graph, so it cannot create a cycle.
@@ -130,15 +131,15 @@ in
       inherit (ctx) recompute hashOf accessor;
 
       # Declared in-edges: dependents that name deadId as a producer.
-      requiredBy = builtins.filter (id: builtins.elem deadId (accessor.edges id)) accessor.nodes;
+      requiredBy = builtins.filter (id: builtins.elem deadId (accessor.dependencies id)) accessor.nodes;
 
       # The node-removed accessor: deadId dropped from nodes; every dependent's
-      # edge list has deadId spliced out (an edge a→deadId is DROPPED, not
-      # redirected). nodeData/edges fall through for the surviving nodes.
+      # dependency list has deadId spliced out (an edge a→deadId is DROPPED, not
+      # redirected). nodeData/dependencies fall through for the surviving nodes.
       nodes' = builtins.filter (id: id != deadId) accessor.nodes;
-      edges' = id: builtins.filter (d: d != deadId) (accessor.edges id);
+      dependencies' = id: builtins.filter (d: d != deadId) (accessor.dependencies id);
       accessor' = mkAccessor {
-        edges = edges';
+        dependencies = dependencies';
         nodes = nodes';
         inherit (accessor) nodeData parent;
       };
@@ -146,7 +147,7 @@ in
       # Reverse cone of deadId = its dependents (the nodes whose value moves when
       # deadId vanishes). Computed over the PRIOR accessor (deadId still present),
       # so dependentsOf can see who pointed at it.
-      revCone = graph.dependentsOf accessor deadId;
+      revCone = graph.dependentsOf (graphView accessor) deadId;
 
       # Splice base: deadId removed FIRST. A dependent that still hard-reads deadId
       # by name would then throw "missing" (correct — that is the out-of-contract
@@ -159,15 +160,15 @@ in
         keep = nodes';
       };
 
-      # Re-write trace.deps for EVERY edge-touched node (the dependents whose edge
-      # list lost deadId) + drop deadId's own trace entry, and re-hash the cone
-      # nodes whose value moved. Edge-touched = requiredBy (their declared edges
-      # changed); they must carry FRESH deps (else verify/support read stale deps).
+      # Re-write trace.deps for EVERY edge-touched node (the dependents whose
+      # dependency list lost deadId) + drop deadId's own trace entry, and re-hash the
+      # cone nodes whose value moved. Edge-touched = requiredBy (their declared
+      # dependencies changed); they must carry FRESH deps (else verify/support read stale deps).
       traceWithoutDead = removeAttrs ctx.trace [ deadId ];
       trace' =
         traceWithoutDead
         // prelude.genAttrs revCone (id: {
-          deps = accessor'.edges id;
+          deps = accessor'.dependencies id;
           hash = hashGuarded hashOf store'.${id};
         });
 
@@ -208,10 +209,10 @@ in
       inherit (ctx) recompute hashOf accessor;
       newEdgesU = prelude.unique newEdges;
 
-      # The new edge function (changedId's out-edges replaced). The edge function
-      # is independent of the node-set, so forward reachability can be queried off
+      # The new dependency function (changedId's out-edges replaced). It is
+      # independent of the node-set, so forward reachability can be queried off
       # it before the node-set is finalized.
-      edges' = id: if id == changedId then newEdgesU else accessor.edges id;
+      dependencies' = id: if id == changedId then newEdgesU else accessor.dependencies id;
 
       # New producers: forward-reachable from newEdges over the new edge function,
       # minus the prior node set. These are fresh DEPENDENCIES that the reverse cone
@@ -220,29 +221,31 @@ in
       # `s.z` throws "missing").
       priorSet = prelude.genAttrs accessor.nodes (_: true);
       forwardReach = prelude.unique (
-        newEdgesU ++ prelude.concatMap (graph.reachableFrom { edges = edges'; }) newEdgesU
+        newEdgesU ++ prelude.concatMap (graph.reachableFrom { edges = dependencies'; }) newEdgesU
       );
       newProducers = builtins.filter (id: !(priorSet ? ${id})) forwardReach;
 
-      # New full accessor: changedId's edges replaced; node set grown by ALL the
-      # newly-reachable producers (not just the direct newEdges targets — a fresh
-      # target may itself read further fresh producers). edges'/nodeData/parent fall
-      # through for everyone else.
+      # New full accessor: changedId's dependencies replaced; node set grown by ALL
+      # the newly-reachable producers (not just the direct newEdges targets — a fresh
+      # target may itself read further fresh producers). dependencies'/nodeData/parent
+      # fall through for everyone else.
       nodes' = prelude.unique (accessor.nodes ++ newProducers);
       accessor' = mkAccessor {
-        edges = edges';
+        dependencies = dependencies';
         nodes = nodes';
         inherit (accessor) nodeData parent;
       };
 
       # Located cycle recheck (seeded at the only touched node) BEFORE any splice.
-      # Forces selfReachable over accessor'.edges; throws a catchable located blame.
-      addedEdges = builtins.filter (e: !(builtins.elem e (accessor.edges changedId))) newEdgesU;
+      # Forces selfReachable over accessor'.dependencies; throws a catchable located blame.
+      addedEdges = builtins.filter (e: !(builtins.elem e (accessor.dependencies changedId))) newEdgesU;
       checkedAccessor = if addedEdges == [ ] then accessor' else reCycleCheck accessor' [ changedId ];
 
       # Reverse cone of changedId over the NEW accessor (added edges pull new
       # producers in as DEPS, not dependents; removed edges shrink the cone).
-      revCone = prelude.unique ([ changedId ] ++ graph.dependentsOf checkedAccessor changedId);
+      revCone = prelude.unique (
+        [ changedId ] ++ graph.dependentsOf (graphView checkedAccessor) changedId
+      );
       # The newly-reachable producers are new nodes: they have no prior value to be
       # clean against, so the decision here is `nothing is clean` for the same reason
       # the cone splice's is.
@@ -276,7 +279,7 @@ in
       trace' =
         ctx.trace
         // prelude.genAttrs rehash (id: {
-          deps = checkedAccessor.edges id;
+          deps = checkedAccessor.dependencies id;
           hash = hashGuarded hashOf store'.${id};
         });
     in

@@ -45,7 +45,7 @@ let
   };
 
   mkCtx =
-    { roots, declaredEdges }:
+    { roots, declaredDependencies }:
     let
       parseParent = _: null;
       eval = genScope.eval { inherit roots attributes parseParent; };
@@ -56,11 +56,11 @@ let
         attributes
         parseParent
         eval
-        declaredEdges
+        declaredDependencies
         ;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        edges = declaredEdges;
+        dependencies = declaredDependencies;
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };
@@ -77,23 +77,23 @@ let
       };
     };
 
-  declaredEdges = id: if id == "consumer" then [ "producer" ] else [ ];
+  declaredDependencies = id: if id == "consumer" then [ "producer" ] else [ ];
 
   # (1) the read is declared — the consumer is in the producer's cone
   ctxD = mkCtx {
     roots = mkRoots 1;
-    inherit declaredEdges;
+    inherit declaredDependencies;
   };
   ctxD' = bump ctxD;
   freshD = mkCtx {
     roots = mkRoots 9;
-    inherit declaredEdges;
+    inherit declaredDependencies;
   };
 
   # (2) the read is NOT declared — the consumer is outside the cone and is served stale
   ctxN = mkCtx {
     roots = mkRoots 1;
-    declaredEdges = _: [ ];
+    declaredDependencies = _: [ ];
   };
   ctxN' = bump ctxN;
 in

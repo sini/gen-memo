@@ -75,7 +75,7 @@ let
     };
 
   # `other` depends on `node`, so it is inside `node`'s reverse cone and must be recomputed.
-  declaredEdges = id: if id == "other" then [ "node" ] else [ ];
+  declaredDependencies = id: if id == "other" then [ "node" ] else [ ];
 
   mkCtx =
     seed: v:
@@ -91,11 +91,11 @@ let
         attributes
         parseParent
         eval
-        declaredEdges
+        declaredDependencies
         ;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        edges = declaredEdges;
+        dependencies = declaredDependencies;
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };

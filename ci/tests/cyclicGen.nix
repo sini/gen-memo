@@ -20,7 +20,12 @@
 # the declared maxIter = 100. The 120-seed property therefore never triggers an uncatchable
 # runScc divergence — the soundness gate measures fixed-point-EQUALITY, not
 # termination luck.
-{ lib, graph, ... }:
+{
+  lib,
+  graph,
+  fx,
+  ...
+}:
 let
   # glibc LCG (identical to gen.nix). 64-bit safe: lcg < 2^31, salts small.
   mod = a: b: a - b * (a / b);
@@ -80,7 +85,7 @@ let
         }) idx
       );
 
-      acc = graph.mkGraph {
+      acc = fx.mkPlaneAccessor {
         edges = edgesList;
         nodeData = weightsMap;
       };
@@ -89,7 +94,7 @@ let
       # Monotone + bounded by the global max weight ⇒ always converges.
       recompute =
         a: s: id:
-        lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.edges id));
+        lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
 
       # Per-node OVERWRITE lattice for ALL ids. Declaring every node is safe:
       # build/restabilize only require the CYCLIC nodes to carry a lattice; the

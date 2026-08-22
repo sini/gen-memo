@@ -4,6 +4,7 @@
   graph,
   mkCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -65,7 +66,7 @@ let
     if x < 0 then -x else x;
   absHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   # single isolated leaf "l" (no deps, no dependents) keeps the collision local.
-  collisionAcc = graph.mkGraph {
+  collisionAcc = fx.mkPlaneAccessor {
     nodeData = {
       l = {
         weight = 30;
@@ -94,7 +95,7 @@ let
   # to REUSE. A recompute that THROWS on b/a must therefore NEVER fire. With the v1
   # whole-cone splice this would throw (it recomputed every cone node); the
   # needsEval gate makes the override succeed. The asymmetry is the proof.
-  collisionChainAcc = graph.mkGraph {
+  collisionChainAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -157,9 +158,9 @@ let
   # --- hand-computed pins (NOT oracle-derived): chain a->b->c ---
   pinRecompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   pinHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
-  pinAcc = graph.mkGraph {
+  pinAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -211,7 +212,7 @@ let
   # d depends on c AND e; override c. cone = {c, d}. e is NOT in the cone, so d's
   # recompute must read e from ctx.store (via ctx.store // s). Bare `s` would miss
   # e entirely. build: c=1, e=2, d=10+1+2=13. After c:=100: d=10+100+2=112.
-  fanAcc = graph.mkGraph {
+  fanAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "d";
@@ -264,7 +265,7 @@ let
     ov.store == oracle.store;
 
   # wide diamond: top fans out to m1..m4, all fan in to a shared base.
-  wideDiamond = graph.mkGraph {
+  wideDiamond = fx.mkPlaneAccessor {
     edges =
       builtins.concatMap
         (m: [
@@ -311,7 +312,7 @@ let
   };
 
   # deep chain n0 -> n1 -> ... -> n5 (n0 depends on n1 … n4 depends on n5).
-  deepChain = graph.mkGraph {
+  deepChain = fx.mkPlaneAccessor {
     edges =
       map
         (i: {

@@ -3,6 +3,7 @@
   genMemo,
   graph,
   engine,
+  fx,
   ...
 }:
 let
@@ -17,9 +18,9 @@ let
   # chain a->b->c (edges a=["b"], b=["c"], c=[]) — consumer→producer.
   recompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
-  acc = graph.mkGraph {
+  acc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -53,7 +54,7 @@ let
   accessor' = ctx.accessor // {
     nodeData = id: if id == changedId then { weight = 200; } else ctx.accessor.nodeData id;
   };
-  cone = lib.unique ([ changedId ] ++ graph.dependentsOf accessor' changedId);
+  cone = lib.unique ([ changedId ] ++ graph.dependentsOf (fx.graphOf accessor') changedId);
   coneSet = lib.genAttrs cone (_: true);
   # the recomputed store over the changed accessor: c=200, b=210, a=211.
   spliced = ctx.store // lib.fix (s: lib.genAttrs cone (id: recompute accessor' (ctx.store // s) id));
@@ -65,7 +66,7 @@ let
   };
 
   # --- a function-bearing node => hash = null => always-dirty ---
-  lambdaAcc = graph.mkGraph {
+  lambdaAcc = fx.mkPlaneAccessor {
     nodeData = {
       f = { };
     };

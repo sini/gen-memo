@@ -23,7 +23,7 @@
 #
 #   why : the verdict an override of `changedId` would produce for `id`. Acar 2002
 #     §7 read-rule, reframed: l∈C → recomputed, cmp-unchanged → cutoff, l∉C →
-#     unaffected. `graph.canReach ctx.accessor id changedId` is the single
+#     unaffected. `graph.canReach (graphView ctx.accessor) id changedId` is the single
 #     Θ( Σ_{u ∈ reach id} (1 + outdeg u) ) verdict fast path — reducing to the
 #     cone's size only at BOUNDED out-degree, Θ(n²) on a complete DAG, since the
 #     operator re-reads `edges` at every visit (forward edges — NOT transposed:
@@ -45,9 +45,9 @@
 #     `why`/`whyNot` are UNCHANGED and keep the point query — the amortization is a
 #     decision the CALLER makes, never a cost imposed on the caller asking once.
 #
-# Edge convention: accessor.edges id = ids `id` depends on (consumer→producer); an
-# override of `changedId` recomputes its dependent cone, i.e. every `id` that can
-# REACH `changedId` over forward edges.
+# Dependency convention: accessor.dependencies id = ids `id` depends on
+# (consumer→producer); an override of `changedId` recomputes its dependent cone, i.e.
+# every `id` that can REACH `changedId` over forward edges.
 { prelude, graph, ... }@args:
 let
   sort = builtins.sort builtins.lessThan;
@@ -55,23 +55,27 @@ let
   # The cone operator, imported directly rather than reached through the library
   # value: one definition of the dependent cone, shared by the dual below.
   inherit (import ./dirtySet.nix args) dirtySet;
+  inherit (import ./graph-view.nix { }) graphView;
 
   # support : BuiltCtx -> id -> [id]
-  # Transitive declared producers of `id`, sorted, `id` excluded. Edges are read
+  # Transitive declared producers of `id`, sorted, `id` excluded. The relation is read
   # from the trace snapshot (falling back to the live accessor for any id the
   # trace has no entry for) so support is consistent with the committed override.
   # reachableFrom already excludes the start node.
   support =
     ctx: id:
     sort (
+      # The `edges` key is gen-graph's own parameter name; the relation supplied for it
+      # is this plane's trace-or-declared reading. Two vocabularies meet on one line, so
+      # neither name is a typo for the other.
       graph.reachableFrom {
-        edges = id': ctx.trace.${id'}.deps or (ctx.accessor.edges id');
+        edges = id': ctx.trace.${id'}.deps or (ctx.accessor.dependencies id');
       } id
     );
 
   # supportDirect : the depth-1 declared producers (sorted) — the immediate
   # in-edges from the trace snapshot, without the transitive closure.
-  supportDirect = ctx: id: sort (ctx.trace.${id}.deps or (ctx.accessor.edges id));
+  supportDirect = ctx: id: sort (ctx.trace.${id}.deps or (ctx.accessor.dependencies id));
 
   # _verdict : BuiltCtx -> { changedId; cutoffs } -> (id -> bool) -> id -> WhyResult
   #   WhyResult = { verdict = "unaffected"; }
@@ -103,7 +107,7 @@ let
       # the change origin). interior p = prelude.init (prelude.tail p): tail drops `id`, init
       # drops `changedId` — a direct edge [id, changedId] has interior [].
       let
-        paths = graph.pathsBetween ctx.accessor id changedId;
+        paths = graph.pathsBetween (graphView ctx.accessor) id changedId;
         # THE ORIGIN'S SELF-PATH IS THE SINGLETON, AND ITS INTERIOR IS EMPTY BY THE
         # DEFINITION ABOVE, not by a carve-out: `pathsBetween x x` is [ x ], whose endpoints
         # coincide, so no node lies strictly between them. `tail` leaves [ ] and `init [ ]`
@@ -159,7 +163,7 @@ let
     # forward edges (or IS changedId — the change origin, always recomputed). No
     # transpose: canReach already walks consumer→producer.
     _verdict ctx { inherit changedId cutoffs; } (
-      i: i == changedId || graph.canReach ctx.accessor i changedId
+      i: i == changedId || graph.canReach (graphView ctx.accessor) i changedId
     ) id;
 
   # whyFor : BuiltCtx -> { changedId; cutoffs ? {} } -> id -> WhyResult

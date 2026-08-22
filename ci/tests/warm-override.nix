@@ -58,7 +58,7 @@ let
     {
       roots,
       parseParent ? (_: null),
-      declaredEdges ? (_: [ ]),
+      declaredDependencies ? (_: [ ]),
     }:
     let
       eval = genScope.eval { inherit roots attributes parseParent; };
@@ -69,11 +69,11 @@ let
         attributes
         parseParent
         eval
-        declaredEdges
+        declaredDependencies
         ;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        edges = declaredEdges;
+        dependencies = declaredDependencies;
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };
@@ -193,7 +193,7 @@ in
           cctx = mkCtx {
             inherit roots;
             parseParent = pp roots;
-            declaredEdges = id: if id == "child" then [ "parent" ] else [ "child" ];
+            declaredDependencies = id: if id == "child" then [ "parent" ] else [ "child" ];
           };
         in
         project (warmOverride engine cctx {

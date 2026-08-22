@@ -15,7 +15,8 @@
 # complete DAG.
 { graph, ... }:
 let
-  affected = ctx: id: graph.dependentsOf ctx.accessor id;
+  inherit (import ./graph-view.nix { }) graphView;
+  affected = ctx: id: graph.dependentsOf (graphView ctx.accessor) id;
 in
 {
   inherit affected;

@@ -11,6 +11,7 @@
   graph,
   mkCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -25,9 +26,9 @@ let
   # node value = own weight + Σ dep values. ctx.store: c=100, b=110, a=111.
   recompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
-  chainAcc = graph.mkGraph {
+  chainAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -187,7 +188,7 @@ let
   # Change base (cone = everything) AND m2 (cone = {m2, top}) in one batch. The
   # single union-cone lib.fix must reach the same fixed point as a full rebuild —
   # the overlap at `top` is visited ONCE (lib.unique), not double-recomputed.
-  wideDiamond = graph.mkGraph {
+  wideDiamond = fx.mkPlaneAccessor {
     edges =
       builtins.concatMap
         (m: [

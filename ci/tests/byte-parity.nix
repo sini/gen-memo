@@ -54,6 +54,7 @@
   graph,
   lib,
   engine,
+  fx,
   ...
 }:
 let
@@ -119,7 +120,7 @@ let
     };
 
   # ── Fleet shape: a shared producer and three consumers. ──
-  fleetAcc = graph.mkGraph {
+  fleetAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "h1";
@@ -152,14 +153,14 @@ let
 
   valueRecompute =
     acc: s: id:
-    (acc.nodeData id).w + builtins.foldl' (sum: d: sum + s.${d}) 0 (acc.edges id);
+    (acc.nodeData id).w + builtins.foldl' (sum: d: sum + s.${d}) 0 (acc.dependencies id);
 
   # The derivation arm's node value is the drvPath — see the header. The dependency edge is real:
   # a node's derivation takes its producers' drvPaths as inputs, so a producer whose identity
   # moved moves every consumer's identity with it.
   drvPathRecompute =
     acc: s: id:
-    (mkDrv "gen-memo-parity-${id}" (map (d: s.${d}) (acc.edges id)) (acc.nodeData id).w).drvPath;
+    (mkDrv "gen-memo-parity-${id}" (map (d: s.${d}) (acc.dependencies id)) (acc.nodeData id).w).drvPath;
 
   # ── THE DERIVATION ARM WITH A DERIVATION AS THE NODE VALUE, which is the shape the arm above
   # could not take. A node value holding a derivation used to abort the trace's hash walk
@@ -170,7 +171,7 @@ let
   # form that cannot compare equal to a plain string.
   drvValueRecompute = acc: s: id: {
     pkg = mkDrv "gen-memo-parity-value-${id}" (map (d: s.${d}.pkg.drvPath) (
-      acc.edges id
+      acc.dependencies id
     )) (acc.nodeData id).w;
   };
 
@@ -235,7 +236,7 @@ let
 
   # ── The cyclic arm: its cold side is a STRATIFIED build, so it is spelled out rather than
   # routed through `parity`. ──
-  cyclicAcc = graph.mkGraph {
+  cyclicAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "p";
@@ -273,7 +274,7 @@ let
     acc: s: id:
     let
       w = (acc.nodeData id).w;
-      deps = builtins.filter (d: s ? ${d}) (acc.edges id);
+      deps = builtins.filter (d: s ? ${d}) (acc.dependencies id);
     in
     builtins.foldl' (m: d: if s.${d} > m then s.${d} else m) w deps;
 in

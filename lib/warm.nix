@@ -135,12 +135,12 @@ let
       };
 
       # The verifying-trace shape (Mokhov 2018 §4.2.2): per key, its deps and a content hash. The
-      # deps are the accessor's own declared edges, read where they live rather than through a
-      # second surface that restates them. The hash is null, which this library's guards read as
+      # deps are the accessor's own declared dependencies, read where they live rather than through
+      # a second surface that restates them. The hash is null, which this library's guards read as
       # conservatively-always-dirty — the same trade the cone makes, for the same reason: a hash
       # here would force the spine the evaluator is about to force anyway.
       trace' = prelude.genAttrs (builtins.attrNames eval'.allNodes) (nid: {
-        deps = accessor'.edges nid;
+        deps = accessor'.dependencies nid;
         hash = null;
       });
 

@@ -7,6 +7,7 @@
   genMemo,
   graph,
   engine,
+  fx,
   ...
 }:
 let
@@ -16,11 +17,11 @@ let
 
   recompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
   # chain a -> b -> c (a deps b, b deps c). ctx.store: c=100, b=110, a=111.
-  acc = graph.mkGraph {
+  acc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -73,7 +74,7 @@ let
       x = (a.nodeData id).weight - 50;
     in
     if x < 0 then -x else x;
-  collAcc = graph.mkGraph {
+  collAcc = fx.mkPlaneAccessor {
     nodeData = {
       l = {
         weight = 30;
@@ -95,7 +96,7 @@ let
   };
 
   # --- function-bearing node (hash = null) is always affected when in the cone ---
-  lambdaAcc = graph.mkGraph {
+  lambdaAcc = fx.mkPlaneAccessor {
     nodeData = {
       f = { };
     };

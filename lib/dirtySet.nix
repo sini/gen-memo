@@ -13,8 +13,13 @@
 # Uses concatMap over the single-target graph.dependentsOf rather than the
 # O(n²) multi-target `dependents` — cheaper for the small changed-id sets v1 sees.
 { prelude, graph, ... }:
+let
+  inherit (import ./graph-view.nix { }) graphView;
+in
 {
   dirtySet =
     ctx: changedIds:
-    prelude.unique (changedIds ++ prelude.concatMap (graph.dependentsOf ctx.accessor) changedIds);
+    prelude.unique (
+      changedIds ++ prelude.concatMap (graph.dependentsOf (graphView ctx.accessor)) changedIds
+    );
 }

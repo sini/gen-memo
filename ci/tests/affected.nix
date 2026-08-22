@@ -2,6 +2,7 @@
   genMemo,
   graph,
   engine,
+  fx,
   ...
 }:
 let
@@ -10,7 +11,7 @@ let
 
   # chain: a->b->c->d (edges a=["b"], …) — a depends on b depends on c depends on d.
   ctx = build {
-    accessor = graph.fixtures.chain;
+    accessor = (fx.planeOf graph.fixtures.chain);
     recompute =
       _acc: _s: id:
       id;
@@ -31,7 +32,7 @@ in
     # re-export of graph.dependentsOf over the ctx's accessor.
     test-affected-eq-dependentsOf = {
       expr = affected ctx "d";
-      expected = graph.dependentsOf ctx.accessor "d";
+      expected = graph.dependentsOf (fx.graphOf ctx.accessor) "d";
     };
     # nothing depends on the root "a".
     test-affected-root = {

@@ -38,6 +38,11 @@
       engine = (import ../reference/schedule.nix { inherit prelude; }) // {
         inherit (gen-scope.lib) evalWarm;
       };
+
+      # Fixture constructors. They live outside ./tests so the harness does not collect them as a
+      # test module, and they reach every module through specialArgs rather than through an import
+      # repeated in each one.
+      fx = import ./fixtures.nix { inherit graph; };
     in
     gen-harness.lib.mkCi {
       inherit inputs;
@@ -49,6 +54,7 @@
           graph
           prelude
           engine
+          fx
           ;
         genScope = gen-scope.lib;
       };

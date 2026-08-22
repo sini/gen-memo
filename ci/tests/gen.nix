@@ -17,7 +17,12 @@
 #     well-defined; function-valued nodes are out of this property's reach (they
 #     are sound-by-always-dirty, not by store ==). The fixed adversarial fixtures
 #     in override.nix complement these random DAGs with hand-built shapes.
-{ lib, graph, ... }:
+{
+  lib,
+  graph,
+  fx,
+  ...
+}:
 let
   # glibc LCG. 64-bit safe: lcg always returns < 2^31, and the salts i,j added are
   # small (< 2^31), so every lcg input stays < 2^32 ⇒ 1103515245·input < 9.2e18.
@@ -58,7 +63,7 @@ let
         }) idx
       );
 
-      acc = graph.mkGraph {
+      acc = fx.mkPlaneAccessor {
         edges = edgesList;
         nodeData = weightsMap;
       };
@@ -74,10 +79,10 @@ let
         nodeData = id: if id == changedId then newDecls else acc.nodeData id;
       };
 
-      # node value = own weight + sum of dep values (deps from accessor.edges).
+      # node value = own weight + sum of dep values (deps from accessor.dependencies).
       recompute =
         a: s: id:
-        (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+        (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
 
       hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
     in

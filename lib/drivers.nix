@@ -27,6 +27,7 @@
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
   inherit (import ./strategies.nix { }) needsEval;
+  inherit (import ./graph-view.nix { }) graphView;
 in
 rec {
   # applyDelta — data-change only; return stale-pending ctx.
@@ -114,10 +115,12 @@ rec {
           trace
           accessor
           ;
-        accessor' = ctx.accessor; # edges fixed
+        accessor' = ctx.accessor; # dependencies fixed
 
         # Union-cone: seeds + their dependents (entire affected region).
-        unionCone = prelude.unique (seeds ++ prelude.concatMap (graph.dependentsOf accessor') seeds);
+        unionCone = prelude.unique (
+          seeds ++ prelude.concatMap (graph.dependentsOf (graphView accessor')) seeds
+        );
         unionSet = prelude.genAttrs unionCone (_: true);
         seedSet = prelude.genAttrs seeds (_: true);
         newHashOf = id: hashGuarded hashOf builtStore.${id};
@@ -162,7 +165,7 @@ rec {
         trace' =
           ctx.trace
           // prelude.genAttrs affectedInUnion (id: {
-            deps = accessor'.edges id;
+            deps = accessor'.dependencies id;
             hash = newHashOf id;
           });
       in

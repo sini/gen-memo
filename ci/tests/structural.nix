@@ -12,6 +12,7 @@
   graph,
   mkStructuralCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -22,12 +23,12 @@ let
 
   recompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
   # ----- hand-built chain a -> b -> c (a deps b, b deps c) --------------------
   # ctx.store: c=100, b=10+100=110, a=1+110=111.
-  chainAcc = graph.mkGraph {
+  chainAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -90,7 +91,7 @@ let
   npEdgesOf = id: if id == "z" then [ "w" ] else [ ];
   npAccessor = {
     nodes = [ "a" ]; # only a is live initially
-    edges = npEdgesOf;
+    dependencies = npEdgesOf;
     nodeData = id: npNodeData.${id} or { };
     parent = _id: null;
   };
@@ -154,7 +155,7 @@ let
   chainStep2 = retract chainStep1 "a" null; # default error; a has no in-edges
   chainStep3 = applyEdgeDelta chainStep2 "b" [ ];
   # oracle: the thrice-edited from-scratch build.
-  chainOracleAcc = graph.mkGraph {
+  chainOracleAcc = fx.mkPlaneAccessor {
     edges = [ ]; # a deleted, b no longer reads c, c is a leaf ⇒ no edges
     nodeData = {
       b = {

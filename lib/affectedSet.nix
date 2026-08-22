@@ -24,6 +24,7 @@
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
   inherit (import ./strategies.nix { }) needsEval;
+  inherit (import ./graph-view.nix { }) graphView;
 in
 {
   affectedSet =
@@ -32,7 +33,9 @@ in
     let
       # Over-approx cone of all changed ids (edges fixed ⇒ cone is stable). O(1)
       # membership via genAttrs — never builtins.elem.
-      cone = prelude.unique (changedIds ++ prelude.concatMap (graph.dependentsOf accessor') changedIds);
+      cone = prelude.unique (
+        changedIds ++ prelude.concatMap (graph.dependentsOf (graphView accessor')) changedIds
+      );
       coneSet = prelude.genAttrs cone (_: true);
       changedSet = prelude.genAttrs changedIds (_: true);
       newHashOf = id: hashGuarded ctx.hashOf builtStore.${id};

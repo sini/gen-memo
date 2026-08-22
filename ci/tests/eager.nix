@@ -15,6 +15,7 @@
   graph,
   mkCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -50,11 +51,11 @@ let
   # `weight + Σdeps` recompute (additive; never collides — every move propagates).
   sumRecompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.dependencies id);
 
   # --- Pin 1: leaf change on a chain a -> b -> c (a depends on b depends on c) ---
   # cone = {a,b,c}; changing the leaf c moves the whole chain.
-  chainAcc = graph.mkGraph {
+  chainAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -85,7 +86,7 @@ let
 
   # --- Pin 2: diamond  d -> {b,c} -> a (d depends on b,c; b,c depend on a) ---
   # change the root a; both arms then the apex d move (whole cone).
-  diamondAcc = graph.mkGraph {
+  diamondAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "b";
@@ -130,7 +131,7 @@ let
   cap = 100;
   rawOf =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.dependencies id);
   satRecompute =
     a: s: id:
     let
@@ -140,7 +141,7 @@ let
 
   deepN = 8;
   deepIds = map (i: "n${toString i}") (lib.range 0 (deepN - 1));
-  deepAcc = graph.mkGraph {
+  deepAcc = fx.mkPlaneAccessor {
     edges = map (i: {
       from = "n${toString i}";
       to = "n${toString (i - 1)}";
@@ -264,10 +265,10 @@ let
   joinSat =
     a: s: id:
     let
-      raw = (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.edges id);
+      raw = (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}) 0 (a.dependencies id);
     in
     if raw > joinCap then joinCap else raw;
-  joinAcc = graph.mkGraph {
+  joinAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "M";

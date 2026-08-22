@@ -55,11 +55,12 @@
 # height obligation (Arntzenius's preconditions for Kleene ascent); the only
 # runtime divergence guard is `runScc`'s per-member maxIter (a catchable blame).
 #
-# Edge convention: accessor.edges id = [ids that id depends on] (consumer→producer).
+# Dependency convention: accessor.dependencies id = [ids that id depends on] (consumer→producer).
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded;
   inherit (import ./restabilize.nix { inherit prelude graph; }) runScc;
+  inherit (import ./graph-view.nix { }) graphView;
 
   build =
     engine:
@@ -71,14 +72,14 @@ let
     }:
     let
       # Authoritative cyclic id-set (sorted) — graph.cycles (gen-graph/lib/global.nix).
-      cyclic = graph.cycles accessor;
+      cyclic = graph.cycles (graphView accessor);
 
       # Per-key trace shape, shared by both paths (Mokhov verifying-trace shape):
       # per-key dep list + content hash (null when the value is unhashable).
       traceFor =
         store:
         prelude.genAttrs accessor.nodes (id: {
-          deps = accessor.edges id;
+          deps = accessor.dependencies id;
           hash = hashGuarded hashOf store.${id};
         });
 
@@ -95,7 +96,7 @@ let
             {
               why = "cycle";
               cycle = cyclic;
-              path = graph.pathsBetween accessor a b;
+              path = graph.pathsBetween (graphView accessor) a b;
             };
 
           # The flat relocatable store (this library's own property, see the header).
@@ -146,7 +147,7 @@ let
           # door's record is PLAIN DATA — `members` is a map, not a lookup function,
           # because a function's identity is minted by the build that made it and cannot
           # cross a library boundary.
-          cond = graph.condensation accessor;
+          cond = graph.condensation (graphView accessor);
           cyclicSet = prelude.genAttrs cyclic (_: true);
 
           # Bottom-up fold over the condensation strata (producers-first). Each

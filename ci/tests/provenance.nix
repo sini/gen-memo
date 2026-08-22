@@ -13,6 +13,7 @@
   graph,
   mkCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -41,13 +42,13 @@ let
   sort = builtins.sort builtins.lessThan;
 
   # chain a->b->c->d : edges a=[b], b=[c], c=[d], d=[] (consumer→producer).
-  chainCtx = mkCtx graph.fixtures.chain;
+  chainCtx = mkCtx (fx.planeOf graph.fixtures.chain);
   # diamond a->{b,c}->d : edges a=[b,c], b=[d], c=[d], d=[].
-  diamondCtx = mkCtx graph.fixtures.diamond;
+  diamondCtx = mkCtx (fx.planeOf graph.fixtures.diamond);
 
   # --- a function-bearing node (hash = null) for the null-hash support/why cases.
   # f depends on g; g's value carries a function ⇒ trace.g.hash = null.
-  lambdaAcc = graph.mkGraph {
+  lambdaAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "f";

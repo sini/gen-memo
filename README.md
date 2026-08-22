@@ -259,10 +259,16 @@ The internal hash guards (`hashGuarded`, `hashEq`, `hashMoved`) are **not** on t
 imported directly by the files that need them; the evaluator this plane decides for is owed no hash
 surface at all.
 
-## Edge Convention
+## Dependency Convention
 
-`accessor.edges id` is **the ids that `id` depends on** — consumer to producer. A dependent cone is
-therefore reverse reachability over those edges.
+`accessor.dependencies id` is **the ids that `id` depends on** — consumer to producer. A dependent
+cone is therefore reverse reachability over that relation.
+
+The name is not `edges`, and the distinction is load-bearing rather than cosmetic. This relation is
+the node-level **dependency** relation (Knuth's `D(T)`); `edges` is what gen-graph's generic
+operators call the scope-to-scope relation they walk, and they keep that name. The two are crossed
+at one place — `lib/graph-view.nix` — so every call into gen-graph constructs its argument
+explicitly instead of relying on the two vocabularies having happened to coincide.
 
 ## Scope and Soundness
 

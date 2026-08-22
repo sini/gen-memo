@@ -14,10 +14,10 @@ in
     { accessor', spliced }:
     id:
     let
-      depsMatch = ctx.trace.${id}.deps == accessor'.edges id;
+      depsMatch = ctx.trace.${id}.deps == accessor'.dependencies id;
       allDepsClean = builtins.all (
         d: hashEq (hashGuarded ctx.hashOf spliced.${d}) (ctx.trace.${d}.hash or null)
-      ) (accessor'.edges id);
+      ) (accessor'.dependencies id);
     in
     if depsMatch && allDepsClean then
       {
@@ -46,6 +46,6 @@ in
     id == changedId
     || (trace.${id}.hash or null) == null
     || builtins.any (d: (coneSet ? ${d}) && hashMoved (newHashOf d) (trace.${d}.hash or null)) (
-      accessor'.edges id
+      accessor'.dependencies id
     );
 }

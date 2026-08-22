@@ -23,6 +23,7 @@
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
+  inherit (import ./graph-view.nix { }) graphView;
 in
 {
   propagateEager =
@@ -32,10 +33,11 @@ in
       accessor' = ctx.accessor // {
         nodeData = id: changes.${id} or (ctx.accessor.nodeData id);
       };
-      cone = prelude.unique (changedIds ++ prelude.concatMap (graph.dependentsOf accessor') changedIds);
+      graphOf = graphView accessor';
+      cone = prelude.unique (changedIds ++ prelude.concatMap (graph.dependentsOf graphOf) changedIds);
       coneSet = prelude.genAttrs cone (_: true);
-      rank = graph.coneRank accessor' cone;
-      revAll = graph.directDependents accessor'; # FULL direct reverse-adjacency map
+      rank = graph.coneRank graphOf cone;
+      revAll = graph.directDependents graphOf; # FULL direct reverse-adjacency map
       # Restrict to cone: a moved node enqueues only its IN-CONE direct dependents. gen-graph
       # publishes the full map (the cone restriction is the caller's job); do NOT drop the
       # filter to `revAll.${id}` — out-of-cone dependents would be recomputed + wrongly re-hashed.
@@ -77,7 +79,7 @@ in
       trace' =
         ctx.trace
         // prelude.genAttrs final.affected (id: {
-          deps = accessor'.edges id;
+          deps = accessor'.dependencies id;
           hash = hashGuarded ctx.hashOf store.${id};
         });
     in

@@ -3,6 +3,7 @@
   genMemo,
   graph,
   engine,
+  fx,
   ...
 }:
 let
@@ -18,9 +19,9 @@ let
         id;
       hashOf = builtins.toString;
     };
-  chainCtx = mkCtx graph.fixtures.chain;
+  chainCtx = mkCtx (fx.planeOf graph.fixtures.chain);
   # diamond: a->{b,c}->d (edges a=["b","c"], b=["d"], c=["d"], d=[]).
-  diamondCtx = mkCtx graph.fixtures.diamond;
+  diamondCtx = mkCtx (fx.planeOf graph.fixtures.diamond);
 
   sort = builtins.sort builtins.lessThan;
 in
@@ -43,7 +44,9 @@ in
     # canonical form (acceptance): deduped union of changed ids + their cones.
     test-canonical-form = {
       expr = dirtySet diamondCtx [ "d" ];
-      expected = lib.unique ([ "d" ] ++ lib.concatMap (graph.dependentsOf diamondCtx.accessor) [ "d" ]);
+      expected = lib.unique (
+        [ "d" ] ++ lib.concatMap (graph.dependentsOf (fx.graphOf diamondCtx.accessor)) [ "d" ]
+      );
     };
     # two-change union + dedup on diamond: cone(b)=cone(c)={a}, so a appears once.
     test-two-change-dedup = {

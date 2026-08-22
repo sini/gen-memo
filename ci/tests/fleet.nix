@@ -37,6 +37,7 @@
   graph,
   lib,
   engine,
+  fx,
   ...
 }:
 let
@@ -73,7 +74,7 @@ let
   recordedSavedFraction = 0.6671837496042232;
   floor = 0.60;
 
-  fleetAcc = graph.mkGraph {
+  fleetAcc = fx.mkPlaneAccessor {
     edges = map (h: {
       from = h;
       to = "shared";

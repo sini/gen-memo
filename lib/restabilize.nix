@@ -46,11 +46,12 @@
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
+  inherit (import ./graph-view.nix { }) graphView;
 
   # runScc — solve one SCC to its least fixed point (per-member iterate-from-⊥).
   #
   # runScc :: {
-  #   accessor,            # any object exposing .edges / .nodeData (topology oracle)
+  #   accessor,            # any object exposing .dependencies / .nodeData (topology oracle)
   #   store,               # externals map (lower-stratum / fixed inputs)
   #   recompute,           # accessor -> store -> id -> value (the node-eval)
   #   scc,                 # [id] — the SCC member ids (M)
@@ -217,7 +218,7 @@ let
       # computed fresh to mirror build). A cyclic node lacking a lattice is a
       # LOCATED blame — restabilize's own check (build would have rejected the
       # fixpoint up front, but a post-build mutation can drop one).
-      cyclic = graph.cycles accessor';
+      cyclic = graph.cycles (graphView accessor');
       missing = builtins.filter (id: !(fixpoint.lattices ? ${id})) cyclic;
       undeclaredBlame = {
         why = "undeclared-cyclic-node";
@@ -225,12 +226,12 @@ let
         cycle = cyclic;
       };
 
-      cond = graph.condensation accessor';
+      cond = graph.condensation (graphView accessor');
       cyclicSet = prelude.genAttrs cyclic (_: true);
 
       # Dependent cone of changedId (reverse reachability; valid on cyclic
       # graphs — Arntzenius 2016 reverse reachability).
-      cone = prelude.unique ([ changedId ] ++ graph.dependentsOf accessor' changedId);
+      cone = prelude.unique ([ changedId ] ++ graph.dependentsOf (graphView accessor') changedId);
       coneSet = prelude.genAttrs cone (_: true);
 
       # Bottom-up fold (producers-first over the condensation), accumulator SEEDED
@@ -278,7 +279,7 @@ let
       trace' =
         ctx.trace
         // prelude.genAttrs affected (id: {
-          deps = accessor'.edges id;
+          deps = accessor'.dependencies id;
           hash = newHashOf id;
         });
 

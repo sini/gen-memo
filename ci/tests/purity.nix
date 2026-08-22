@@ -314,7 +314,7 @@ in
     #
     # `reference/schedule.nix` is NOT a member, by construction rather than by omission: it is read
     # by the store-fix control below, which is a different subject, not by the library scan. It
-    # carries a prelude, so joining it would move this list to 18 AND the live-content list to 14,
+    # carries a prelude, so joining it would move this list to 19 AND the live-content list to 14,
     # and widen the library cell's subject past `lib/**` plus the two roots, which is more than
     # that cell claims.
     test-scan-subject-is-the-library-tree = {
@@ -327,6 +327,7 @@ in
         "lib/dirtySet.nix"
         "lib/drivers.nix"
         "lib/eager.nix"
+        "lib/graph-view.nix"
         "lib/hash.nix"
         "lib/merge.nix"
         "lib/provenance.nix"
@@ -355,12 +356,13 @@ in
     # carrying one swells it to all seventeen. A list asserted at FULL coverage would be satisfied by
     # the second and would not discriminate it.
     #
-    # `lib/affected.nix`, `lib/hash.nix`, `lib/strategies.nix` and `lib/warmTrace.nix` are outside
-    # the list by construction, not by accident: `affected.nix` takes `{ graph, ... }`, `hash.nix`
+    # `lib/affected.nix`, `lib/graph-view.nix`, `lib/hash.nix`, `lib/strategies.nix` and
+    # `lib/warmTrace.nix` are outside the list by construction, not by accident: `affected.nix`
+    # takes `{ graph, ... }`, `graph-view.nix` takes `{ }` and is one record update, `hash.nix`
     # takes `{ ... }` and reaches for `builtins.*` directly, `strategies.nix` takes `{ ... }` and
     # imports `./hash.nix`, and `warmTrace.nix` takes `{ ... }` and is two functions over data with
     # no traversal to fold. None names a prelude because none uses one. What bounds that residue is
-    # `test-scan-reads-non-empty-sources` above: emptying one of those four files' `code` alone
+    # `test-scan-reads-non-empty-sources` above: emptying one of those five files' `code` alone
     # leaves this cell green — the label was never in the list — and the floor is the only cell
     # that reds it.
     test-scan-reads-are-live = {

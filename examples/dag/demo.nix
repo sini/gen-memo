@@ -15,10 +15,10 @@ let
   inherit (genMemo) dirtySet;
 
   # Hand-written accessor (the demo needs no gen-graph constructor; build wires
-  # graph.cycles/dependentsOf in itself). Edge convention: edges id = deps of id.
+  # graph.cycles/dependentsOf in itself). Dependency convention: dependencies id = deps of id.
   mkAcc = nodeDataMap: edgesMap: {
     nodes = builtins.attrNames nodeDataMap;
-    edges = id: edgesMap.${id} or [ ];
+    dependencies = id: edgesMap.${id} or [ ];
     nodeData = id: nodeDataMap.${id} or { };
     parent = _id: null;
   };
@@ -61,7 +61,7 @@ let
   recompute =
     acc: s: id:
     let
-      deps = acc.edges id;
+      deps = acc.dependencies id;
     in
     builtins.trace "recompute ${id}" (
       (acc.nodeData id).weight + builtins.foldl' (sum: d: sum + s.${d}) 0 deps

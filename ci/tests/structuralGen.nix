@@ -22,7 +22,12 @@
 # SCOPE: node values are INTEGERS (hashable / toJSON-able), so store
 # byte-equality is well-defined; the recompute mirrors gen.nix
 # (own weight + Σ dep values), so a topology change genuinely moves values.
-{ lib, graph, ... }:
+{
+  lib,
+  graph,
+  fx,
+  ...
+}:
 let
   # glibc LCG (same constants/64-bit-safety argument as gen.nix).
   mod = a: b: a - b * (a / b);
@@ -60,7 +65,7 @@ let
         }) idx
       );
 
-      acc = graph.mkGraph {
+      acc = fx.mkPlaneAccessor {
         edges = edgesList;
         nodeData = weightsMap;
       };
@@ -84,7 +89,7 @@ let
         from = changedId;
         to = t;
       }) newEdges;
-      accEdge = graph.mkGraph {
+      accEdge = fx.mkPlaneAccessor {
         edges = edgesWithoutChanged ++ newEdgeRecords;
         nodeData = weightsMap;
       };
@@ -95,14 +100,14 @@ let
       deadId = nameOf (mod (rnd seed 23 23) nNodes);
       edgesWithoutDead = builtins.filter (e: e.from != deadId && e.to != deadId) edgesList;
       weightsWithoutDead = removeAttrs weightsMap [ deadId ];
-      accRetract = graph.mkGraph {
+      accRetract = fx.mkPlaneAccessor {
         edges = edgesWithoutDead;
         nodeData = weightsWithoutDead;
       };
 
       recompute =
         a: s: id:
-        (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+        (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
       hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
     in
     {

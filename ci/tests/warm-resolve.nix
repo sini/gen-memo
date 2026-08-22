@@ -49,10 +49,10 @@ let
         parseParent
         eval
         ;
-      declaredEdges = _: [ ];
+      declaredDependencies = _: [ ];
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        edges = _: [ ];
+        dependencies = _: [ ];
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };

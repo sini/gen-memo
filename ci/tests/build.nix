@@ -3,6 +3,7 @@
   genMemo,
   graph,
   engine,
+  fx,
   ...
 }:
 let
@@ -10,7 +11,7 @@ let
   override = genMemo.override engine;
 
   # a depends on b depends on c (edges a=["b"], b=["c"], c=[]) — consumer→producer.
-  accessor = graph.mkGraph {
+  accessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -39,7 +40,7 @@ let
     acc: s: id:
     let
       data = acc.nodeData id;
-      deps = acc.edges id;
+      deps = acc.dependencies id;
     in
     data.v + lib.foldl' (sum: d: sum + s.${d}) 0 deps;
 
@@ -51,7 +52,7 @@ let
   # the trace hash must be null (always-dirty), not an eval error. `f` has the
   # function at depth 1; `g` buries it in attrs + lists, to exercise the full
   # recursive walk of the hash guard (lib/hash.nix).
-  lambdaAccessor = graph.mkGraph {
+  lambdaAccessor = fx.mkPlaneAccessor {
     nodeData = {
       f = { };
       g = { };
@@ -79,7 +80,7 @@ let
   # null-hash dep means `consumer` is ALWAYS-DIRTY in the cone — the only path that
   # exercises the null-hash guard inside override's needsEval gate. Overriding fnode
   # must stay sound (the consumer is recomputed, never false-clean reused).
-  fnAccessor = graph.mkGraph {
+  fnAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "consumer";
@@ -122,7 +123,7 @@ let
   };
 
   # a <-> b cycle: build must throw a located blame (catchable), never loop.
-  cyclic = graph.mkGraph {
+  cyclic = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -153,7 +154,7 @@ let
   #   b1 -> [b2], b2 -> [b1]            (SCC-B, a 2-cycle)
   #   a1 -> [a2, b1], a2 -> [a1]        (SCC-A, a 2-cycle; a1 also reads b1 of B)
   # self weights: b1=1, b2=2, a1=10, a2=3.
-  twoSccAcc = graph.mkGraph {
+  twoSccAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "b1";
@@ -199,7 +200,7 @@ let
   # 10 (a1 = a2 = 10).
   maxRecompute =
     acc: s: m:
-    lib.foldl' lib.max (acc.nodeData m).weight (map (d: s.${d}) (acc.edges m));
+    lib.foldl' lib.max (acc.nodeData m).weight (map (d: s.${d}) (acc.dependencies m));
 
   # Overwrite "lattice" per node: bottom = 0, join keeps the new iterate, eq is
   # structural ==. Not a semilattice join (no ⊑ order); naive iterate-to-
@@ -222,7 +223,7 @@ let
 
   # Self-loop x -> [x]: x is cyclic but has no declared lattice ⇒ the relaxed
   # precheck must throw an undeclared-cyclic-node blame (catchable).
-  selfLoopAcc = graph.mkGraph {
+  selfLoopAcc = fx.mkPlaneAccessor {
     edges = [
       {
         from = "x";
@@ -253,7 +254,7 @@ in
       expected = 100;
     };
 
-    # --- trace: per-key deps (= accessor.edges) + content hash ---
+    # --- trace: per-key deps (= accessor.dependencies) + content hash ---
     test-trace-deps-a = {
       expr = ctx.trace.a.deps;
       expected = [ "b" ];
@@ -386,7 +387,7 @@ in
     test-fixpoint-condensation-producer-before-consumer = {
       expr =
         let
-          cond = graph.condensation twoSccAcc;
+          cond = graph.condensation (fx.graphOf twoSccAcc);
           bu = cond.bottomUp;
           # `sccOf` is a MAP, not a lookup function. The partition door publishes plain
           # data on purpose: a function's identity is minted by the build that made it
@@ -407,7 +408,7 @@ in
     test-fixpoint-condensation-two-distinct-strata = {
       expr =
         let
-          cond = graph.condensation twoSccAcc;
+          cond = graph.condensation (fx.graphOf twoSccAcc);
         in
         {
           distinct = cond.sccOf.a1 != cond.sccOf.b1;

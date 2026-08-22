@@ -4,6 +4,7 @@
   graph,
   mkCyclicCase,
   engine,
+  fx,
   ...
 }:
 let
@@ -14,7 +15,7 @@ let
   # --- Fixture 1: genuine-join reachability SCC (Arntzenius Lemma-4 ascent) ---
   # 2-node cycle a<->b. Per-node lattice = powerset of {a,b} under union.
   # reachable-from m = {m} U reachable-from-dep. ⊥={} ⊑ {self} ⊑ {a,b} = lfp.
-  reachAccessor = graph.mkGraph {
+  reachAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -42,7 +43,7 @@ let
   };
   reachRecompute =
     a: s: m:
-    lib.sort builtins.lessThan (lib.unique ([ m ] ++ s.${builtins.head (a.edges m)}));
+    lib.sort builtins.lessThan (lib.unique ([ m ] ++ s.${builtins.head (a.dependencies m)}));
   reachResult = runScc {
     accessor = reachAccessor;
     store = { };
@@ -61,7 +62,7 @@ let
   # Magnusson-Hedin circular attribute, naive iterate-to-stabilization. There is
   # no ascent witness; only maxIter guards divergence. It stabilizes because both
   # peers compute the same max (5) and then quiesce.
-  agreeAccessor = graph.mkGraph {
+  agreeAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -94,7 +95,7 @@ let
   agreeRecompute =
     a: s: m:
     let
-      dep = builtins.head (a.edges m);
+      dep = builtins.head (a.dependencies m);
     in
     lib.max (a.nodeData m).self s.${dep};
   agreeResult = runScc {
@@ -134,7 +135,7 @@ let
   # 1-member self-loop x->x, recompute x = s.x + 1 (strictly increasing, never
   # quiesces under overwrite). maxIter = 5 caps it; runScc must throw a catchable
   # blame (never Nix infinite recursion).
-  divergeAccessor = graph.mkGraph {
+  divergeAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "x";
@@ -172,7 +173,7 @@ let
   # ONLY because its OWN eq (mod-10) declares 13 and 23 equal. If a single
   # whole-SCC eq or whole-attrset == drove quiescence, q would never settle and
   # this would diverge. Proves lattices.${m}.eq is read per node.
-  perMemberAccessor = graph.mkGraph {
+  perMemberAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "p";
@@ -267,7 +268,7 @@ let
   # store must be byte-identical to override's. We build the restabilize ctx WITH
   # an (all-singleton) fixpoint and the override ctx WITHOUT one, change `c`, and
   # assert the two stores agree (and pin the expected store).
-  acyclicChain = graph.mkGraph {
+  acyclicChain = fx.mkPlaneAccessor {
     edges = [
       {
         from = "a";
@@ -295,10 +296,10 @@ let
     "b"
     "c"
   ];
-  # node value = own weight + sum of dep values (deps from accessor.edges).
+  # node value = own weight + sum of dep values (deps from accessor.dependencies).
   chainRecompute =
     a: s: id:
-    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.edges id);
+    (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   chainHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   acyclicSingletonFixpoint = {
     lattices = lib.genAttrs acyclicIds (_: {
@@ -337,7 +338,7 @@ let
   # --- Fixture B: a built cyclic ctx, reused by the precheck/throw tests ---
   # 2-SCC {x,y} reading an acyclic producer p; an acyclic consumer c reads y.
   #   edges: x→y, y→x (the SCC); x→p (SCC reads producer); c→y (consumer reads SCC)
-  mixedAccessor = graph.mkGraph {
+  mixedAccessor = fx.mkPlaneAccessor {
     edges = [
       {
         from = "x";
@@ -380,7 +381,7 @@ let
   # MAX-fold (monotone + bounded ⇒ always converges).
   mixedRecompute =
     a: s: id:
-    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.edges id));
+    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
   mixedHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   mixedFixpoint = {
     lattices = lib.genAttrs mixedIds (_: {
