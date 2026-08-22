@@ -61,9 +61,14 @@ let
         self: id: if id == "other" then self.get "node" (aName (n - 1)) + self.get "node" (aName 0) else 0;
     };
 
+  # The vocabulary these nodes' kinds are names in. A kind is a name in a REGISTERED vocabulary
+  # rather than a free string, so the fixture registers the one kind it declares.
+  hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
+
   rootsFor =
     v:
-    genScope.buildNodes {
+    genScope.buildRoots {
+      kinds = hostKinds;
       decls = {
         node.base = v;
         other = { };
@@ -83,7 +88,10 @@ let
       roots = rootsFor v;
       attributes = attributesFor seed;
       parseParent = _: null;
-      eval = genScope.eval { inherit roots attributes parseParent; };
+      eval = genScope.eval {
+        scope = roots;
+        inherit attributes parseParent;
+      };
     in
     {
       inherit

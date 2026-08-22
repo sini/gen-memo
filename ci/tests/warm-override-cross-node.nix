@@ -23,9 +23,14 @@
 let
   inherit (genMemo) warmOverride;
 
+  # The vocabulary these nodes' kinds are names in. A kind is a name in a REGISTERED vocabulary
+  # rather than a free string, so the fixture registers the one kind it declares.
+  hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
+
   mkRoots =
     v:
-    genScope.buildNodes {
+    genScope.buildRoots {
+      kinds = hostKinds;
       importGraph = genScope.edge "consumer" "producer";
       decls = {
         producer.v = v;
@@ -48,7 +53,10 @@ let
     { roots, declaredDependencies }:
     let
       parseParent = _: null;
-      eval = genScope.eval { inherit roots attributes parseParent; };
+      eval = genScope.eval {
+        scope = roots;
+        inherit attributes parseParent;
+      };
     in
     {
       inherit

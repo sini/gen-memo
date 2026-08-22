@@ -47,6 +47,13 @@
 # it is taken deliberately: an edge set IS the labelled reachability relation, and the reason
 # structure is always recomputed applies to it exactly.
 #
+# `ctx.roots` CARRIES THE EVALUATOR'S SCOPE RECORD, NOT A BARE NODE MAP. The entry this fold calls
+# takes `{ nodes, nodeOrder, kinds }` — the node set together with the declared vertex order and the
+# kind registry it was validated against — so the record travels through here WHOLE and the splice
+# reaches into `.nodes`. Rebuilding a record at the call site is not an option and not merely an
+# inelegant one: it drops the registry, and an order recovered from `attrNames` is alphabetical
+# rather than declared. Both are silent and both change what the evaluator does.
+#
 # THE SPLICE IS THIS LIBRARY'S OWN CONSTRUCTION AND CARRIES NO ATTRIBUTION. The content that arrived
 # here credited a reverse-topological splice to Acar 2002; `topolog` occurs 0 times in that paper's
 # archived extraction, against a live control of `adaptiv` ⇒ 76 in the same run. What is genuinely
@@ -99,23 +106,27 @@ let
   warmSplice =
     engine: ctx: edits:
     assert
-      (builtins.all (id: builtins.hasAttr id ctx.roots) (builtins.attrNames edits))
+      (builtins.all (id: builtins.hasAttr id ctx.roots.nodes) (builtins.attrNames edits))
       || throw "gen-memo.warm: edit target(s) must be root nodes — ${
-        builtins.toJSON (builtins.filter (id: !(builtins.hasAttr id ctx.roots)) (builtins.attrNames edits))
+        builtins.toJSON (
+          builtins.filter (id: !(builtins.hasAttr id ctx.roots.nodes)) (builtins.attrNames edits)
+        )
       } not in roots (a node spawned during evaluation is not editable; edit the root that spawns it).";
     let
       ids = builtins.attrNames edits;
-      roots' = builtins.foldl' (
-        r: id:
-        r
-        // {
-          ${id} = r.${id} // {
-            decls = (r.${id}.decls or { }) // edits.${id};
-          };
-        }
-      ) ctx.roots ids;
+      scope' = ctx.roots // {
+        nodes = builtins.foldl' (
+          ns: id:
+          ns
+          // {
+            ${id} = ns.${id} // {
+              decls = (ns.${id}.decls or { }) // edits.${id};
+            };
+          }
+        ) ctx.roots.nodes ids;
+      };
       accessor' = ctx.accessor // {
-        nodeData = nid: (roots'.${nid} or { decls = { }; }).decls;
+        nodeData = nid: (scope'.nodes.${nid} or { decls = { }; }).decls;
       };
 
       # The prior is the same evaluation's own restricted facade — `get`, `nodeIds`,
@@ -129,7 +140,7 @@ let
       } ids;
 
       eval' = engine.evalWarm {
-        roots = roots';
+        scope = scope';
         inherit (ctx) attributes parseParent;
         inherit prior decision;
       };
@@ -160,7 +171,7 @@ let
     in
     ctx
     // {
-      roots = roots';
+      roots = scope';
       eval = eval';
       accessor = accessor';
       builtCtx = builtCtx';
