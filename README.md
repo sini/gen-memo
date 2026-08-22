@@ -270,6 +270,32 @@ operators call the scope-to-scope relation they walk, and they keep that name. T
 at one place — `lib/graph-view.nix` — so every call into gen-graph constructs its argument
 explicitly instead of relying on the two vocabularies having happened to coincide.
 
+### Two accessor contracts, differing in the relation's domain
+
+The plane is parametric over its dependency oracle, and the two instantiations that ship do **not**
+agree on which ids `dependencies` will answer for. Which one you hold decides what is legal to ask.
+
+- **Caller-built.** The relation is **total over probed ids**, including ids outside
+  `accessor.nodes` — here `nodes` means *the live set*, not *every id the relation knows*.
+  `applyEdgeDelta`'s new-producer sub-build and the `why` / `whyNot` walks depend on that totality:
+  discovering an id that is not yet a member is how a fresh producer gets found and built.
+- **Substrate-contracted.** The relation is the normalized union of a structural and a declared
+  half, and it is **fail-closed** — a non-member id is refused by name. Its domain is exactly the
+  evaluated node set.
+
+The two cannot meet by accident, because the membership contract bounds every id an edge names: the
+structural half is refused at the projection when an endpoint is not a node, and the declared half
+is contracted at minting. A contracted edge set therefore names only members, so the discovery walk
+has no foreign id to reach. Cross them deliberately and the boundary is **loud** — the membership
+refusal fires at the first probe and the operation aborts naming the id.
+
+One asymmetry follows from this and is a stated fact rather than a bug: `why` decides cone
+membership by *walking* the relation, so a foreign id under a contracted accessor aborts, while
+`whyFor` decides it by *set lookup*, so the same id misses the cone and comes back `unaffected`. The
+two agree by construction on their verdict branches, within a mode; they differ in the domain their
+membership oracle accepts. `lib/graph-view.nix` carries the full statement and the condition under
+which it must be revisited; `ci/tests/accessor-modes.nix` pins both halves.
+
 ## Scope and Soundness
 
 - **`override` is a DATA-change operation.** It replaces one node's data; edges are fixed. Its

@@ -85,9 +85,27 @@ let
   # THE VERDICT, WITH THE l∈C DECISION AS ITS ONLY PARAMETER. Acar 2002 §7 read-rule:
   # l∈C → recomputed, cmp-unchanged → cutoff, l∉C → unaffected — the rule is the same
   # whoever decides membership. The entry points below hand it different oracles (a
-  # forward point query, or a cone bound once) and differ in NOTHING else; a second
-  # copy of these three branches would make the two answers agree by coincidence
-  # rather than by construction.
+  # forward point query, or a cone bound once) and differ in nothing else HERE; a
+  # second copy of these three branches would make the two answers agree by
+  # coincidence rather than by construction.
+  #
+  # ★★★ THE SCOPE OF THAT AGREEMENT, STATED BECAUSE IT IS NOT UNCONDITIONAL. Sharing
+  # this function pins the BRANCHES; it says nothing about the DOMAIN each oracle
+  # accepts, and the two oracles differ there. Against a fail-closed accessor — the
+  # substrate-contracted mode, whose relation refuses a non-member by name — an id
+  # that is not a node splits them:
+  #
+  #   · `why` walks the relation through `graph.canReach`, meets the refusal, and
+  #     ABORTS naming the id.
+  #   · `whyFor` decides membership by lookup in a cone bound once, so the same id
+  #     misses the cone and it answers `unaffected` — a plausible verdict about a
+  #     node that does not exist.
+  #
+  # This is a WRITTEN FACT of the interface rather than a defect queued for repair:
+  # closing it means deciding membership a second time inside the plane, which is the
+  # consumer-side guard the accessor-domain ruling declined. The full statement of the
+  # two contracts lives at `graph-view.nix`, and `ci/tests/accessor-modes.nix` pins
+  # both halves so the pair cannot quietly drift out of the documented shape.
   _verdict =
     ctx:
     { changedId, cutoffs }:

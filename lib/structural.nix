@@ -31,6 +31,14 @@ let
   # mkGraph: `dependencies` is wrapped with prelude.unique (the registry.nix:74 dedup),
   # and `parent` is carried through. Unlike v1 override's partial `// { nodeData }`,
   # structural ops move `nodes`/`dependencies`, so the whole record is rebuilt.
+  #
+  # ★ IT PRESERVES THE DOMAIN IT IS GIVEN AND NARROWS NOTHING. `prelude.unique` is a
+  # normalization of the ANSWER, never a restriction of the QUESTION: this wrapper
+  # asks nothing about membership, so an accessor rebuilt here answers for exactly
+  # the ids its input relation answered for. That is what lets the SAME constructor
+  # serve both accessor contracts — the caller-built relation, total over probed ids,
+  # and the substrate-contracted one, fail-closed off its node set. The two domains
+  # and why they cannot meet are stated once, at `graph-view.nix`.
   mkAccessor =
     {
       dependencies,
@@ -203,6 +211,18 @@ in
   #     the base BEFORE the reverse-cone splice.
   #   - reCycleCheck seeded at the touched node [changedId] (added edges can close
   #     a cycle the build-time precheck never saw); skipped when addedEdges == [].
+  #
+  # ★★★ THE NEW-PRODUCER WALK BELONGS TO THE CALLER-BUILT ACCESSOR CONTRACT, AND THIS
+  # IS THE SITE WHERE THAT MATTERS. `forwardReach` probes `dependencies` at an id that
+  # is BY DEFINITION not yet a member — discovering ids outside the node set is the
+  # feature, not an edge case — so this operation REQUIRES a relation total over
+  # probed ids. A substrate-contracted relation is fail-closed instead: it refuses a
+  # non-member by name. The two contracts and the argument that they cannot meet (a
+  # contracted edge set names only members, so there is no foreign id to walk to) are
+  # stated once at `graph-view.nix`; `ci/tests/accessor-modes.nix` measures both the
+  # probe and the refusal. Read that statement before adding a membership check here:
+  # under the ruled design there is nothing for it to catch, and it would decide a
+  # question the substrate has already answered.
   applyEdgeDelta =
     engine: ctx: changedId: newEdges:
     let
