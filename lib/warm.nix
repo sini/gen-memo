@@ -47,12 +47,21 @@
 # it is taken deliberately: an edge set IS the labelled reachability relation, and the reason
 # structure is always recomputed applies to it exactly.
 #
-# `ctx.roots` CARRIES THE EVALUATOR'S SCOPE RECORD, NOT A BARE NODE MAP. The entry this fold calls
+# THE FOLD READS `ctx.scope`, AND `ctx.roots` IS NOT A SECOND SOURCE FOR IT. The evaluator entry
 # takes `{ nodes, nodeOrder, kinds }` — the node set together with the declared vertex order and the
 # kind registry it was validated against — so the record travels through here WHOLE and the splice
 # reaches into `.nodes`. Rebuilding a record at the call site is not an option and not merely an
 # inelegant one: it drops the registry, and an order recovered from `attrNames` is alphabetical
 # rather than declared. Both are silent and both change what the evaluator does.
+#
+# The seal publishes the node map as `roots` as well, and this fold deliberately does NOT read it.
+# The two carry the same nodes, nothing types the ctx that holds them, and a fold that took its
+# membership test from one and handed the other to the evaluator would splice into a node map it did
+# not evaluate on any ctx where they had drifted apart. One source, and `.nodes` off it.
+#
+# What the fold WRITES is both, because the ctx it returns is consumed by whoever holds it next: a
+# `roots` left at its pre-edit value is a stale node map published under a live name, which is the
+# same silent-drift failure read from the other end.
 #
 # THE SPLICE IS THIS LIBRARY'S OWN CONSTRUCTION AND CARRIES NO ATTRIBUTION. The content that arrived
 # here credited a reverse-topological splice to Acar 2002; `topolog` occurs 0 times in that paper's
@@ -106,15 +115,15 @@ let
   warmSplice =
     engine: ctx: edits:
     assert
-      (builtins.all (id: builtins.hasAttr id ctx.roots.nodes) (builtins.attrNames edits))
+      (builtins.all (id: builtins.hasAttr id ctx.scope.nodes) (builtins.attrNames edits))
       || throw "gen-memo.warm: edit target(s) must be root nodes — ${
         builtins.toJSON (
-          builtins.filter (id: !(builtins.hasAttr id ctx.roots.nodes)) (builtins.attrNames edits)
+          builtins.filter (id: !(builtins.hasAttr id ctx.scope.nodes)) (builtins.attrNames edits)
         )
       } not in roots (a node spawned during evaluation is not editable; edit the root that spawns it).";
     let
       ids = builtins.attrNames edits;
-      scope' = ctx.roots // {
+      scope' = ctx.scope // {
         nodes = builtins.foldl' (
           ns: id:
           ns
@@ -123,7 +132,7 @@ let
               decls = (ns.${id}.decls or { }) // edits.${id};
             };
           }
-        ) ctx.roots.nodes ids;
+        ) ctx.scope.nodes ids;
       };
       accessor' = ctx.accessor // {
         nodeData = nid: (scope'.nodes.${nid} or { decls = { }; }).decls;
@@ -171,7 +180,8 @@ let
     in
     ctx
     // {
-      roots = scope';
+      scope = scope';
+      roots = scope'.nodes;
       eval = eval';
       accessor = accessor';
       builtCtx = builtCtx';

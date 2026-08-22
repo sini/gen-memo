@@ -26,7 +26,7 @@ let
   # rather than a free string, so the fixture registers the one kind it declares.
   hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
 
-  mkRoots =
+  mkScope =
     v:
     genScope.buildRoots {
       kinds = hostKinds;
@@ -49,22 +49,22 @@ let
   };
 
   mkCtx =
-    { roots, declaredDependencies }:
+    { scope, declaredDependencies }:
     let
       parseParent = _: null;
-      eval = genScope.eval {
-        scope = roots;
-        inherit attributes parseParent;
-      };
+      eval = genScope.eval { inherit scope attributes parseParent; };
     in
     {
       inherit
-        roots
+        scope
         attributes
         parseParent
         eval
         declaredDependencies
         ;
+      # The node map, published under the name the seal publishes it under. The fixture mirrors
+      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
+      roots = scope.nodes;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
         dependencies = declaredDependencies;
@@ -88,18 +88,18 @@ let
 
   # (1) the read is declared — the consumer is in the producer's cone
   ctxD = mkCtx {
-    roots = mkRoots 1;
+    scope = mkScope 1;
     inherit declaredDependencies;
   };
   ctxD' = bump ctxD;
   freshD = mkCtx {
-    roots = mkRoots 9;
+    scope = mkScope 9;
     inherit declaredDependencies;
   };
 
   # (2) the read is NOT declared — the consumer is outside the cone and is served stale
   ctxN = mkCtx {
-    roots = mkRoots 1;
+    scope = mkScope 1;
     declaredDependencies = _: [ ];
   };
   ctxN' = bump ctxN;

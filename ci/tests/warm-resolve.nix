@@ -17,7 +17,7 @@ let
   # rather than a free string, so the fixture registers the one kind it declares.
   hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
 
-  mkRoots =
+  mkScope =
     av: bv:
     genScope.buildRoots {
       kinds = hostKinds;
@@ -41,21 +41,21 @@ let
   };
 
   mkCtx =
-    roots:
+    scope:
     let
       parseParent = _: null;
-      eval = genScope.eval {
-        scope = roots;
-        inherit attributes parseParent;
-      };
+      eval = genScope.eval { inherit scope attributes parseParent; };
     in
     {
       inherit
-        roots
+        scope
         attributes
         parseParent
         eval
         ;
+      # The node map, published under the name the seal publishes it under. The fixture mirrors
+      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
+      roots = scope.nodes;
       declaredDependencies = _: [ ];
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
@@ -68,7 +68,7 @@ let
     ctx: id: attr:
     ctx.eval.get id attr;
 
-  ctx = mkCtx (mkRoots 1 2);
+  ctx = mkCtx (mkScope 1 2);
   edits = {
     a = {
       v = 5;
@@ -110,7 +110,7 @@ in
 
     # The batch equals a fresh cold evaluation with every edit pre-applied.
     test-batch-eq-fresh = {
-      expr = probe batch == probe (mkCtx (mkRoots 5 6));
+      expr = probe batch == probe (mkCtx (mkScope 5 6));
       expected = true;
     };
 

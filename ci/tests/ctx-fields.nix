@@ -23,7 +23,7 @@
 # attribute read two ways, and a scan that sees only `ctx.<field>` is not slightly incomplete — it
 # is wrong by exactly the fields that happen to be spelled the other way. Measured here: the dot
 # form alone finds NINE of the eleven, missing `attributes` and `parseParent`, both of which reach
-# the plane only through `inherit (ctx) …` at `lib/warm.nix:133`. That two-short count is not
+# the plane only through `inherit (ctx) …` at `lib/warm.nix:153`. That two-short count is not
 # hypothetical — it is the count the interface spec's own gate produced before the second form was
 # added, reproduced below as a live control rather than described in a comment.
 {
@@ -137,7 +137,7 @@ in
         "parseParent"
         "pending"
         "recompute"
-        "roots"
+        "scope"
         "store"
         "trace"
       ];
@@ -159,7 +159,7 @@ in
         "hashOf"
         "pending"
         "recompute"
-        "roots"
+        "scope"
         "store"
         "trace"
       ];

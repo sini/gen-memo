@@ -64,7 +64,7 @@ let
   # rather than a free string, so the fixture registers the one kind it declares.
   hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
 
-  rootsFor =
+  scopeFor =
     v:
     genScope.buildRoots {
       kinds = hostKinds;
@@ -84,22 +84,22 @@ let
   mkCtx =
     seed: v:
     let
-      roots = rootsFor v;
+      scope = scopeFor v;
       attributes = attributesFor seed;
       parseParent = _: null;
-      eval = genScope.eval {
-        scope = roots;
-        inherit attributes parseParent;
-      };
+      eval = genScope.eval { inherit scope attributes parseParent; };
     in
     {
       inherit
-        roots
+        scope
         attributes
         parseParent
         eval
         declaredDependencies
         ;
+      # The node map, published under the name the seal publishes it under. The fixture mirrors
+      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
+      roots = scope.nodes;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
         dependencies = declaredDependencies;

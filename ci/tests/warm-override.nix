@@ -28,7 +28,7 @@ let
   # rather than a free string, so the fixture registers the one kind it declares.
   hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
 
-  mkRoots =
+  mkScope =
     cv:
     genScope.buildRoots {
       kinds = hostKinds;
@@ -60,24 +60,24 @@ let
   # library and therefore cannot be pinned back. The fold reads exactly these fields.
   mkCtx =
     {
-      roots,
+      scope,
       parseParent ? (_: null),
       declaredDependencies ? (_: [ ]),
     }:
     let
-      eval = genScope.eval {
-        scope = roots;
-        inherit attributes parseParent;
-      };
+      eval = genScope.eval { inherit scope attributes parseParent; };
     in
     {
       inherit
-        roots
+        scope
         attributes
         parseParent
         eval
         declaredDependencies
         ;
+      # The node map, published under the name the seal publishes it under. The fixture mirrors
+      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
+      roots = scope.nodes;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
         dependencies = declaredDependencies;
@@ -89,11 +89,11 @@ let
     ctx: id: attr:
     ctx.eval.get id attr;
 
-  pp = roots: id: roots.nodes.${id}.parent or null;
-  roots = mkRoots 1;
+  pp = scope: id: scope.nodes.${id}.parent or null;
+  scope = mkScope 1;
   ctx = mkCtx {
-    inherit roots;
-    parseParent = pp roots;
+    inherit scope;
+    parseParent = pp scope;
   };
   edited = warmOverride engine ctx {
     id = "child";
@@ -111,8 +111,8 @@ in
       expr =
         let
           fresh = mkCtx {
-            roots = mkRoots 5;
-            parseParent = pp (mkRoots 5);
+            scope = mkScope 5;
+            parseParent = pp (mkScope 5);
           };
         in
         project edited "child" "plus-one" == project fresh "child" "plus-one";
@@ -198,8 +198,8 @@ in
       expr =
         let
           cctx = mkCtx {
-            inherit roots;
-            parseParent = pp roots;
+            inherit scope;
+            parseParent = pp scope;
             declaredDependencies = id: if id == "child" then [ "parent" ] else [ "child" ];
           };
         in
