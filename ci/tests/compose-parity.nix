@@ -7,7 +7,9 @@
 # `warmAdmits` — and its published record through `warmTrace` — leaves that caller's own output
 # byte-identical to the cold evaluation of the same input. That is a property of the CALLER's
 # evaluation, so the caller's evaluator has to be present, which is why `ci/flake.nix` takes
-# gen-merge for this file and `../lib` still declares neither it nor an evaluator of any kind.
+# gen-merge for this file while `../lib` takes no evaluator DEPENDENCY — which is the claim
+# `ci/tests/purity.nix` enforces, and it is narrower than "names no evaluator": `warm.nix:151` calls
+# `engine.evalWarm` on an engine it was HANDED, and a caller of an evaluator is not an evaluator.
 #
 # THE CALLER IS WRITTEN HERE, IN THE SHAPE THE MIGRATION LEAVES IT. `composeAt` below is the part of
 # gen-flake's compose that does NOT cross — the `evalModuleTree` invocation, the warm-knob splice,
@@ -229,9 +231,20 @@ let
   # ARM COLD — the same fixture and the same revision with no warm context at all.
   armCold = compose { modules = base ++ [ addN3 ]; };
 
+  # ★★ BOTH RED CONTROLS SEED ON THE WARM ARM'S OWN MODULE SET — `[ addN3 <seed> ]`, NOT `[ <seed> ]`.
+  # §3.1 says "the same pair", and a control built as `ovBase.override { modules = [ <seed> ]; }`
+  # is NOT that pair: compared against `armWarm` it differs in the seed AND in host `n3`, so it
+  # reddens whether or not the seed does anything. MEASURED on the earlier shape: with the seed
+  # replaced by `{ }` both halves still differed and both cells still passed. A control that passes
+  # with its seed removed is measuring the arm, not the seed — which is the failure §3.1 rejects H2
+  # for. On the shape below a null seed goes GREEN, so the seed is necessary as well as sufficient.
+
   # ── RED CONTROL 1 — the ordinary leaf ──────────────────────────────────────────────────────────
   ovDiffering = ovBase.override {
-    modules = [ { config.hosts.n1.addr = mkForce "10.4.4.4"; } ];
+    modules = [
+      addN3
+      { config.hosts.n1.addr = mkForce "10.4.4.4"; }
+    ];
   };
 
   # ── RED CONTROL — the provenance half, armed on its own ────────────────────────────────────────
@@ -242,7 +255,10 @@ let
   # half and certifies the other. This seed moves the second def count and the winning priority at a
   # TOP-LEVEL declared leaf, which is where this channel records anything at all.
   ovProvSeed = ovBase.override {
-    modules = [ { config.fleet.size = mkForce 9; } ];
+    modules = [
+      addN3
+      { config.fleet.size = mkForce 9; }
+    ];
   };
 
   # ── RED CONTROL 2 — inside the comparator's own blind class (H1) ────────────────────────────────
@@ -302,7 +318,10 @@ in
     test-control-comparator-hedges-are-live = {
       expr = {
         cycleCutFired = countIn "<cycle:" (image armWarm).values > 0;
-        functionsNulled = countIn "null" (image armWarm).values > 0;
+        # The FUNCTION leaf specifically. A bare `null` count cannot read false here: the image
+        # carries 63 of them and only ONE comes from a function, so an arm with every function
+        # removed still counts 62 and the leg stays green. Measured: 1 with the function, 0 without.
+        functionsNulled = countIn "\"transform\":null" (image armWarm).values > 0;
         absentTokenReadsZero = countIn "qzwvxk" (image armWarm).values == 0;
       };
       expected = {
