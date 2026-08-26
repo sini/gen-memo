@@ -250,10 +250,19 @@ let
   # ── RED CONTROL — the provenance half, armed on its own ────────────────────────────────────────
   # MEASURED, and it is why this control exists as a separate seed: control 1's forced definition
   # sits at `hosts.n1.addr`, INSIDE a submodule, and this engine's provenance stops at the declared
-  # leaf `hosts` — nested evaluations are a documented provenance boundary. Control 1 therefore moves
-  # the `values` image and leaves the `provenance` image byte-identical, so on its own it arms one
-  # half and certifies the other. This seed moves the second def count and the winning priority at a
-  # TOP-LEVEL declared leaf, which is where this channel records anything at all.
+  # leaf `hosts` — nested evaluations are a documented provenance boundary, so control 1's forced
+  # definition changes NO PRIORITY VALUE: `hosts` reads priority 100 on both sides, and across
+  # control 1's whole provenance image the priority multiset is the arm's with ONE MORE 100 added
+  # (100×9 → 100×10, 1500×3 unchanged, no other value present).
+  # ★ SO WHAT CONTROL 1 MOVES IS THE DEF COUNT AT THE SAME PRIORITY, and it moves it only since the
+  # seed was re-based onto the warm arm: `[ addN3 <seed> ]` gives `hosts` a FOURTH def record against
+  # the arm's three. Measured both shapes — pre-fix, control 1's provenance image was byte-identical
+  # to the arm's; landed, it differs.
+  # ⇒ This seed is still necessary, on a narrower ground than "control 1 cannot move provenance at
+  # all": it is the only one that changes a priority VALUE, introducing 50 at a TOP-LEVEL declared
+  # leaf (`fleet.size`, winning priority 100 → 50). Adding a def and changing a priority are not the
+  # same event — this seed does both, control 1 does only the first — and a channel half that
+  # records the winner's priority is not exercised by a cell that only ever adds peers at 100.
   ovProvSeed = ovBase.override {
     modules = [
       addN3
