@@ -9,6 +9,14 @@
     # asymmetry is nixpkgs's below: a test-runner input is not a library input, and ../lib is
     # checked to be free of both.
     gen-scope.url = "github:sini/gen-scope";
+    # gen-merge enters HERE AND ONLY HERE, on gen-scope's ground and for the same reason. The two
+    # functions in `lib/warmTrace.nix` decide FOR an evaluator they are handed and name none, so the
+    # only way to exercise them against the caller they were migrated from is to hand them that
+    # caller's evaluator. `ci/tests/compose-parity.nix` is the byte-parity oracle of that migration
+    # and its subject is a compose-shaped module tree, which is gen-merge's to produce; a stub would
+    # make the oracle an oracle for the stub. The asymmetry is nixpkgs's below — a test-runner input
+    # is not a library input — and `ci/tests/purity.nix` scans `../lib` and enforces it.
+    gen-merge.url = "github:sini/gen-merge";
     # nixpkgs is the CI runner's dependency (nix-unit harness, treefmt) and supplies the `lib` the
     # test modules use — including, here, to run the purity scan itself. It enters ONLY in ci/,
     # never as a `lib/` dep: the library (../lib) is nixpkgs-lib-free, which ci/tests/purity.nix
@@ -22,6 +30,7 @@
       gen-prelude,
       gen-graph,
       gen-scope,
+      gen-merge,
       ...
     }:
     let
@@ -57,6 +66,7 @@
           fx
           ;
         genScope = gen-scope.lib;
+        genMerge = gen-merge.lib;
       };
     };
 }
