@@ -17,6 +17,14 @@
     # make the oracle an oracle for the stub. The asymmetry is nixpkgs's below — a test-runner input
     # is not a library input — and `ci/tests/purity.nix` scans `../lib` and enforces it.
     gen-merge.url = "github:sini/gen-merge";
+    # The gen HUB SOURCE — `flake = false`, and that is R1's discipline rather than thrift. The
+    # successor compose (the construct `ci/tests/compose-parity.nix` evaluates) lives at the hub,
+    # `lib/compose.nix`, parameterised on an engine and the plane's two decision functions. The
+    # suite imports the FILE and applies THIS lock's gen-merge and ../lib to it — a full-flake hub
+    # input would carry a second gen-merge pin, and an oracle with two engine revisions in one run
+    # is not a reading. The pin must be at or past the hub revision that carries lib/compose.nix.
+    gen.url = "github:sini/gen";
+    gen.flake = false;
     # nixpkgs is the CI runner's dependency (nix-unit harness, treefmt) and supplies the `lib` the
     # test modules use — including, here, to run the purity scan itself. It enters ONLY in ci/,
     # never as a `lib/` dep: the library (../lib) is nixpkgs-lib-free, which ci/tests/purity.nix
@@ -31,6 +39,7 @@
       gen-graph,
       gen-scope,
       gen-merge,
+      gen,
       ...
     }:
     let
@@ -67,6 +76,9 @@
           ;
         genScope = gen-scope.lib;
         genMerge = gen-merge.lib;
+        # The hub SOURCE (flake = false above): compose-parity imports the successor compose from
+        # it and binds this lock's engine to it.
+        genHub = gen;
       };
     };
 }

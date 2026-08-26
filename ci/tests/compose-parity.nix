@@ -11,14 +11,16 @@
 # `ci/tests/purity.nix` enforces, and it is narrower than "names no evaluator": `warm.nix:151` calls
 # `engine.evalWarm` on an engine it was HANDED, and a caller of an evaluator is not an evaluator.
 #
-# THE CALLER IS WRITTEN HERE, IN THE SHAPE THE MIGRATION LEAVES IT. `composeAt` below is the part of
-# gen-flake's compose that does NOT cross — the `evalModuleTree` invocation, the warm-knob splice,
-# the re-compose of merged args, and the recursion — with the two crossing parts replaced by calls
-# into this library. It is deliberately the KERNEL and not a port: no tree loader, no `specialArgs`
-# thread, no aspect registry, no host projection. Those belong to other rows of the same settlement
-# and none of them is compared by this oracle, which reads `values` and `provenance` only. A reader
-# should take this as the oracle's caller, never as the successor compose's declared surface — that
-# surface does not exist yet and this file does not propose one.
+# THE CALLER IS THE SUCCESSOR COMPOSE ITSELF. `successor` below imports the construct that replaced
+# gen-flake's `composeAt` — the hub's `lib/compose.nix`, the settlement's S2 core: the
+# `evalModuleTree` invocation, the warm-knob splice, the re-compose merge law, the recursion, and
+# the engineArgs collision guard — and applies it to THIS suite's own engine pin and to this
+# library's two decision functions. The hand-written kernel caller that stood here existed only
+# because the successor did not; the arms are now what the migration spec's §3.1 named: the
+# successor compose evaluated with and without the warm path. The successor takes `specialArgs`
+# caller-total and has no tree formal, so the fixture feeds it `modules` alone, exactly as before —
+# no tree loader, no aspect registry, no host projection is compared by this oracle, which reads
+# `values` and `provenance` only.
 #
 # R1 — THE ENGINE REVISION IS PART OF THE ORACLE, and an unpinned run is not a reading. Both arms
 # run at whatever `ci/flake.lock` pins for gen-merge, which is the whole of the pin: one lock, one
@@ -37,11 +39,11 @@
 {
   genMemo,
   genMerge,
+  genHub,
   ...
 }:
 let
   inherit (genMerge)
-    evalModuleTree
     types
     mkOption
     mkForce
@@ -108,56 +110,16 @@ let
   countIn =
     needle: hay: builtins.length (builtins.filter builtins.isList (builtins.split needle hay));
 
-  # ── the caller, with the two migrated decisions crossing into this library ─────────────────────
-  # The warm knobs reach the engine ONLY on a fired warm override; a base compose and a refused one
-  # pass neither, which is the engine's documented zero-behaviour-change default. `warmAdmits` is
-  # handed the argument key its caller's warm splice is defined against — the plane holds no
-  # evaluator's argument names, so the key arrives as a parameter.
-  composeAt =
-    {
-      warmFrom ? null,
-      editedModules ? [ ],
-      traced ? false,
-    }:
-    args@{
-      modules ? [ ],
-    }:
-    let
-      warmKnobs = if warmFrom == null then { } else { inherit warmFrom editedModules; };
-      result = evalModuleTree ({ inherit modules; } // warmKnobs);
-      projection = {
-        values = result.config;
-        inherit (result) provenance;
-        override =
-          edits:
-          composeAt
-            (
-              if genMemo.warmAdmits "modules" edits then
-                {
-                  warmFrom = result;
-                  editedModules = edits.modules;
-                  traced = true;
-                }
-              else
-                { traced = true; }
-            )
-            (
-              args
-              // {
-                modules = (args.modules or [ ]) ++ (edits.modules or [ ]);
-              }
-            );
-      };
-    in
-    # The observation is spliced UNCONDITIONALLY — a result reached without an edit carries no
-    # `trace` because the record says so, not because this branch says so.
-    projection
-    // genMemo.warmTrace {
-      edited = traced;
-      decision = result.warmDecision;
-    };
-
-  compose = composeAt { };
+  # ── the subject: the successor compose, at this suite's own pins ───────────────────────────────
+  # The engine is handed in whole (the construct calls `engine.evalModuleTree`); the two decision
+  # functions are ../lib's own. `warmAdmits` receives the argument key the successor's warm splice
+  # is defined against as a literal at ITS call site — the plane holds no evaluator's argument
+  # names, so the key arrives as a parameter there and none is restated here.
+  successor = import "${genHub}/lib/compose.nix" {
+    engine = genMerge;
+    inherit (genMemo) warmAdmits warmTrace;
+  };
+  inherit (successor) compose;
 
   # ── the migration fixture ──────────────────────────────────────────────────────────────────────
   # `hooks` is declared `attrsOf raw` and defined with a lambda. That is not decoration: H1's class
@@ -287,6 +249,52 @@ let
   # green cannot be read without them.
   c2a = compose { modules = mkBase (x: x + 1); };
   c2b = compose { modules = mkBase (x: x + 2); };
+
+  # ── the admission key, exercised from the refusing side ────────────────────────────────────────
+  # The warm half is the arm itself (`armWarm`, a modules-only edit). This is the other half: an
+  # edit carrying `specialArgs` must NOT warm-fire — the fail-unsound direction is a warm pass for
+  # an edit that changed an argument the splice assumes fixed — so it takes the engine's cold path
+  # and the trace says so, with the reason.
+  ovColdEdit = ovBase.override {
+    specialArgs = {
+      seeded = true;
+    };
+  };
+
+  # ── the engineArgs collision guard, seeded per owned key ───────────────────────────────────────
+  # `modules`/`specialArgs` are the successor's own arguments; `warmFrom`/`editedModules` are the
+  # warm knobs only its `override` path produces. An engineArgs key colliding with any of the four
+  # would be silently overridden by the successor's engine-call splice, so it throws naming the
+  # offender(s) instead — a `throw`, legal as a cell per the preface. One seed per key; the
+  # non-colliding control below is what keeps four reds from being a guard that fires on
+  # everything.
+  guardFires = c: !(builtins.tryEval (builtins.seq c.values true)).success;
+  guardSeeds = {
+    modules = compose {
+      modules = base;
+      engineArgs = {
+        modules = [ ];
+      };
+    };
+    specialArgs = compose {
+      modules = base;
+      engineArgs = {
+        specialArgs = { };
+      };
+    };
+    warmFrom = compose {
+      modules = base;
+      engineArgs = {
+        warmFrom = null;
+      };
+    };
+    editedModules = compose {
+      modules = base;
+      engineArgs = {
+        editedModules = [ ];
+      };
+    };
+  };
 in
 {
   flake.tests.compose-parity = {
@@ -368,6 +376,46 @@ in
     test-control-h1-blind-class-reads-green = {
       expr = (image c2a).values == (image c2b).values;
       expected = true;
+    };
+
+    # ---- the admission key is pinned (the refusing half; the warm half is the arm) --------------
+    test-admission-wider-edit-refuses-warm = {
+      expr = ovColdEdit.trace.mode;
+      expected = "cold";
+    };
+    test-admission-refusal-states-its-reason = {
+      expr = ovColdEdit.trace.reason;
+      expected = "no warmFrom (cold)";
+    };
+
+    # ---- the engineArgs collision guard bites, once per owned key -------------------------------
+    test-guard-refuses-engineargs-modules = {
+      expr = guardFires guardSeeds.modules;
+      expected = true;
+    };
+    test-guard-refuses-engineargs-specialargs = {
+      expr = guardFires guardSeeds.specialArgs;
+      expected = true;
+    };
+    test-guard-refuses-engineargs-warmfrom = {
+      expr = guardFires guardSeeds.warmFrom;
+      expected = true;
+    };
+    test-guard-refuses-engineargs-editedmodules = {
+      expr = guardFires guardSeeds.editedModules;
+      expected = true;
+    };
+    # The paired non-colliding call: a legal engine key rides through the splice and the guard
+    # stays quiet — the eval completes and the values read.
+    test-control-engineargs-noncolliding-passes = {
+      expr =
+        (compose {
+          modules = base;
+          engineArgs = {
+            check = true;
+          };
+        }).values.fleet.name;
+      expected = "prod";
     };
   };
 }

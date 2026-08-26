@@ -70,6 +70,23 @@
         "type": "github"
       }
     },
+    "gen": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787722307,
+        "narHash": "sha256-EuqzFieCDDmKvThDAIKrsqHXUQo4nJ27P/JotB9j+90=",
+        "ref": "refs/heads/main",
+        "rev": "55e1d0ffb8a20691e6e251ccd48a4c7a8b7197ff",
+        "revCount": 171,
+        "type": "git",
+        "url": "file:///home/sini/Documents/repos/sini/gen"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen",
+        "type": "github"
+      }
+    },
     "gen-algebra": {
       "locked": {
         "lastModified": 1782521734,
@@ -574,6 +591,7 @@
     },
     "root": {
       "inputs": {
+        "gen": "gen",
         "gen-graph": "gen-graph",
         "gen-harness": "gen-harness",
         "gen-merge": "gen-merge",
