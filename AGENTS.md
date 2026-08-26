@@ -7,12 +7,15 @@ The **incremental plane**: a decision layer over the evaluator that never evalua
 byte-identical to what a cold run produces — so the plane is correct exactly when it is invisible in
 the result and visible only in the work avoided.
 
-**Two migrations have LANDED; one piece has not.** What is here: the flat relocatable result store
+**Three migrations have LANDED.** What is here: the flat relocatable result store
 and its verifying trace, the three reuse predicates, the dirty cone and the exact affected set, the
 change/propagate split with its fused override, the cut-heavy eager push, the structural deltas, the
 provenance reads and the per-SCC solver — 24 exports from the retiring rebuilder library, whose
-shell and name retire with them; and the **warm fold and override cone** from gen-resolve, three
-exports more. What is still elsewhere: gen-flake's **compose warm/override/trace** arm.
+shell and name retire with them; the **warm fold and override cone** from gen-resolve, three
+exports more; and gen-flake's **compose warm/override/trace** arm, which arrived as the two
+`warmAdmits`/`warmTrace` observation exports (ADR-0031 F3). gen-flake itself has since dissolved and
+its repo orphans as reference; the hub's `lib.compose` / flakeModule (INTERIM, not yet ADR-0027) is
+what now binds this fold at the composition boundary.
 
 The interface to the evaluator is **settled and built in the evaluator**: the plane returns a
 `Decision` of two total functions and no values, reads through a restricted facade of exactly
@@ -95,7 +98,7 @@ is always to write a small local version of something a row below rather than co
 | The static attribute-dependency schedule, and the **cold** fold | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)". Its **warm** fold and override cone have moved here; the schedule and the cold path have not, and their destinations are the query-gate home and the evaluator respectively — neither is this library |
 | The equation record — `stratum`, `readsAttrs`, `kind` | `gen-resolve`, and it did NOT travel with the fold. The warm fold takes the ATTRIBUTE SET, not the equations: what may be reused is decided from the evaluator's own resolutional vocabulary, and a declared stratum answering the same question one library away is the classifier that supersession removed |
 | Result store, verifying traces, dirty propagation | **This library.** They arrived from the retiring rebuilder core, whose shell and name retire with them; the origin repository is history rather than a place to read the current definition |
-| Flake composition, and the warm/override/trace arm built on it | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem". Its compose warm/override/trace is destined here and was explicitly gated on this repository existing; gen-flake dissolves and its repo orphans as reference. `diff.nix` stays in the orphaned repo — its two hedges (function-equality blindness in `dropFns`; the four-reserved-names group misclassification) are named inputs to the plane's failure-attribution spec, not code to copy |
+| Flake composition, and the warm/override/trace arm built on it | Composition itself is `gen-flake`'s successor, the hub's `lib.compose` / flakeModule (INTERIM, not yet ADR-0027) — gen-flake dissolved and its repo orphans as reference (ADR-0031 F3). The warm/override/trace arm ALREADY LANDED here, as the gating predicted — `warmAdmits`/`warmTrace` in the Exports table below. `diff.nix` stays in the orphaned repo — its two hedges (function-equality blindness in `dropFns`; the four-reserved-names group misclassification) are named inputs to the plane's failure-attribution spec, not code to copy |
 | Graph traversal, reverse reachability, the SCC partition — the dependent cone and the quotient as **algorithms** | `gen-graph` — "gen-graph: accessor-based graph query combinators". The plane *reads* a cone and *reads* a partition through the one published door; neither traversal is re-implemented here. `dependentsOf` / `reachableFrom` / `coneRank` / `directDependents` / `condensation` are all consumed, never mirrored |
 | Well-definedness and stratification **checks** | Neither the plane nor a standalone analysis library: they survive as **graph-native analysis queries** over the graph the engine already exposes, with reads derived from the graph rather than declared |
 | The typed demand cascade (kinds, demands, sub-demands, provenance) | **`gen-scope`, the evaluator — `gen-demand` RETIRED as a library, and its destination was the evaluator rather than this plane.** ADR-0008 §4: *"gen-resolve and gen-demand as libraries retire into these homes; gen-demand's demand/kind folds re-express over scope"*. That adjacency is the whole point of the row: a retirement running alongside this plane's own and landing somewhere else, so the cascade is `gen-scope/lib/cascade.nix` + `lib/folds.nix` under claim vocabulary (`mkClaim` / `resolveClaims`) and never arrives here. The gen-demand repository orphans as reference under ADR-0031 §3's F3 pattern, off the `gen/lib/mkGenLibs.nix` roster and not a `gen` hub input |
@@ -191,8 +194,8 @@ library's surface silently.
 | Format | `cd ci && nix fmt -- --ci` |
 | Change the export surface | Write it in `lib/`, then update `ci/tests/surface.nix`, this sheet's **Exports** section, and `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md` — the surface test fails until you do. Adding a module also means the fold: a name already taken is a REFUSAL, not a shadow |
 | Read or amend the reference spec | `papers/den-architecture/gen-specs/gen-memo/REFERENCE.md` — it is **not** in this repo; specs live in the papers repo |
-| Find the content that has NOT arrived yet | `gen-resolve` (`lib/override.nix`, the warm half of `lib/resolve.nix`), `gen-flake` (compose warm/override/trace) |
-| Learn the plane's obligations before extending it | The execution-engine ADR (the plane's definition and what retires into it) and the gen-flake dissolution ADR (what arrives from there, and the two hedges that travel as spec inputs rather than as code) |
+| Find content that has NOT arrived yet | **Nothing — all three migrations have landed** (rebuilder core, gen-resolve's warm fold/override cone, gen-flake's compose warm/override/trace arm; see Scope). gen-resolve's cold path and equation record, and gen-flake's composition surface itself (now the hub's `lib.compose`), remain permanently elsewhere — see "Not this library's job" |
+| Learn the plane's obligations before extending it | The execution-engine ADR (the plane's definition and what retires into it) and the gen-flake dissolution ADR (what arrived from there, now complete, and the two hedges that travel as spec inputs rather than as code) |
 
 ## Measured traps
 
