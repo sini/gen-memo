@@ -71,17 +71,21 @@ evaluator is a CALLER of one, which is why it can live here without inverting th
 does pin gen-scope — a fold that is handed an evaluator can only be tested by handing it one, and a
 stub would make those suites an oracle for the stub.
 
-**Not in the hub roster.** `gen/lib/mkGenLibs.nix` has no `memo` entry and gen-memo has no stratum.
-That is deliberate, not an oversight: the roster's stratum declaration is total and explicit by
-design — its own text says "a member with no entry here is a build error, never a member of an
-implicit residue bucket" — so assigning a stratum is a design decision. The buckets are **five**,
-not four: `substrate` / `modules` / `aspects` / `framework` / `retiring`, the last carried today by
-`resolve`, `flake`, `edge`, `demand` and `pipe`. The plane is none of `modules`, `aspects` or
-`framework`, and it is not `retiring` either — that bucket is for a member on its way *off* the
-roster, and the plane is the destination of two of those five retirements rather than one of them.
-So the elimination still lands on "substrate by default", exactly the silent choice the roster
-forbids reading as a decision, and the stratum still needs a ruling. gen-vars and gen-rebuild sit
-off the roster on the same footing. Consume via `inputs.gen-memo.lib`, never through `mkGenLibs`.
+**On the hub roster, substrate stratum.** `gen/lib/mkGenLibs.nix:30` binds
+`memo = genInputs.gen-memo.lib;` and `:167` assigns its stratum `memo = "substrate";` — ruled at
+`den-hoag-h99g` and executed at `den-hoag-hqcz` (gen `7138cbc`, 2026-08-17). The roster's stratum
+declaration is total and explicit by design — its own text says "a member with no entry here is a
+build error, never a member of an implicit residue bucket" — so this was a design decision, not a
+default. The buckets are **five**, not four: `substrate` / `modules` / `aspects` / `framework` /
+`retiring`, the last carried today by `resolve`, `flake`, `edge`, `demand` and `pipe`. The plane is
+none of `modules`, `aspects` or `framework`, and it is not `retiring` either — that bucket is for a
+member on its way *off* the roster, and the plane is the destination of two of those five
+retirements rather than one of them. The elimination lands on `substrate`, and the ruling settled it
+rather than leaving it as the silent default the roster's own text forbids reading as a decision.
+gen-memo is neither frozen (gen-vars, ADR-0003) nor archived (gen-rebuild, `den-hoag-wz9f`) — it is a
+live roster member in its own right, not a peer of either retired library. Consume via `mkGenLibs` —
+the hub is the sanctioned single input (ADR-0015) — rather than reaching around it to
+`inputs.gen-memo.lib` directly.
 
 ## Not this library's job
 
@@ -360,7 +364,7 @@ nix eval --json .#lib --apply builtins.attrNames
 Current output (verbatim):
 
 ```json
-["affected","affectedSet","applyDelta","applyEdgeDelta","batch","build","dirtySet","earlyCutoff","force","forceCtx","impactOf","mkAccessor","needsEval","override","propagate","propagateEager","restabilize","retract","runScc","support","supportDirect","verify","why","whyNot"]
+["affected","affectedSet","applyDelta","applyEdgeDelta","batch","build","dirtySet","earlyCutoff","force","forceCtx","impactOf","mkAccessor","needsEval","override","propagate","propagateEager","restabilize","retract","runScc","support","supportDirect","verify","warmAdmits","warmDecision","warmOverride","warmResolve","warmTrace","why","whyFor","whyNot","whyNotFor"]
 ```
 
 The flake-ref form is load-bearing, not stylistic. `nix eval --json --expr 'builtins.attrNames (import ./lib)'` **does not run**: under the default pure evaluation mode it exits 1 with *"access
