@@ -52,13 +52,20 @@ let
   # ── the comparator ─────────────────────────────────────────────────────────────────────────────
   # Functions are nulled rather than skipped, so a topology change still moves the bytes even though
   # the closures themselves cannot be compared — which is exactly the blindness the H1 control below
-  # measures. The walk is cycle-aware at the option-type protocol marker: a completed type's
-  # `functor.type` is the type itself, so an unguarded descent would not terminate.
+  # measures. The walk is cycle-aware at EVERY attrs node on the current path, not only the
+  # option-type protocol marker it was first written against
+  # (den-hoag-memo-cycle-guard-shape-wt4b9): a completed type's `functor.type` is the type itself, so
+  # an unguarded descent would not terminate — and neither would one through any other
+  # self-referential attrset, which is why the ancestor-path check below is no longer gated on a
+  # `_type` tag. `builtins.isAttrs x` already decided which nodes reach this branch; the tag was an
+  # arbitrary narrowing of that same domain, not a distinct completeness claim.
   dropFns =
     let
-      isCycleCarrier = v: builtins.isAttrs v && v ? _type && v._type == "option-type";
-      # The revisited carrier's index among the carrier ancestors on the path, or null when the node
-      # is not one of them. `seen` is nearest-ancestor-first, so 0 is the innermost.
+      # The revisited ancestor's index on the path, or null when x is not one of them. `seen` is
+      # nearest-ancestor-first, so 0 is the innermost, and holds EVERY attrs node walked so far on
+      # the current path. `==` on attrsets short-circuits on pointer identity, so a genuine
+      # self-reference reads cheaply; a coincidental structural match would force a deeper compare,
+      # bounded by path depth rather than by the whole visited set.
       carrierIndex =
         seen: x:
         let
@@ -80,18 +87,13 @@ let
         else if builtins.isList x then
           map (walk seen) x
         else if builtins.isAttrs x then
-          (
-            if isCycleCarrier x then
-              let
-                revisit = carrierIndex seen x;
-              in
-              if revisit != null then
-                "<cycle:${toString revisit}>"
-              else
-                builtins.mapAttrs (_: walk ([ x ] ++ seen)) x
-            else
-              builtins.mapAttrs (_: walk seen) x
-          )
+          let
+            revisit = carrierIndex seen x;
+          in
+          if revisit != null then
+            "<cycle:${toString revisit}>"
+          else
+            builtins.mapAttrs (_: walk ([ x ] ++ seen)) x
         else
           x;
     in
