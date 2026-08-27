@@ -80,5 +80,12 @@
         # it and binds this lock's engine to it.
         genHub = gen;
       };
+      # `testModules` is the batch asserter's own quantifier (`gen-harness/flakeModule.nix`'s
+      # `flake.tests`), which forces every cell's `expr` unconditionally — a cell that ABORTS
+      # belongs outside it by construction. `ci/tests-error.nix` is den-hoag-4xqpg's non-option-
+      # type cycle measurement, exactly that kind of cell; the ecosystem-standard split
+      # (gen-graph, gen-scope, gen-merge, gen-link, gen-resolve all carry the identical pattern)
+      # puts it here rather than under ./tests.
+      extraModules = [ ./tests-error.nix ];
     };
 }
