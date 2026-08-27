@@ -20,6 +20,21 @@
 # Precondition (RTD's never-assign-non-final invariant relies on it): acyclic AND
 # fixed edges (the data-change envelope — accessor' differs from ctx.accessor only in
 # the changedIds' nodeData). Topology-changing deltas are the v2 applyDelta seam.
+#
+# ACYCLIC-ONLY, ENFORCED (den-hoag-xyme). This calls `engine.schedule` directly —
+# the SAME bare `prelude.fix` knot drivers.nix's `propagate` calls, with none of
+# that file's cycle-awareness of its own. MEASURED: a `cone` reaching a genuine
+# SCC black-holes with Nix's own uncatchable "infinite recursion", which escapes
+# `builtins.tryEval` and, unlike a per-cell test failure, took the entire nix-unit
+# run down with it (den-hoag-xyme gate run). Nothing is ever CACHED on that path —
+# the crash aborts before any value is produced, so Söderberg-Hedin 2013 §4.2's
+# non-final-caching obligation is not literally broken — but an unguarded
+# uncatchable abort is the wrong shape here for the identical reason it was wrong
+# in drivers.nix, and ADR-0008 item 2's byte-parity definition is better served by
+# a located refusal. `affectedSet` now refuses, by a catchable throw, any change
+# whose cone reaches a cycle — scoped to the touched cone, mirroring `propagate`'s
+# guard exactly (a cycle elsewhere, outside this change's cone, is not this call's
+# business).
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
@@ -38,6 +53,11 @@ in
       );
       coneSet = prelude.genAttrs cone (_: true);
       changedSet = prelude.genAttrs changedIds (_: true);
+
+      # THE GUARD (see header: den-hoag-xyme). Mirrors drivers.nix's `propagate`
+      # exactly — graph.cycles' one authoritative answer, filtered to this call's
+      # own cone.
+      cyclicInCone = builtins.filter (id: coneSet ? ${id}) (graph.cycles (graphView accessor'));
       newHashOf = id: hashGuarded ctx.hashOf builtStore.${id};
 
       # THE DECISION, computed here and applied by the engine (identical to override's):
@@ -81,7 +101,10 @@ in
       reused = builtins.filter (id: !(builtins.elem id affected)) cone;
       hashes = prelude.genAttrs cone newHashOf;
     in
-    {
-      inherit affected hashes reused;
-    };
+    if cyclicInCone != [ ] then
+      throw "gen-memo.affectedSet: cyclic node(s) reachable from this change's cone: ${builtins.toJSON cyclicInCone} — this decision has no fixpoint solver (the acyclic-only counterpart to restabilize.nix); use restabilize for a ctx carrying a declared fixpoint."
+    else
+      {
+        inherit affected hashes reused;
+      };
 }

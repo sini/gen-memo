@@ -339,6 +339,80 @@ let
         }).store
         true
     )).success;
+
+  # ===== cyclic-cone refusal (den-hoag-xyme) ====================================
+  # Same 2-SCC {x,y}/producer p/consumer c shape as restabilize.nix's Fixture B
+  # and ci/tests/drivers.nix's cyclic-cone guard fixture, reconstructed locally
+  # per this file's own convention. propagateEager takes no guard of its own —
+  # `graph.coneRank`'s own cyclic-cone precondition (topoOrderKahn's cycle check,
+  # run before any node is warmed) is what refuses here; see lib/eager.nix's
+  # header for the measured claim this pins.
+  #
+  # ★ A BARE `.success` ON THE OUTER RESULT WOULD BE A FALSE POSITIVE. Unlike
+  # drivers.nix's `propagate`, propagateEager's return is an unconditional
+  # `{ inherit store; ... }` with no top-level `if cyclic then throw` — so WHNF
+  # of the returned attrset never touches `rank`/`cone`/`final` at all. Only a
+  # forced read of `.store` reaches coneRank's check; every cell below forces one.
+  cyclicAcc = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "y";
+      }
+      {
+        from = "y";
+        to = "x";
+      }
+      {
+        from = "x";
+        to = "p";
+      }
+      {
+        from = "c";
+        to = "y";
+      }
+    ];
+    nodeData = {
+      p.weight = 5;
+      x.weight = 1;
+      y.weight = 1;
+      c.weight = 0;
+    };
+  };
+  # NOT built via `ctxOf`/`build` without a fixpoint: that path is the ACYCLIC
+  # arm and throws unconditionally on ANY cyclic accessor, regardless of which
+  # edit follows (lib/build.nix's `cyclic != []` precheck is unconditional on
+  # the whole ctx, not scoped to a cone) — a bare `ctxOf` here would make every
+  # cell below fail at ctx-construction and test nothing about propagateEager
+  # itself. `fixpoint` selects build's STRATIFIED arm (runScc-solved SCCs), the
+  # same cyclic-capable ctx restabilize produces — exactly the shape that can
+  # legitimately reach an acyclic-only driver like propagateEager.
+  # `sumRecompute` (additive) does not converge on a genuine cycle — x reads y
+  # and y reads x, so an additive sum climbs without bound. The lfp solver needs
+  # a recompute that actually stabilizes; `max`-over-deps is idempotent (mirrors
+  # the same fixture in ci/tests/drivers.nix's cyclic-cone guard).
+  cyclicRecompute =
+    a: s: id:
+    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
+  cyclicCtx = build {
+    accessor = cyclicAcc;
+    recompute = cyclicRecompute;
+    inherit hashOf;
+    fixpoint = {
+      lattices = lib.genAttrs [ "p" "x" "y" "c" ] (_: {
+        bottom = 0;
+        join = _: v: v;
+        eq = (a: b: a == b);
+        maxIter = 100;
+      });
+    };
+  };
+  eagerReachesCycle = builtins.tryEval (
+    builtins.deepSeq (propagateEager cyclicCtx { p.weight = 50; }).store true
+  );
+  eagerMissesCycle = builtins.tryEval (
+    builtins.deepSeq (propagateEager cyclicCtx { c.weight = 999; }).store true
+  );
 in
 {
   flake.tests.eager = {
@@ -503,6 +577,30 @@ in
     };
     test-join-poison-is-real = {
       expr = joinPoisonIsReal;
+      expected = true;
+    };
+
+    # ===== cyclic-cone refusal (den-hoag-xyme) =====
+    # LIVE CONTROL — the fixture is a genuine SCC (same shape drivers.nix pins).
+    test-control-cyclic-fixture-is-a-genuine-scc = {
+      expr = builtins.sort builtins.lessThan (graph.cycles (fx.graphOf cyclicAcc));
+      expected = [
+        "x"
+        "y"
+      ];
+    };
+    # An edit whose cone reaches the SCC is refused — catchably, by coneRank's
+    # own precondition (see lib/eager.nix's header) — never Nix's uncatchable
+    # infinite recursion.
+    test-eager-refuses-cyclic-cone = {
+      expr = eagerReachesCycle.success;
+      expected = false;
+    };
+    # THE COUNTER-CASE — an edit whose own cone never reaches the SCC still
+    # succeeds on the SAME cyclic ctx (the refusal is coneRank's cone-scoped
+    # precondition, not a blanket refusal of any ctx that carries a cycle).
+    test-control-eager-cyclic-ctx-safe-edit-still-works = {
+      expr = eagerMissesCycle.success;
       expected = true;
     };
   };

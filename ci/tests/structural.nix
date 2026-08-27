@@ -210,6 +210,132 @@ let
     in
     r.store == oracle.store;
   retractFailing = builtins.filter (seed: !(retractSound seed)) (lib.range 1 120);
+
+  # ===== cyclic-domain guard (den-hoag-xyme) ===================================
+  # Same 2-SCC {x,y}/producer p/consumer c shape used elsewhere this session.
+  # Built via `fixpoint` (build's STRATIFIED arm) — a bare `build` without one
+  # throws unconditionally on ANY cyclic accessor regardless of the edit tested.
+  cyclicAcc = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "y";
+      }
+      {
+        from = "y";
+        to = "x";
+      }
+      {
+        from = "x";
+        to = "p";
+      }
+      {
+        from = "c";
+        to = "y";
+      }
+    ];
+    nodeData = {
+      p.weight = 5;
+      x.weight = 1;
+      y.weight = 1;
+      c.weight = 0;
+    };
+  };
+  cyclicRecompute =
+    a: s: id:
+    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
+  cyclicCtx = build {
+    accessor = cyclicAcc;
+    recompute = cyclicRecompute;
+    inherit hashOf;
+    fixpoint = {
+      lattices =
+        lib.genAttrs
+          [
+            "p"
+            "x"
+            "y"
+            "c"
+          ]
+          (_: {
+            bottom = 0;
+            join = _: v: v;
+            eq = a: b: a == b;
+            maxIter = 100;
+          });
+    };
+  };
+
+  # dependentsOf(p) = {c,x,y} — retract "p"'s revCone reaches BOTH members of the
+  # pre-existing {x,y} SCC even though p itself is never part of it and the edit
+  # (a plain deletion) creates no new edge at all.
+  retractReachesCycle = builtins.tryEval (
+    builtins.deepSeq (retract cyclicCtx "p" "recompute-without").store true
+  );
+  # dependentsOf(c) = {} — retracting the leaf consumer c never touches the SCC.
+  retractMissesCycle = builtins.tryEval (builtins.deepSeq (retract cyclicCtx "c" null).store true);
+
+  # qAcc: cyclicAcc plus an unwired leaf q, so applyEdgeDelta can give p a
+  # genuinely NEW, non-cyclic-for-p edge (p -> q) — addedEdges is non-empty and
+  # the touched node (p) is honestly NOT self-reachable in the new topology, yet
+  # revCone(p) = {c,x,y} still reaches the untouched, pre-existing {x,y} SCC.
+  qAcc = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "y";
+      }
+      {
+        from = "y";
+        to = "x";
+      }
+      {
+        from = "x";
+        to = "p";
+      }
+      {
+        from = "c";
+        to = "y";
+      }
+    ];
+    nodeData = {
+      p.weight = 5;
+      x.weight = 1;
+      y.weight = 1;
+      c.weight = 0;
+      q.weight = 0;
+    };
+  };
+  qCtx = build {
+    accessor = qAcc;
+    recompute = cyclicRecompute;
+    inherit hashOf;
+    fixpoint = {
+      lattices =
+        lib.genAttrs
+          [
+            "p"
+            "x"
+            "y"
+            "c"
+            "q"
+          ]
+          (_: {
+            bottom = 0;
+            join = _: v: v;
+            eq = a: b: a == b;
+            maxIter = 100;
+          });
+    };
+  };
+  edgeDeltaReachesCycle = builtins.tryEval (
+    builtins.deepSeq (applyEdgeDelta qCtx "p" [ "q" ]).store true
+  );
+  # c's revCone is just {c} (nobody depends on c) — dropping its own edge to y
+  # never touches the SCC.
+  edgeDeltaMissesCycle = builtins.tryEval (
+    builtins.deepSeq (applyEdgeDelta cyclicCtx "c" [ ]).store true
+  );
 in
 {
   flake.tests.structural = {
@@ -316,6 +442,31 @@ in
     # ===== chaining (structural ∘ structural ∘ data) == thrice-edited rebuild =====
     test-chain-structural-equiv = {
       expr = chainEquiv;
+      expected = true;
+    };
+
+    # ===== cyclic-domain guard (den-hoag-xyme) =====
+    test-control-cyclic-fixture-is-a-genuine-scc = {
+      expr = builtins.sort builtins.lessThan (graph.cycles (fx.graphOf cyclicAcc));
+      expected = [
+        "x"
+        "y"
+      ];
+    };
+    test-retract-refuses-cyclic-domain = {
+      expr = retractReachesCycle.success;
+      expected = false;
+    };
+    test-control-retract-safe-edit-still-works = {
+      expr = retractMissesCycle.success;
+      expected = true;
+    };
+    test-applyEdgeDelta-refuses-cyclic-domain = {
+      expr = edgeDeltaReachesCycle.success;
+      expected = false;
+    };
+    test-control-applyEdgeDelta-safe-edit-still-works = {
+      expr = edgeDeltaMissesCycle.success;
       expected = true;
     };
   };

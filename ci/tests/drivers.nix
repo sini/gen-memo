@@ -277,6 +277,77 @@ let
   forceCtxQuiescent = fcPending.ctx.pending.dirty;
   # the returned ctx is genuinely drained: re-reading c off it is the new value.
   forceCtxDrainedStore = fcPending.ctx.store.c;
+
+  # ===== cyclic-cone guard (den-hoag-xyme) =====
+  # This driver has no fixpoint solver (see header). 2-SCC {x,y} reading acyclic
+  # producer p; acyclic consumer c reads y. Same shape as restabilize.nix's own
+  # "Fixture B", reconstructed locally rather than shared across test modules —
+  # this file's own established convention (chainAcc/pinAcc/wideDiamond are each
+  # local too).
+  cyclicAcc = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "y";
+      }
+      {
+        from = "y";
+        to = "x";
+      }
+      {
+        from = "x";
+        to = "p";
+      }
+      {
+        from = "c";
+        to = "y";
+      }
+    ];
+    nodeData = {
+      p = {
+        weight = 5;
+      };
+      x = {
+        weight = 1;
+      };
+      y = {
+        weight = 1;
+      };
+      c = {
+        weight = 0;
+      };
+    };
+  };
+  cyclicIds = [
+    "p"
+    "x"
+    "y"
+    "c"
+  ];
+  cyclicRecompute =
+    a: s: id:
+    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
+  cyclicHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
+  cyclicCtx = build {
+    accessor = cyclicAcc;
+    recompute = cyclicRecompute;
+    hashOf = cyclicHashOf;
+    fixpoint = {
+      lattices = lib.genAttrs cyclicIds (_: {
+        bottom = 0;
+        join = _: v: v;
+        eq = (a: b: a == b);
+        maxIter = 100;
+      });
+    };
+  };
+  # p is the producer feeding the SCC: an override of p puts {x,y} in the cone.
+  overrideReachesCycle = builtins.tryEval (override cyclicCtx "p" { weight = 50; });
+  propagateReachesCycle = builtins.tryEval (propagate (applyDelta cyclicCtx "p" { weight = 50; }));
+  # c is downstream of the SCC but its OWN data-change cone is just {c} — nothing
+  # depends on c, so the edit never reaches {x,y}. Measured (den-hoag-xyme): this
+  # must keep working — the guard is scoped to the touched cone, not the whole ctx.
+  overrideMissesCycle = builtins.tryEval (override cyclicCtx "c" { weight = 999; });
 in
 {
   flake.tests.drivers = {
@@ -377,6 +448,40 @@ in
     test-forceCtx-store-drained = {
       expr = forceCtxDrainedStore;
       expected = 200;
+    };
+
+    # ===== cyclic-cone guard (den-hoag-xyme) =====
+    # LIVE CONTROL — the fixture is a genuine SCC, not a vacuous one: {x,y} really
+    # are mutually reachable.
+    test-control-cyclic-fixture-is-a-genuine-scc = {
+      expr = builtins.sort builtins.lessThan (graph.cycles (fx.graphOf cyclicAcc));
+      expected = [
+        "x"
+        "y"
+      ];
+    };
+    # THE GUARD, seeded: an edit whose cone reaches the SCC is refused with a
+    # catchable, located throw — never the uncatchable Nix "infinite recursion"
+    # that engine.schedule's bare fix-knot produces without this guard (measured
+    # directly against the pre-fix code; see lib/drivers.nix's header).
+    test-propagate-refuses-cyclic-cone = {
+      expr = overrideReachesCycle.success;
+      expected = false;
+    };
+    test-propagate-refuses-cyclic-cone-via-propagate = {
+      expr = propagateReachesCycle.success;
+      expected = false;
+    };
+    # THE COUNTER-CASE — the guard is scoped to the touched cone, not a blanket
+    # refusal of any ctx that happens to carry a cycle anywhere. An edit whose own
+    # cone never reaches the SCC still succeeds, on the SAME cyclic ctx.
+    test-control-cyclic-ctx-safe-edit-still-works = {
+      expr = overrideMissesCycle.success;
+      expected = true;
+    };
+    test-control-cyclic-ctx-safe-edit-value = {
+      expr = overrideMissesCycle.value.store.c;
+      expected = 999;
     };
   };
 }

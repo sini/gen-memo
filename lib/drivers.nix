@@ -10,6 +10,25 @@
 #   - Hammer 2014 (Adapton force/demand; note: our force is full-drain, not
 #     Adapton's selective per-edge repair — dropped S6)
 #
+# ACYCLIC-ONLY, ENFORCED AT `propagate` (den-hoag-xyme). This is restabilize.nix's
+# stated counterpart ("the CYCLIC-CAPABLE analogue of override") and carries none of
+# that file's SCC machinery — no runScc, no lattices, no condensation fold.
+# `engine.schedule`'s knot (reference/schedule.nix) is a bare `prelude.fix` with no
+# ascent logic of its own; measured directly: handing it a cone that reaches a
+# genuine cycle black-holes with Nix's own uncatchable "infinite recursion", which
+# escapes `builtins.tryEval` — the identical hazard build.nix's own acyclic-arm
+# precheck exists to convert into a located throw (see that file's header). Nothing
+# is ever CACHED on that path — the crash aborts before any value is produced, so
+# Söderberg-Hedin 2013 §4.2's non-final-caching obligation is not literally broken —
+# but an unguarded uncatchable abort is the wrong shape for a decision layer whose
+# sibling entry point already has the catchable form, and ADR-0008 item 2's
+# byte-parity definition is better served by a located refusal than a bare crash.
+# `propagate` now refuses, by a catchable throw, any edit whose cone reaches a
+# cycle — scoped to the touched cone rather than the whole accessor, because an
+# edit whose cone never reaches a cycle elsewhere in the graph is measured safe (a
+# leaf edit downstream of an untouched SCC completes correctly) and refusing it
+# would be tightening past what the hazard requires.
+#
 # Honest gaps (load-bearing; stated in code):
 #   - (G1) FORCE NOT SELECTIVE: full cone/frontier drain vs Adapton's demand-
 #     ordered per-edge cutoff (needs mutable dirty flags + order — the dropped S6;
@@ -122,6 +141,12 @@ rec {
           seeds ++ prelude.concatMap (graph.dependentsOf (graphView accessor')) seeds
         );
         unionSet = prelude.genAttrs unionCone (_: true);
+
+        # THE GUARD (see header: den-hoag-xyme). Reuses graph.cycles' one authoritative
+        # answer, scoped to this call's own cone — a cycle this edit never reaches is
+        # not this call's business.
+        cyclicInCone = builtins.filter (id: unionSet ? ${id}) (graph.cycles (graphView accessor'));
+
         seedSet = prelude.genAttrs seeds (_: true);
         newHashOf = id: hashGuarded hashOf builtStore.${id};
 
@@ -169,15 +194,18 @@ rec {
             hash = newHashOf id;
           });
       in
-      {
-        store = builtStore;
-        trace = trace';
-        accessor = accessor';
-        inherit recompute hashOf;
-        pending = {
-          dirty = [ ];
+      if cyclicInCone != [ ] then
+        throw "gen-memo.propagate: cyclic node(s) reachable from this edit's cone: ${builtins.toJSON cyclicInCone} — this driver has no fixpoint solver (the acyclic-only counterpart to restabilize.nix); use restabilize for a ctx carrying a declared fixpoint."
+      else
+        {
+          store = builtStore;
+          trace = trace';
+          accessor = accessor';
+          inherit recompute hashOf;
+          pending = {
+            dirty = [ ];
+          };
         };
-      };
 
   # force — pull-semantics entry point: quiescent → value; pending → drain + read.
   # Adapton demand/pull interface. On a pending ctx, forces the full cone drain,

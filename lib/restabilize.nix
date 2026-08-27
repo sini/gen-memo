@@ -203,6 +203,17 @@ let
   # Kleene ascent), RTD-disclaimed. The AFFECTED post-filter below is reused only
   # as a trace-pruning convenience (re-hash the cone nodes that actually moved),
   # NOT as an optimality claim.
+  #
+  # WHAT "claims neither" DOES NOT DISCLAIM (den-hoag-xyme): RTD's invariant is
+  # its OWN optimality-envelope property, stated in RTD's terms and abandoned
+  # along with the O(|AFFECTED|) bound it travels with. It is not this plane's
+  # never-serve-a-non-final-value discipline (Söderberg-Hedin 2013 §4.2's second
+  # NTA obligation), which is not RTD's to disclaim in the first place — it is
+  # ADR-0008 item 2's own definition of this plane (byte-/fixpoint-parity against
+  # a cold evaluation). That discipline holds here BY CONSTRUCTION: `runScc`
+  # below never returns and nothing is ever bound to `builtStore`/the returned
+  # ctx before `settled` — an unconverged iterate is a local loop variable that
+  # is discarded on ascent, never a value this function can cache or hand back.
   restabilize =
     ctx: changedId: newDecls:
     let

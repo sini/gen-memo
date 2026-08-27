@@ -110,6 +110,93 @@ let
     accessor' = lambdaAcc;
     changedIds = [ "f" ];
   };
+
+  # ===== cyclic-cone guard (den-hoag-xyme) =====
+  # Same 2-SCC {x,y}/producer p/consumer c shape as drivers.nix's/eager.nix's
+  # cyclic-cone fixtures, reconstructed locally per this file's own convention.
+  # Built via `fixpoint` (build's STRATIFIED arm) — a bare `build` without one
+  # throws unconditionally on ANY cyclic accessor regardless of the edit that
+  # follows, which would test nothing about affectedSet's own guard.
+  cyclicAcc = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "y";
+      }
+      {
+        from = "y";
+        to = "x";
+      }
+      {
+        from = "x";
+        to = "p";
+      }
+      {
+        from = "c";
+        to = "y";
+      }
+    ];
+    nodeData = {
+      p = {
+        weight = 5;
+      };
+      x = {
+        weight = 1;
+      };
+      y = {
+        weight = 1;
+      };
+      c = {
+        weight = 0;
+      };
+    };
+  };
+  cyclicIds = [
+    "p"
+    "x"
+    "y"
+    "c"
+  ];
+  # max-over-deps: idempotent, actually converges on the {x,y} SCC (an additive
+  # recompute would climb without bound and never reach a fixpoint at all).
+  cyclicRecompute =
+    a: s: id:
+    lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
+  cyclicCtx = build {
+    accessor = cyclicAcc;
+    recompute = cyclicRecompute;
+    inherit hashOf;
+    fixpoint = {
+      lattices = lib.genAttrs cyclicIds (_: {
+        bottom = 0;
+        join = _: v: v;
+        eq = (a: b: a == b);
+        maxIter = 100;
+      });
+    };
+  };
+  cyclicAccReaches = cyclicAcc // {
+    nodeData = id: if id == "p" then { weight = 50; } else cyclicAcc.nodeData id;
+  };
+  cyclicAccMisses = cyclicAcc // {
+    nodeData = id: if id == "c" then { weight = 999; } else cyclicAcc.nodeData id;
+  };
+  # Unlike eager.nix's `propagateEager` (an unconditional attrset literal —
+  # forcing a field is required to reach the hazard), `affectedSet`'s guard IS
+  # the function's own outermost expression (`if cyclicInCone != [] then throw
+  # else {...}`), so a bare `tryEval` on the call already forces the branch.
+  affectedReachesCycle = builtins.tryEval (
+    affectedSet cyclicCtx {
+      accessor' = cyclicAccReaches;
+      changedIds = [ "p" ];
+    }
+  );
+  affectedMissesCycle = builtins.tryEval (
+    affectedSet cyclicCtx {
+      accessor' = cyclicAccMisses;
+      changedIds = [ "c" ];
+    }
+  );
 in
 {
   flake.tests."affectedSet" = {
@@ -169,6 +256,27 @@ in
     test-hashes-null-hash = {
       expr = affLambda.hashes.f;
       expected = null;
+    };
+
+    # ===== cyclic-cone guard (den-hoag-xyme) =====
+    test-control-cyclic-fixture-is-a-genuine-scc = {
+      expr = builtins.sort builtins.lessThan (graph.cycles (fx.graphOf cyclicAcc));
+      expected = [
+        "x"
+        "y"
+      ];
+    };
+    test-affectedSet-refuses-cyclic-cone = {
+      expr = affectedReachesCycle.success;
+      expected = false;
+    };
+    test-control-affectedSet-cyclic-ctx-safe-edit-still-works = {
+      expr = affectedMissesCycle.success;
+      expected = true;
+    };
+    test-control-affectedSet-cyclic-ctx-safe-edit-value = {
+      expr = affectedMissesCycle.value.hashes.c;
+      expected = hashOf 999;
     };
   };
 }

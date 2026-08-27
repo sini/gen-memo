@@ -51,18 +51,34 @@ let
       dependencies = id: prelude.unique (dependencies id);
     };
 
-  # reCycleCheck — STRUCTURAL self-reachability query over accessor'.dependencies, seeded
-  # at `touched` (the nodes whose out-edges the delta changed). Any new cycle
-  # routes through a touched node that is now self-reachable. Throws a LOCATED
-  # blame (the build.nix shape: why="cycle"; cycle=[…]) — tryEval-catchable, never
-  # Nix infinite recursion. Restrict-to-touched is sound ONLY because the prior
-  # topology was build-proven acyclic and edges not touched cannot create a cycle.
-  # Returns the accessor unchanged on success (so it can wrap a let-binding).
-  reCycleCheck =
-    accessor': touched:
+  # cycleGuard — refuse (LOCATED, tryEval-catchable, never Nix infinite recursion)
+  # any `domain` that reaches a cycle in accessor'.dependencies. `domain` is the
+  # FULL set of ids the caller's own `engine.schedule` call is about to resolve
+  # (retract's revCone; applyEdgeDelta's revCone ∪ newProducers) — never just the
+  # edited node.
+  #
+  # den-hoag-xyme (WAS `reCycleCheck`, self-reachability restricted to the
+  # touched node only). MEASURED that restriction is unsound: `retract`/
+  # `applyEdgeDelta`'s follow-on `spliceStore`/`producerStore` call the SAME bare
+  # `prelude.fix` knot drivers.nix/affectedSet.nix guard against, and a domain
+  # member that is cyclic in accessor' black-holes Nix's own uncatchable
+  # "infinite recursion" — REGARDLESS of whether the cycle was newly closed by
+  # this edit (in which case the touched node is self-reachable, the old check's
+  # case) or was ALREADY there and merely happens to sit downstream of the
+  # touched node (retract has NO precondition ruling this out — "deletion only
+  # shrinks the graph" answers "can this CREATE a cycle", never "can a
+  # PRE-EXISTING one already be in the domain"; applyEdgeDelta's old touched-only
+  # recheck had the identical blind spot whenever the new edges are non-cyclic
+  # for the touched node itself). `graph.cycles` restricted to `domain` catches
+  # both shapes with one check: a newly-closed cycle always contains the touched
+  # node, which is always ∈ domain (revCone is seeded there), so nothing the old
+  # check caught is lost. Returns the accessor unchanged on success (so it can
+  # wrap a let-binding).
+  cycleGuard =
+    accessor': domain:
     let
-      selfReach = graph.selfReachable (graphView accessor');
-      offenders = builtins.filter selfReach touched;
+      domainSet = prelude.genAttrs domain (_: true);
+      offenders = builtins.filter (id: domainSet ? ${id}) (graph.cycles (graphView accessor'));
       blame = {
         why = "cycle";
         cycle = offenders;
@@ -78,7 +94,7 @@ let
     if offenders == [ ] then
       accessor'
     else
-      throw "gen-memo: structural delta closed a cycle: ${builtins.toJSON blame}";
+      throw "gen-memo: structural delta's domain reaches a cycle: ${builtins.toJSON blame}";
 
   # spliceStore — reverse-cone recompute over a base store + obsolete prune.
   # `base` is the store the engine reads through (already pruned of any dead key);
@@ -131,7 +147,9 @@ in
   #                         (outside the declared relation) is the unenforceable K5/H4
   #                         ambient read — out of contract.
   #
-  # NO cycle recheck: deletion only SHRINKS the graph, so it cannot create a cycle.
+  # Node removal cannot CREATE a cycle (deletion only shrinks the graph) — but it
+  # can still expose an ALREADY-cyclic remainder to `spliceStore`'s engine.schedule,
+  # so the domain (revCone) is guarded (den-hoag-xyme; see cycleGuard's header).
   retract =
     engine: ctx: deadId: retractPolicy:
     let
@@ -157,12 +175,17 @@ in
       # so dependentsOf can see who pointed at it.
       revCone = graph.dependentsOf (graphView accessor) deadId;
 
+      # THE GUARD (den-hoag-xyme; see cycleGuard's header). revCone is the exact
+      # domain `spliceStore` below hands `engine.schedule`.
+      checkedAccessor = cycleGuard accessor' revCone;
+
       # Splice base: deadId removed FIRST. A dependent that still hard-reads deadId
       # by name would then throw "missing" (correct — that is the out-of-contract
       # ambient read), rather than silently reading a STALE value.
       baseWithoutDead = removeAttrs ctx.store [ deadId ];
       store' = spliceStore {
-        inherit engine accessor' recompute;
+        inherit engine recompute;
+        accessor' = checkedAccessor;
         base = baseWithoutDead;
         inherit revCone;
         keep = nodes';
@@ -176,7 +199,7 @@ in
       trace' =
         traceWithoutDead
         // prelude.genAttrs revCone (id: {
-          deps = accessor'.dependencies id;
+          deps = checkedAccessor.dependencies id;
           hash = hashGuarded hashOf store'.${id};
         });
 
@@ -192,7 +215,7 @@ in
       {
         store = store';
         trace = trace';
-        accessor = accessor';
+        accessor = checkedAccessor;
         inherit recompute hashOf;
       };
 
@@ -209,8 +232,11 @@ in
   #     changedId`'s `s.z` would throw "missing". So the newly-reachable producer
   #     subgraph is SUB-BUILT (a forward pass over accessor') and spliced into
   #     the base BEFORE the reverse-cone splice.
-  #   - reCycleCheck seeded at the touched node [changedId] (added edges can close
-  #     a cycle the build-time precheck never saw); skipped when addedEdges == [].
+  #   - cycleGuard covers the FULL domain (revCone ∪ newProducers) — a cycle can
+  #     reach this op either newly-closed by the added edges, or PRE-EXISTING and
+  #     merely downstream of changedId (den-hoag-xyme; unconditional, never
+  #     skipped — see cycleGuard's header for why the old touched-only,
+  #     added-edges-gated recheck was unsound).
   #
   # ★★★ THE NEW-PRODUCER WALK BELONGS TO THE CALLER-BUILT ACCESSOR CONTRACT, AND THIS
   # IS THE SITE WHERE THAT MATTERS. `forwardReach` probes `dependencies` at an id that
@@ -256,16 +282,17 @@ in
         inherit (accessor) nodeData parent;
       };
 
-      # Located cycle recheck (seeded at the only touched node) BEFORE any splice.
-      # Forces selfReachable over accessor'.dependencies; throws a catchable located blame.
-      addedEdges = builtins.filter (e: !(builtins.elem e (accessor.dependencies changedId))) newEdgesU;
-      checkedAccessor = if addedEdges == [ ] then accessor' else reCycleCheck accessor' [ changedId ];
-
       # Reverse cone of changedId over the NEW accessor (added edges pull new
       # producers in as DEPS, not dependents; removed edges shrink the cone).
-      revCone = prelude.unique (
-        [ changedId ] ++ graph.dependentsOf (graphView checkedAccessor) changedId
-      );
+      revCone = prelude.unique ([ changedId ] ++ graph.dependentsOf (graphView accessor') changedId);
+
+      # THE GUARD (den-hoag-xyme; see cycleGuard's header). domain = everywhere
+      # `engine.schedule` is about to resolve a value below: revCone (existing
+      # nodes whose value moves) ∪ newProducers (fresh nodes sub-built next). A
+      # newly-closed cycle always contains changedId, which is always ∈ revCone,
+      # so this subsumes the old touched-only recheck as well as covering the
+      # pre-existing-downstream-cycle case it missed. BEFORE any splice.
+      checkedAccessor = cycleGuard accessor' (prelude.unique (revCone ++ newProducers));
       # The newly-reachable producers are new nodes: they have no prior value to be
       # clean against, so the decision here is `nothing is clean` for the same reason
       # the cone splice's is.

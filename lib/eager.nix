@@ -14,8 +14,16 @@
 # Honest envelope (preconditions; out-of-envelope ⇒ use propagate):
 #   - DATA-change only: `changes` replaces nodeData; EDGES ARE FIXED (cone over accessor' ==
 #     cone over ctx.accessor), exactly like override.
-#   - ACYCLIC cone: graph.coneRank requires it (a cyclic cone makes its prelude.fix recurrence
-#     self-referential ⇒ uncatchable infinite recursion). Cyclic stays in restabilize/runScc.
+#   - ACYCLIC cone: graph.coneRank requires it. This comment PREVIOUSLY claimed a cyclic cone
+#     black-holes into Nix's uncatchable "infinite recursion" — MEASURED FALSE at the pinned
+#     gen-graph revision (den-hoag-xyme): `coneRank` computes its cycle-check (topoOrderKahn)
+#     BEFORE warming any node, and a cyclic cone throws a CATCHABLE, LOCATED refusal naming the
+#     cycle (`gen-graph.coneRank: cyclic cone has no producers-first rank; cycles [...]`) — the
+#     identical hazard build.nix/drivers.nix guard against, already discharged one layer down.
+#     Nothing is ever recomputed or cached on that path (the throw fires before `rank.order` is
+#     read), so Söderberg-Hedin 2013 §4.2's non-final-caching obligation and ADR-0008 item 2's
+#     byte-parity definition both hold here BY CONSTRUCTION, with no guard owed at this site.
+#     Cyclic stays in restabilize/runScc.
 #   - COST: a constant-factor win on the EXPENSIVE axis (recompute/hash/alloc) for cut-heavy
 #     edits; it still pays O(|cone|) cheap drive bookkeeping (rank + sweep), so it is NOT a
 #     total-work O(|AFFECTED|) bound (v3 minimality spike verdict: PARTIAL — sub-cone on
