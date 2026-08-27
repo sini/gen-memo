@@ -102,6 +102,39 @@ let
     in
     self;
 
+  # ── the fixture for the OTHER residual (den-hoag-memo-cycle-guard-shape-wt4b9 follow-up): a
+  # MUTUAL cycle between two DISTINCT attrsets, neither of which is an ancestor of itself. The
+  # generalized guard extends `seen` for every attrs node and revisits it by `==`, and `==` itself
+  # has no cycle detection — deciding "is candidate `x` one of my ancestors" for a candidate that
+  # is not pointer-identical to any of them falls through to a STRUCTURAL compare that can recurse
+  # through the very cycle it is trying to detect. Two shapes isolate WHEN that structural compare
+  # terminates: same discriminating tag (nothing short-circuits the recursion into `ref`) and
+  # differing tag (the mismatched scalar is found before `ref` is ever compared).
+  mutualSame =
+    let
+      a = {
+        tag = "same";
+        ref = b;
+      };
+      b = {
+        tag = "same";
+        ref = a;
+      };
+    in
+    a;
+  mutualDiff =
+    let
+      a = {
+        tag = "a";
+        ref = b;
+      };
+      b = {
+        tag = "b";
+        ref = a;
+      };
+    in
+    a;
+
   decls = {
     options.leaf = mkOption {
       type = types.raw;
@@ -118,6 +151,18 @@ let
     modules = [
       decls
       { config.leaf = plainCycle; }
+    ];
+  };
+  subjectMutualSame = successor.compose {
+    modules = [
+      decls
+      { config.leaf = mutualSame; }
+    ];
+  };
+  subjectMutualDiff = successor.compose {
+    modules = [
+      decls
+      { config.leaf = mutualDiff; }
     ];
   };
 in
@@ -154,6 +199,75 @@ in
           leaf = {
             tag = "plain-cycle";
             ref = "<cycle:0>";
+          };
+        };
+      };
+    };
+
+    # ── THE MUTUAL-CYCLE RESIDUAL (den-hoag-memo-cycle-guard-shape-wt4b9 follow-up) ───────────────
+    # The self-cycle above is caught: `self` is pushed onto `seen` and a later revisit of the SAME
+    # thunk is a pointer-identical `==`, cheap by construction. A cycle between two DISTINCT
+    # attrsets is a different case — `carrierIndex` must decide "is `b` one of my ancestors" by
+    # comparing `b` against `a` STRUCTURALLY, and `==` has no cycle detection of its own. Nix
+    # exposes no pointer-identity primitive a userland comparator could call in its place, so this
+    # is PINNED rather than patched — see the header and `dropFns`'s comment for the full argument.
+    flake.testsError.mutual-cycle = {
+      # LIVE CONTROL — the same-tag fixture is a genuine 2-cycle between DISTINCT attrsets (`a.ref`
+      # is `b`, `b.ref` is `a`, `a` is not `b`) that SURVIVED the compose pipeline with that
+      # structure intact, asserted WITHOUT forcing a deep compare of `a` and `b` against each
+      # other: that deep compare is exactly the pathology the pinned cell below measures, so this
+      # reads pointer-identity on `a.ref.ref` (loops back to the SAME thunk as `leaf`, cheap) and
+      # plain string leaves rather than comparing `a` and `b` to one another. Needed only here: the
+      # pin cell below aborts, so nothing about it can attest the fixture independently — where the
+      # diff-tag fixture is concerned, `test-control-mutual-cycle-diff-tag-terminates` already
+      # asserts the same survived-identity fact as a side effect of its exact expected shape.
+      test-control-same-tag-fixture-is-a-genuine-mutual-cycle = {
+        expr = {
+          loopsBack = subjectMutualSame.values.leaf.ref.ref == subjectMutualSame.values.leaf;
+          outerTag = subjectMutualSame.values.leaf.tag;
+          innerTag = subjectMutualSame.values.leaf.ref.tag;
+        };
+        expected = {
+          loopsBack = true;
+          outerTag = "same";
+          innerTag = "same";
+        };
+      };
+      # THE PIN. Deciding whether `b` is one of the walk's ancestors compares it against `a` by
+      # `==`; both carry the same `tag`, so that comparison cannot stop at a mismatched scalar and
+      # instead recurses into `ref` — which is `b` and `a` pointing at each other — forever. A
+      # comparator bounded to avoid this overflow would also refuse the pointer-identical revisits
+      # this guard exists to cut (the option-type functor self-cycle `compose-parity.nix` depends
+      # on, and `test-nonoption-type-cycle-cuts` above): general cycle detection over arbitrary Nix
+      # attrsets is INEXPRESSIBLE in userland without breaking the working arm. Match
+      # discrimination (wrong `type`, wrong `msg`) was checked by hand against this exact cell
+      # before landing — both redden — for the same reason den-hoag-4xqpg could not build a
+      # permanent negative-control cell: the only way to construct one here is `tryEval` over the
+      # same aborting `expr`, and the abort propagates THROUGH `tryEval` uncaught.
+      test-mutual-same-tag-cycle-aborts-uncaught = {
+        expr = builtins.toJSON (walkCopy subjectMutualSame.values);
+        expectedError = {
+          type = "Error";
+          msg = "^stack overflow; max-call-depth exceeded$";
+        };
+      };
+      # THE COUNTEREXAMPLE THAT PROVES THE PIN IS NARROW, NOT INHERENT TO EVERY MUTUAL CYCLE. The
+      # identical shape with DIFFERING first-compared scalars ("a" vs "b") terminates: `==` finds a
+      # discriminating leaf before it ever has to recurse through the shared `ref` chain, and the
+      # walk completes with `<cycle:1>` — `b`'s `ref` revisits `a`, the OUTER ancestor (index 1;
+      # `b` itself, index 0, is the innermost). ★ THIS TERMINATION IS COMPARISON-ORDER-INCIDENTAL,
+      # NOT GUARANTEED: it depends on which attribute the evaluator happens to compare first (an
+      # interned-symbol-table detail, not a documented contract), so this fixture is not proof that
+      # every differing-tag mutual cycle terminates — only that this one, measured, does.
+      test-control-mutual-cycle-diff-tag-terminates = {
+        expr = builtins.toJSON (walkCopy subjectMutualDiff.values);
+        expected = builtins.toJSON {
+          leaf = {
+            tag = "a";
+            ref = {
+              tag = "b";
+              ref = "<cycle:1>";
+            };
           };
         };
       };

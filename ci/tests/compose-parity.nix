@@ -66,6 +66,19 @@ let
       # the current path. `==` on attrsets short-circuits on pointer identity, so a genuine
       # self-reference reads cheaply; a coincidental structural match would force a deeper compare,
       # bounded by path depth rather than by the whole visited set.
+      #
+      # ★ A CARRIED RESIDUAL, PINNED RATHER THAN CLOSED (den-hoag-memo-cycle-guard-shape-wt4b9
+      # follow-up; cells at `ci/tests-error.nix`'s `mutual-cycle` suite). This scan fingerprints a
+      # candidate SOLELY by `==` against the ancestors, and `==` has no cycle detection of its own;
+      # Nix exposes no pointer-identity primitive a userland comparator could call instead. A
+      # candidate that is NOT pointer-identical to an ancestor but is mutually cyclic WITH one — two
+      # distinct attrsets each holding a reference to the other — makes the structural compare
+      # recurse through that same cycle, and whether it terminates first on a discriminating scalar
+      # is an evaluator comparison-order detail, not a guarantee. Bounding the scan to avoid that
+      # would also refuse the pointer-identical revisits this guard exists to cut (the option-type
+      # functor self-cycle this suite's own fixture depends on): general cycle detection over
+      # arbitrary Nix attrsets is INEXPRESSIBLE in userland without breaking the working arm. All
+      # three walk copies (the shipped gen-flake original and both local ones) share this ground.
       carrierIndex =
         seen: x:
         let
