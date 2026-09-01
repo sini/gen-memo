@@ -30,14 +30,14 @@ and on no `<nixpkgs>`. A dedicated `purity` suite pins that as a checked propert
 
 ## Overview
 
-| Term | Definition |
-| --- | --- |
-| Store | flat relocatable id-keyed result map `{ <id> = value; }` — plain values, not thunks closed over an evaluation |
-| Trace | per-key `{ deps; hash }` verifying record |
-| Cone | the dependent cone of `x` — everyone who transitively depends on it |
-| Dirty set | changed ids together with their dependent cones (the cheap over-approximation) |
-| Affected set | the exact subset whose hash actually moved, discovered by the propagation |
-| Splice | `priorStore // fix-of-cone` — recompute the cone, reuse the rest |
+| Term         | Definition                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| Store        | flat relocatable id-keyed result map `{ <id> = value; }` — plain values, not thunks closed over an evaluation |
+| Trace        | per-key `{ deps; hash }` verifying record                                                                     |
+| Cone         | the dependent cone of `x` — everyone who transitively depends on it                                           |
+| Dirty set    | changed ids together with their dependent cones (the cheap over-approximation)                                |
+| Affected set | the exact subset whose hash actually moved, discovered by the propagation                                     |
+| Splice       | `priorStore // fix-of-cone` — recompute the cone, reuse the rest                                              |
 
 The flatness and relocatability of the store are **this library's own design claims about its own
 store**, stated in its own voice. They are not attributed to any paper; see
@@ -55,14 +55,14 @@ it is not re-proposed.
 
 ## Gen Ecosystem
 
-| Library | Role |
-|---------|------|
-| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base |
-| [gen-scope](https://github.com/sini/gen-scope) | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces |
-| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door |
+| Library                                            | Role                                                                                                                                                                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base                                                                                                                                                                                                             |
+| [gen-scope](https://github.com/sini/gen-scope)     | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces                                                                                                                           |
+| [gen-graph](https://github.com/sini/gen-graph)     | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door                                                                                           |
 | [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule and cold fold — consumes this plane's `build`. Its warm half and override cone **have arrived**; the cold fold and the schedule have not, and their destinations are the evaluator and the query-gate home, not here |
-| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions |
-| **gen-memo** | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold) |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions                                                                                                                                                                                 |
+| **gen-memo**                                       | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold)                                                                                                                                                 |
 
 ## Design Principles
 
@@ -169,50 +169,50 @@ do not, because they populate no store.
 
 **Build and reuse decision**
 
-| Export | What it does |
-| --- | --- |
-| `build` | Full evaluation into a store and a verifying trace, the store populated by the engine handed in. Pre-checks acyclicity and throws a *located*, `tryEval`-catchable blame on a cycle. With a `fixpoint` argument it relaxes the check and solves stratified over the condensation |
-| `needsEval` | Whether a node must be recomputed, before any cutoff |
-| `earlyCutoff` | Whether a recomputed value's hash moved, after recompute |
-| `verify` | Whether a node's trace is still valid — deps unchanged and all dep hashes clean |
+| Export        | What it does                                                                                                                                                                                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build`       | Full evaluation into a store and a verifying trace, the store populated by the engine handed in. Pre-checks acyclicity and throws a *located*, `tryEval`-catchable blame on a cycle. With a `fixpoint` argument it relaxes the check and solves stratified over the condensation |
+| `needsEval`   | Whether a node must be recomputed, before any cutoff                                                                                                                                                                                                                             |
+| `earlyCutoff` | Whether a recomputed value's hash moved, after recompute                                                                                                                                                                                                                         |
+| `verify`      | Whether a node's trace is still valid — deps unchanged and all dep hashes clean                                                                                                                                                                                                  |
 
 Three predicates deciding at three different times; that is the plane's precision story, and they
 are not the same predicate under three names.
 
 **Cones**
 
-| Export | What it does |
-| --- | --- |
-| `affected` / `impactOf` | The dependent cone of one id |
-| `dirtySet` | The cheap over-approximation: changed ids together with their cones |
-| `affectedSet` | The exact subset whose hash actually moved, post-filtered from the propagation |
+| Export                  | What it does                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `affected` / `impactOf` | The dependent cone of one id                                                   |
+| `dirtySet`              | The cheap over-approximation: changed ids together with their cones            |
+| `affectedSet`           | The exact subset whose hash actually moved, post-filtered from the propagation |
 
 **Change and propagate**
 
-| Export | What it does |
-| --- | --- |
-| `applyDelta` | Data change only: rewrite one node's data, mark it pending, recompute nothing |
-| `batch` | Fold `applyDelta` over several deltas |
-| `propagate` | Drain the pending set to quiescence over the union cone |
-| `override` | The fused convenience — propagate after applyDelta |
-| `force` / `forceCtx` | Pull semantics: drain, then read a value (or the quiescent context) |
-| `propagateEager` | The cut-heavy fast path: rank-ordered push that recomputes only enqueued nodes |
+| Export               | What it does                                                                   |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `applyDelta`         | Data change only: rewrite one node's data, mark it pending, recompute nothing  |
+| `batch`              | Fold `applyDelta` over several deltas                                          |
+| `propagate`          | Drain the pending set to quiescence over the union cone                        |
+| `override`           | The fused convenience — propagate after applyDelta                             |
+| `force` / `forceCtx` | Pull semantics: drain, then read a value (or the quiescent context)            |
+| `propagateEager`     | The cut-heavy fast path: rank-ordered push that recomputes only enqueued nodes |
 
 **Topology change**
 
-| Export | What it does |
-| --- | --- |
-| `mkAccessor` | Rebuild a full accessor record |
-| `retract` | Delete a node and splice it out of its dependents |
+| Export           | What it does                                                                   |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `mkAccessor`     | Rebuild a full accessor record                                                 |
+| `retract`        | Delete a node and splice it out of its dependents                              |
 | `applyEdgeDelta` | Replace a node's declared edge set, sub-building any newly reachable producers |
 
 **The warm fold — reuse decided for an evaluator**
 
-| Export | What it does |
-| --- | --- |
+| Export         | What it does                                                                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `warmDecision` | The decision itself: `isClean` (the complement of the dirty cone) and `reusable` (the evaluator's own resolutional vocabulary). Two total functions and no values |
-| `warmOverride` | Splice one node's declaration, decide, and hand the evaluator one warm pass |
-| `warmResolve` | The batch form: N edits, one union cone, one pass |
+| `warmOverride` | Splice one node's declaration, decide, and hand the evaluator one warm pass                                                                                       |
+| `warmResolve`  | The batch form: N edits, one union cone, one pass                                                                                                                 |
 
 **The evaluator is a PARAMETER, not a dependency.** This library declares no evaluator input; the
 fold takes `{ evalWarm }` and calls it. So the call reads
@@ -226,10 +226,10 @@ unobservable.
 
 **The observed decision — an evaluator's warm answer, watched rather than made**
 
-| Export | What it does |
-| --- | --- |
+| Export       | What it does                                                                                                                                                                                                    |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `warmAdmits` | Whether a caller's edit has the shape a warm pass may be asked for: its key set is exactly the one reuse-bearing argument named, so every other argument is unchanged by construction rather than by comparison |
-| `warmTrace` | The evaluator's published decision, narrowed to the five fields a consumer reads, attached only to a result that was reached through an edit |
+| `warmTrace`  | The evaluator's published decision, narrowed to the five fields a consumer reads, attached only to a result that was reached through an edit                                                                    |
 
 **These two OBSERVE; the group above DECIDES, and that split is why `warmTrace` is not called
 `warmDecision`.** `warmDecision` is this plane's own answer — two total functions over a declared
@@ -246,14 +246,14 @@ against itself, so for an argument carrying a function there is no equality that
 
 **Cycles and provenance**
 
-| Export | What it does |
-| --- | --- |
-| `runScc` | Solve one strongly connected component to its least fixed point |
-| `restabilize` | The cyclic-capable analogue of `override` |
-| `support` / `supportDirect` | The transitive (or immediate) declared producers of a node |
-| `why` | The verdict an override would produce for a node: recomputed, cutoff or unaffected |
-| `whyNot` | The same as a total record — `{ reason; at }` for every verdict |
-| `whyFor` / `whyNotFor` | The same two questions curried on the change: one cone bound, spent over many nodes |
+| Export                      | What it does                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `runScc`                    | Solve one strongly connected component to its least fixed point                     |
+| `restabilize`               | The cyclic-capable analogue of `override`                                           |
+| `support` / `supportDirect` | The transitive (or immediate) declared producers of a node                          |
+| `why`                       | The verdict an override would produce for a node: recomputed, cutoff or unaffected  |
+| `whyNot`                    | The same as a total record — `{ reason; at }` for every verdict                     |
+| `whyFor` / `whyNotFor`      | The same two questions curried on the change: one cone bound, spent over many nodes |
 
 The internal hash guards (`hashGuarded`, `hashEq`, `hashMoved`) are **not** on this surface. They are
 imported directly by the files that need them; the evaluator this plane decides for is owed no hash
@@ -362,12 +362,12 @@ second is what a filename sweep measures, and it is the weaker instrument. At **
 across `used/` and `reference-catalog/`, with archived names as live controls and a nonsense token
 ⇒ 0 as the negative control:
 
-| cited name | primary? | discussed in archived work |
-|---|---|---|
-| Kosaraju / Sharir | no | **⇒ 0 at both granularities** — genuinely absent, nothing checkable |
-| Tarjan 1972 | no | named in **3** archived works, one of them Mokhov 2017 — itself a primary this ecosystem cites. A recorded acquisition gap |
-| Kleene | no | named in **5** archived works |
-| Magnusson–Hedin | no | **the construct is described in archived primaries on exactly the cited subject** — Söderberg 2013 lists "Magnusson, E., Hedin, G.: Circular reference attributed grammars" and describes their fixed-point iteration; Hedin 2000 is a co-author primary on reference attribute grammars. Checkable here; not an absence |
+| cited name        | primary? | discussed in archived work                                                                                                                                                                                                                                                                                               |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Kosaraju / Sharir | no       | **⇒ 0 at both granularities** — genuinely absent, nothing checkable                                                                                                                                                                                                                                                      |
+| Tarjan 1972       | no       | named in **3** archived works, one of them Mokhov 2017 — itself a primary this ecosystem cites. A recorded acquisition gap                                                                                                                                                                                               |
+| Kleene            | no       | named in **5** archived works                                                                                                                                                                                                                                                                                            |
+| Magnusson–Hedin   | no       | **the construct is described in archived primaries on exactly the cited subject** — Söderberg 2013 lists "Magnusson, E., Hedin, G.: Circular reference attributed grammars" and describes their fixed-point iteration; Hedin 2000 is a co-author primary on reference attribute grammars. Checkable here; not an absence |
 
 None of these carries a section coordinate, which is why the scoping holds and why it has to be said:
 they are attributions to a *named idea*. What that means differs per row — unverifiable for

@@ -43,11 +43,9 @@
 # and nothing here should be read as closing that gap. Both local copies carry the SAME
 # generalization in this change, so they do not drift from EACH OTHER on this axis.
 {
-  lib,
   genMerge,
   genHub,
   genMemo,
-  genInputs,
   ...
 }:
 let
@@ -167,12 +165,6 @@ let
   };
 in
 {
-  options.flake.testsError = lib.mkOption {
-    type = lib.types.lazyAttrsOf (lib.types.lazyAttrsOf lib.types.raw);
-    default = { };
-    description = "Test suites whose cells' `expr` CAN ABORT: { suite.test = { expr; expected | expectedError; }; }. Read by `nix-unit --flake ./ci#testsError`; deliberately outside `flake.tests`, which the batch asserter forces every `expr` of and would crash on rather than fail.";
-  };
-
   config = {
     flake.testsError.non-option-cycle = {
       # LIVE CONTROL — the fixture is genuinely self-referential before anything walks it. Nix's
@@ -272,26 +264,5 @@ in
         };
       };
     };
-
-    perSystem =
-      { pkgs, system, ... }:
-      {
-        pre-commit.settings.hooks.ci-error = {
-          enable = true;
-          name = "ci-error";
-          description = "Run nix-unit error-assertion tests";
-          entry = "${
-            pkgs.writeShellApplication {
-              name = "gen-memo-ci-nix-unit-error";
-              runtimeInputs = [ genInputs.nix-unit.packages.${system}.default ];
-              text = ''
-                exec nix-unit --flake ./ci#testsError "$@"
-              '';
-            }
-          }/bin/gen-memo-ci-nix-unit-error";
-          files = "\\.nix$";
-          pass_filenames = false;
-        };
-      };
   };
 }
