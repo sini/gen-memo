@@ -55,14 +55,13 @@ it is not re-proposed.
 
 ## Gen Ecosystem
 
-| Library                                            | Role                                                                                                                                                                                                                                           |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base                                                                                                                                                                                                             |
-| [gen-scope](https://github.com/sini/gen-scope)     | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces                                                                                                                           |
-| [gen-graph](https://github.com/sini/gen-graph)     | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door                                                                                           |
-| [gen-resolve](https://github.com/sini/gen-resolve) | Static attribute schedule and cold fold — consumes this plane's `build`. Its warm half and override cone **have arrived**; the cold fold and the schedule have not, and their destinations are the evaluator and the query-gate home, not here |
-| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions                                                                                                                                                                                 |
-| **gen-memo**                                       | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold)                                                                                                                                                 |
+| Library                                            | Role                                                                                                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base                                                                                                                   |
+| [gen-scope](https://github.com/sini/gen-scope)     | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces                                 |
+| [gen-graph](https://github.com/sini/gen-graph)     | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions                                                                                       |
+| **gen-memo**                                       | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold)                                                       |
 
 ## Design Principles
 
