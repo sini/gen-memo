@@ -42,15 +42,16 @@ thing to quote.** `prelude.fix` in `lib/` is now **zero** (`ci/tests/purity.nix`
 predicate in the same run). That is a LEXICAL fact about ONE SPELLING, and it is bounded in two
 directions that must be read with it.
 
-**FIRST, the construction test's second arm is undischarged, and the residue is FOUR sites, not the
-three an earlier form of this paragraph named.** A fold threading its own accumulator of resolved
-outputs across a traversal it drives is the same construct differently spelled, and all four are
-here (coordinates at `53df68d`): **`build.nix:155-190`** the bottom-up condensation solve ·
-**`restabilize.nix:134-139`** `runScc`'s ascent beneath it · **`restabilize.nix:240-271`**
-`restabilize`'s OWN cone solve, which is a **separate fold** from `runScc` and is the one the
-earlier count dropped · **`eager.nix:71-75`** the rank-ordered eager drain. Do not read the zero as
-"the plane holds no evaluator"; read it as "the plane binds no store fix", which is what was
-measured.
+**FIRST, the construction test's second arm has ONE undischarged site left.** A fold threading its
+own accumulator of resolved outputs across a traversal it drives is the same construct differently
+spelled, and the residue is **`runScc`'s `final` in `lib/restabilize.nix`** — the Kleene ascent,
+which is a separate carrier's subject because the engine hosts no lattice-shaped ascent today. It is
+exempt for that reason and not because it is clean. **The enumeration is a cell, not this
+paragraph:** `ci/tests/purity.nix`'s `test-node-eval-applications-are-pinned` counts the
+applications at SITE granularity, so a fifth reds it — including one added to a file already on the
+list, which a deduplicated file-label list absorbs. No coordinate and no rev anchor is carried here:
+a binding survives what a line number does not. Do not read the `prelude.fix` zero as "the plane
+holds no evaluator"; read it as "the plane binds no store fix", which is what was measured.
 
 **SECOND, the token arm does not close the IMPORT ROUTE, and that is the likelier way the knot comes
 back.** A `lib/` file writing `import ../reference/schedule.nix` and calling `schedule` itself has
@@ -122,12 +123,13 @@ Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function
 
 **31 exports, in seven groups.**
 
-★ **TEN OF THEM TAKE THE ENGINE FIRST**, because they reach a store and the plane populates none of
-its own: `build` · `affectedSet` · `propagate` · `override` · `force` · `forceCtx` · `retract` ·
-`applyEdgeDelta` · `warmOverride` · `warmResolve`. The other twenty-one do not — they populate
-nothing. `applyDelta`, `batch`, `runScc`, `restabilize` and `propagateEager` are in the second list
-deliberately: the first two only rewrite data, and the last three drive their own accumulator rather
-than a store fix, which is the residue named above rather than a reason they are exempt.
+★ **TWELVE OF THEM TAKE THE ENGINE FIRST**, because they reach a store and the plane populates none
+of its own: `build` · `affectedSet` · `propagate` · `override` · `force` · `forceCtx` · `retract` ·
+`applyEdgeDelta` · `warmOverride` · `warmResolve` · `restabilize` · `propagateEager`. The last two
+joined the list when their folds were re-expressed over `engine.schedule`. The other nineteen do not
+— they populate nothing. `applyDelta`, `batch` and `runScc` are in the second list deliberately: the
+first two only rewrite data, and `runScc` drives its own accumulator rather than a store fix, which
+is the residue named above rather than a reason it is exempt.
 
 ★ **THE TABLE IS THE ENUMERATION AND THE COUNT IS READ OFF IT**, not carried beside it. A count that
 does not enumerate is what let this sheet stand at 27 while the surface was 29 — the two curried
@@ -187,7 +189,7 @@ library's surface silently.
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Full evaluation into a store and trace                                    | `build engine { accessor; recompute; hashOf; fixpoint ? null }` — `lib/build.nix`. `fixpoint` switches on the cyclic path. `engine.schedule` populates the store; `reference/schedule.nix` is the one to hand in when the caller has no evaluator                                                                                                  |
 | Re-evaluate after a data change                                           | `override engine ctx id newDecls` (`lib/drivers.nix`, the fused propagate-after-applyDelta). Cyclic graphs: `restabilize`                                                                                                                                                                                                                          |
-| Re-evaluate after a localized, cut-heavy edit                             | `propagateEager ctx changes` — `lib/eager.nix`. Opt-in; `propagate` stays the general default                                                                                                                                                                                                                                                      |
+| Re-evaluate after a localized, cut-heavy edit                             | `propagateEager engine ctx changes` — `lib/eager.nix`. Opt-in; `propagate` stays the general default                                                                                                                                                                                                                                               |
 | Change the topology                                                       | `retract engine ctx …` / `applyEdgeDelta engine ctx …` — `lib/structural.nix`. `override` is data-change only and cannot express it                                                                                                                                                                                                                |
 | Ask why a node was or was not recomputed                                  | `why` / `whyNot` — `lib/provenance.nix`. `whyNot` is total over all three verdicts                                                                                                                                                                                                                                                                 |
 | See it run end to end                                                     | `nix eval -f examples/dag` — the cone, the reuse, the poisoned-recompute proof and the located cycle blame, as one record                                                                                                                                                                                                                          |

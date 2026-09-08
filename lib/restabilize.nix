@@ -166,7 +166,7 @@ let
 
   # restabilize — the CYCLIC-CAPABLE analogue of `override`.
   #
-  # `restabilize ctx changedId newDecls` replaces changedId's nodeData, then
+  # `restabilize engine ctx changedId newDecls` replaces changedId's nodeData, then
   # re-solves ONLY the dependent cone of changedId — acyclic cone strata by
   # recompute-and-splice (== override), cyclic cone strata by `runScc` (per-SCC
   # least fixed point) — reading every non-cone node out of the prior store
@@ -215,7 +215,7 @@ let
   # ctx before `settled` — an unconverged iterate is a local loop variable that
   # is discarded on ascent, never a value this function can cache or hand back.
   restabilize =
-    ctx: changedId: newDecls:
+    engine: ctx: changedId: newDecls:
     let
       fixpoint = ctx.fixpoint or null;
 
@@ -272,9 +272,19 @@ let
                 lattices = fixpoint.lattices;
               }
             else
-              # Acyclic cone singleton: recompute reading acc (lower strata) as
-              # externals. Byte-identical to a full rebuild's value (== override).
-              acc // prelude.genAttrs coneMembers (m: recompute accessor' acc m);
+              # Acyclic cone singleton: scheduled by the engine, reading acc (lower
+              # strata) as base. Byte-identical to a full rebuild's value (== override).
+              # `schedule` returns the DOMAIN's keys alone, so the accumulator merge
+              # stays explicit; an acyclic stratum is a singleton, so the engine's fix
+              # has nothing to close over.
+              acc
+              // engine.schedule {
+                accessor = accessor';
+                inherit recompute;
+                domain = coneMembers;
+                base = acc;
+                isClean = _: false;
+              };
         in
         # The single loop-carried field, forced per stratum: every reader of `acc`
         # below it is lazy, so unforced the fold builds one `//` thunk per stratum and

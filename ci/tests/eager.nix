@@ -20,7 +20,11 @@
 }:
 let
   build = genMemo.build engine;
-  inherit (genMemo) propagateEager dirtySet;
+  propagateEager = genMemo.propagateEager engine;
+  # `propagate` is here as the RED ARM of the hash-poison pair below — the axis on which the
+  # two drivers actually differ — not as a subject of this suite.
+  propagate = genMemo.propagate engine;
+  inherit (genMemo) applyDelta dirtySet;
 
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
@@ -204,6 +208,64 @@ let
         }).store
         true
     )).success;
+
+  # --- Pin 3b: the HASH axis of the same cut ----------------------------------
+  #
+  # ★ THE PAIR ABOVE POISONS `recompute`, AND THAT AXIS DOES NOT DISCRIMINATE. Measured on
+  # this very fixture at |cone| 8 and 20, and on a reconvergent DAG at 13 and 17: `propagate`
+  # and `propagateEager` have the SAME recompute set (3 = 3) at every size, so
+  # `test-deep-poison-cut-off` stays GREEN under a re-expression that collapsed the eager
+  # path's cost into `propagate`'s. The mechanism is `needsEval` (lib/strategies.nix): a node
+  # `propagate` does not recompute is served from `base = ctx.store`, so its new hash equals
+  # its trace hash and cannot move — `propagate`'s recompute set therefore closes under the
+  # same "an enqueued dep moved" recursion the eager gate walks, while `propagate` HASHES
+  # EVERY CONE NODE to find that out. The eager gate's `enq d` conjunct short-circuits before
+  # the HASH, not before the recompute. So the discriminating axis is the hash, and this pair
+  # is the recompute pair moved onto it.
+  #
+  # THE FIXTURE IS WIDENED, and that is forced rather than stylistic: the chain's values
+  # saturate to a common `100`, so a poison keyed on the VALUE cannot tell n5 from n7. Node
+  # values become `{ id; w }` — `lib/hash.nix`'s `project` passes plain attrsets through via
+  # `mapAttrs`, so the tag survives the projection and `hashGuarded` reaches it. `w` carries
+  # exactly the saturating arithmetic the int fixture carries, and the cut lands in the same
+  # place.
+  tagRecompute =
+    a: s: id:
+    let
+      raw = (a.nodeData id).weight + lib.foldl' (acc: dep: acc + s.${dep}.w) 0 (a.dependencies id);
+    in
+    {
+      inherit id;
+      w = if raw > cap then cap else raw;
+    };
+  tagFx = {
+    accessor = deepAcc;
+    recompute = tagRecompute;
+    inherit hashOf;
+  };
+  tagCtx = ctxOf tagFx;
+
+  # POISON the HASH of the saturated tail. It throws iff something HASHES a tail node's
+  # value; `recompute` is left clean, so this measures the hash axis alone. Swapped in after
+  # the clean build, exactly as the recompute poison above is.
+  poisonTailHash =
+    v:
+    if builtins.isAttrs v && builtins.elem (v.id or null) tailCut then
+      throw "POISON: ${v.id} hashed (must be cut off)"
+    else
+      hashOf v;
+  hashPoisonCtx = tagCtx // {
+    hashOf = poisonTailHash;
+  };
+  # Both arms force `store` AND `trace` on the same fixture in the same run: the store forces
+  # the decision, the trace forces the post-filter, and the poison can fire from either.
+  forceBoth = r: builtins.deepSeq [ r.store r.trace ] true;
+  eagerCutsOffHashPoison =
+    (builtins.tryEval (forceBoth (propagateEager hashPoisonCtx deepChanges))).success;
+  # ...and the hash poison is real: `propagate` hashes the whole cone and hits it.
+  hashPoisonIsReal =
+    !(builtins.tryEval (forceBoth (propagate (applyDelta hashPoisonCtx "n0" { weight = 41; }))))
+    .success;
 
   # --- chained soundness: two eager pushes vs a from-scratch build -------------
   chainEager2 = propagateEager chainEager { c.weight = 300; };
@@ -520,6 +582,23 @@ in
     # ...and the poison is real: a from-scratch build recomputes the tail and throws.
     test-deep-poison-is-real = {
       expr = poisonIsReal;
+      expected = true;
+    };
+
+    # ★ THE SAME CUT ON THE AXIS THAT DISCRIMINATES. A poison that throws when a TAIL node is
+    # HASHED never fires under eager: `moved` sits behind `enq` in a short-circuiting `&&`, so
+    # a cut node is never hashed at all. The recompute pair above cannot see this — `propagate`
+    # and `propagateEager` share a recompute set on this fixture — so without this pair a
+    # re-expression that collapsed the eager path's cost into `propagate`'s would stay green.
+    test-deep-hash-poison-cut-off = {
+      expr = eagerCutsOffHashPoison;
+      expected = true;
+    };
+    # ...and the hash poison is real: `propagate` hashes every cone node and hits it. This is
+    # the pair's RED arm and it is what makes the green above a finding rather than a poison
+    # that could never have fired.
+    test-deep-hash-poison-is-real = {
+      expr = hashPoisonIsReal;
       expected = true;
     };
 

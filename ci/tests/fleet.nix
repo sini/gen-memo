@@ -42,7 +42,8 @@
 }:
 let
   build = genMemo.build engine;
-  inherit (genMemo) propagateEager dirtySet;
+  propagateEager = genMemo.propagateEager engine;
+  inherit (genMemo) dirtySet;
 
   hosts = [
     "bitstream"

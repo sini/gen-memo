@@ -22,10 +22,16 @@
 # ★★★ THE PREDICATE COVERS BOTH READ FORMS, AND THAT IS THE WHOLE INSTRUMENT. Nix spells an
 # attribute read two ways, and a scan that sees only `ctx.<field>` is not slightly incomplete — it
 # is wrong by exactly the fields that happen to be spelled the other way. Measured here: the dot
-# form alone finds NINE of the eleven, missing `attributes` and `parseParent`, both of which reach
-# the plane only through `inherit (ctx) …` at `lib/warm.nix:153`. That two-short count is not
-# hypothetical — it is the count the interface spec's own gate produced before the second form was
-# added, reproduced below as a live control rather than described in a comment.
+# form alone finds EIGHT of the eleven, missing `attributes` and `parseParent` (reached only through
+# `inherit (ctx) …` in `lib/warm.nix`) and `recompute` (same, in `lib/drivers.nix` and
+# `lib/eager.nix`). That shortfall is not hypothetical — the interface spec's own gate produced it
+# before the second form was added, and it is reproduced below as a live control rather than
+# described in a comment.
+#
+# ★ THE SHORTFALL IS A CENSUS OF SPELLINGS, NOT OF THE INTERFACE, so it moves whenever a `lib/` file
+# re-spells a read — `recompute` joined the second form when `propagateEager` was re-expressed over
+# `engine.schedule`. The two control cells below carry no count in their NAMES for that reason: the
+# oracle is what pins the field set, and these pin only how the tree currently spells it.
 {
   lib,
   ...
@@ -143,14 +149,14 @@ in
       ];
     };
 
-    # ★★★ THE INSTRUMENT LESSON, AS A CELL RATHER THAN A COMMENT. The dot form alone finds nine of
-    # the eleven. This is the exact defect the interface spec's gate hit — its count came out two
-    # short — and it is reproduced here so that a future editor who "simplifies" the extractor down
-    # to one form reds THIS cell and reads why, instead of silently narrowing the oracle.
+    # ★★★ THE INSTRUMENT LESSON, AS A CELL RATHER THAN A COMMENT. The dot form alone falls short of
+    # the eleven. This is the exact defect the interface spec's gate hit, and it is reproduced here
+    # so that a future editor who "simplifies" the extractor down to one form reds THIS cell and
+    # reads why, instead of silently narrowing the oracle.
     #
-    # It is asserted as the exact nine rather than as a count: a count of nine is also satisfied by
-    # a scan that found nine DIFFERENT names.
-    test-control-dot-form-alone-is-two-short = {
+    # Asserted as the exact list rather than as a count: a count is also satisfied by a scan that
+    # found the same number of DIFFERENT names.
+    test-control-dot-form-alone-is-short = {
       expr = srt dotOnly;
       expected = [
         "accessor"
@@ -158,20 +164,20 @@ in
         "fixpoint"
         "hashOf"
         "pending"
-        "recompute"
         "scope"
         "store"
         "trace"
       ];
     };
 
-    # The other half of the same pair: the two fields reachable ONLY through `inherit (ctx) …`.
-    # Without this the cell above could be satisfied by a union that happened to equal the dot set.
-    test-control-inherit-form-carries-the-missing-two = {
+    # The other half of the same pair: the fields reachable ONLY through `inherit (ctx) …`. Without
+    # this the cell above could be satisfied by a union that happened to equal the dot set.
+    test-control-inherit-form-carries-the-rest = {
       expr = srt (lib.subtractLists dotOnly inheritOnly);
       expected = [
         "attributes"
         "parseParent"
+        "recompute"
       ];
     };
 

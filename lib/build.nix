@@ -171,15 +171,21 @@ let
                     lattices = fixpoint.lattices;
                   }
                 else
-                  # Acyclic singleton: recompute reading acc (lower strata) as
-                  # externals. Byte-identical to the acyclic path's scheduled value
-                  # (deps already in acc, walked in dependency order).
-                  #
-                  # ★ THIS STRATUM FOLD IS NOT ROUTED THROUGH THE ENGINE: it threads its
-                  # own accumulator of resolved outputs across a traversal it drives,
-                  # which is the same thing a store-fix is by a different construction.
-                  # One of FOUR such folds; `ci/tests/purity.nix` enumerates them.
-                  acc // prelude.genAttrs members (m: recompute accessor acc m);
+                  # Acyclic singleton: scheduled by the engine, reading acc (lower strata)
+                  # as base. Byte-identical to the acyclic path's scheduled value (deps
+                  # already in acc, walked in dependency order). These are the same five
+                  # fields the acyclic arm above passes; only `domain` and `base` differ.
+                  # `schedule` returns the DOMAIN's keys alone, so the accumulator merge
+                  # stays explicit. Knot-vs-no-knot is moot by construction: an SCC with
+                  # two or more members is mutually reachable, so every ACYCLIC stratum is
+                  # a singleton and the engine's fix has nothing to close over.
+                  acc
+                  // engine.schedule {
+                    inherit accessor recompute;
+                    domain = members;
+                    base = acc;
+                    isClean = _: false;
+                  };
             in
             # The single loop-carried field, forced per stratum. Every reader of `acc`
             # below is lazy — `higherStrata` and `recompute`'s store argument both — so

@@ -162,9 +162,9 @@ back; the evaluator does every recomputation.
 
 **Which exports take the engine.** Every operation that reaches a store takes it as its FIRST
 argument: `build`, `override`, `propagate`, `force`, `forceCtx`, `retract`, `applyEdgeDelta`,
-`affectedSet`, and the two warm folds. The rest — the pure queries, the strategy predicates, the
-two observations, `applyDelta`, `batch`, `runScc`, `restabilize`, `propagateEager`, `mkAccessor` —
-do not, because they populate no store.
+`affectedSet`, `restabilize`, `propagateEager`, and the two warm folds. The rest — the pure queries,
+the strategy predicates, the two observations, `applyDelta`, `batch`, `runScc`, `mkAccessor` — do
+not, because they populate no store.
 
 **Build and reuse decision**
 
@@ -463,14 +463,14 @@ a plane output must be byte-identical to a cold evaluation.
   false-clean, which is the unsound one.
 - **The plane holds no store fix, and that is not yet the same as holding no evaluator.** A
   self-referential store over the node set, passed into the caller's node computation, is gone from
-  `lib/` — the five sites that had one now hand the engine a domain, a base and a decision. But a
-  fold threading its own accumulator of resolved outputs across a traversal it drives is the same
-  construct by another spelling, and **four** remain (coordinates at the rev that landed the
-  re-expression): `build.nix:155-190`, the bottom-up condensation solve; `restabilize.nix:134-139`,
-  `runScc`'s ascent beneath it; `restabilize.nix:240-271`, `restabilize`'s own cone solve, a
-  separate fold from `runScc`; and `eager.nix:71-75`, the rank-ordered eager drain.
-  `ci/tests/purity.nix` scans for the first shape and says in its own comment that it cannot see
-  this one.
+  `lib/` — the sites that had one now hand the engine a domain, a base and a decision. But a fold
+  threading its own accumulator of resolved outputs across a traversal it drives is the same
+  construct by another spelling, and **one** remains: **`runScc`'s `final` in
+  `lib/restabilize.nix`**, the per-SCC Kleene ascent. It is exempt because lattice-shaped ascent is
+  a separate carrier's subject and the engine hosts none, not because it is clean. The enumeration
+  lives in `ci/tests/purity.nix` as `test-node-eval-applications-are-pinned`, at SITE granularity, so
+  a fifth application reds it even when added to a file already on the list — named by binding, with
+  no line coordinate and no rev anchor, because a binding survives what a coordinate does not.
 - **The store-fix scan does not close the import route either, so it is scanned separately.** A
   `lib/` file writing `import ../reference/schedule.nix` and calling `schedule` itself would have
   the knot back with no `prelude.fix` token anywhere in `lib/` — measured, that plant leaves the

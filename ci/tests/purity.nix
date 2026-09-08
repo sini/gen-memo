@@ -100,15 +100,13 @@ let
   # base and a decision to an engine and the engine binds the knot.
   #
   # ★ WHAT THIS TOKEN ARM CANNOT SEE, said here so its green is not read as wider than it is.
-  # A store fix has other spellings, and the residue is FOUR sites, not the two an earlier form of
-  # this comment named. A fold threading its own accumulator of resolved outputs across a traversal
-  # it drives is the same construct by a different construction, and all four are in this library
-  # (coordinates at the rev that added this cell):
-  #
-  #   1. `build.nix:155-190`        — the bottom-up condensation solve
-  #   2. `restabilize.nix:134-139`  — `runScc`'s ascent, beneath the first
-  #   3. `restabilize.nix:240-271`  — `restabilize`'s OWN cone solve, a separate fold from 2
-  #   4. `eager.nix:71-75`          — the rank-ordered eager drain
+  # A store fix has other spellings: a fold threading its own accumulator of resolved outputs
+  # across a traversal it drives is the same construct by a different construction, and this arm's
+  # token cannot match one. ONE such fold remains in this library — `runScc`'s ascent, the `final`
+  # binding in `lib/restabilize.nix` — and it is exempt here only because it is a separate carrier's
+  # subject (lattice-shaped Kleene ascent, which the engine does not host today), not because it is
+  # clean. The enumeration itself is `test-node-eval-applications-are-pinned` below, which counts
+  # the applications rather than restating them; a binding survives what a line coordinate does not.
   #
   # This scan is a tripwire against the knot coming back in the shape it left in, not a proof that
   # none is present.
@@ -197,6 +195,110 @@ let
       code = (builtins.head knotControlSources).code;
     in
     lib.filter (t: genPrelude.hasInfix t code) knotControlVocab;
+
+  # THE CALLER'S NODE COMPUTATION, APPLIED — the other spelling of the knot, which the token arm
+  # above admits it cannot see. The residue is closed here as an enumeration rather than restated
+  # as prose that drifts from the tree it describes.
+  #
+  # ★ SITE-GRANULAR, NOT FILE-GRANULAR, and that is the whole point. `map (s: s.name)
+  # (lib.filter p sources)` — the shape every other label list here uses — filters FILES, so it
+  # DEDUPLICATES: a fifth application added to a file already on the list is absorbed silently.
+  # `lib.concatMap` over LINES emits one entry per SITE and repeats the label, which is what lets
+  # this cell red in BOTH directions. `premiseBreaches` above already walks lines this way.
+  #
+  # ★ THE SCAN IS BY LITERAL SUBSTRING, three needles, no pattern — `genPrelude.hasInfix` escapes
+  # its needle, and the `knotControlVocab` paragraph above records why a hand-rolled
+  # `builtins.split` must not replace it. All three are needed: `recompute ` alone counts the
+  # `inherit (ctx) recompute hashOf;` re-export lines (measured: it over-reports by 3.25× and names
+  # two files that hold no application), and the `inherit` exclusion alone still counts the field
+  # binding `recompute = _acc: _store: nid: …`.
+  #
+  # DECLARED CEILINGS — three, in both directions:
+  #   - the predicate is LINE-LOCAL, so an application re-wrapped across two lines escapes it (false
+  #     GREEN). `nixfmt` is deterministic, so such a wrap is a real formatting change.
+  #   - `stripComments` cuts comments but NOT strings, so any non-application mention of
+  #     `recompute ` in a value position counts (false RED against a correct build — the sharper
+  #     direction, because an oracle that reds on a correct tree gets misdiagnosed).
+  #   - the `inherit ` exclusion is LINE-GLOBAL rather than scoped to the token, so a real
+  #     application sharing a line with any `inherit ` escapes (false GREEN).
+  # The expectation is NON-EMPTY, which bounds the damage: a wholesale disarm reds. A single
+  # re-wrapped fifth member is the residue.
+  nodeEvalToken = "recompute "; # the token followed by an argument
+  reExportToken = "inherit "; # `inherit (ctx) recompute hashOf;` is a re-export, not a call
+  bindingToken = "recompute ="; # `recompute = _acc: _store: nid: …` defines the field
+  isApplication =
+    line:
+    genPrelude.hasInfix nodeEvalToken line
+    && !(genPrelude.hasInfix reExportToken line)
+    && !(genPrelude.hasInfix bindingToken line);
+
+  nodeEvalSites = lib.concatMap (
+    s: map (_: s.name) (lib.filter isApplication (lib.splitString "\n" s.code))
+  ) sources;
+
+  # The predicate's own two-sided live control, four literal lines written inside this file: one
+  # real application, one re-export, one parameter, one field binding. It proves the predicate
+  # FIRES and DISCRIMINATES all three needles; it says nothing about what it was pointed at.
+  # Asserted as an exact label list, per this file's idiom, so a broken predicate names itself.
+  nodeEvalControlLines = [
+    {
+      name = "control: an application";
+      line = "                  acc // prelude.genAttrs members (m: recompute accessor acc m);";
+    }
+    {
+      name = "control: a re-export";
+      line = "      inherit (ctx) recompute hashOf;";
+    }
+    {
+      name = "control: a parameter";
+      line = "      recompute,";
+    }
+    {
+      name = "control: a field binding";
+      line = "        recompute = _acc: _store: nid: nid;";
+    }
+  ];
+  nodeEvalControlHits = map (c: c.name) (lib.filter (c: isApplication c.line) nodeEvalControlLines);
+
+  # THE EAGER DRIVE IS A MAP OVER THE DOMAIN, NEVER A RECURSIVE FUNCTION. Nix memoises THUNKS,
+  # not FUNCTION APPLICATIONS, so `enq = id: … enq d …` re-evaluates once per PATH and is
+  # exponential in cone depth wherever paths reconverge — measured at 2,147,502,350 vs 20,113
+  # nrFunctionCalls on a 49-node reconvergent DAG, byte-parity-true in both arms. No cell can
+  # see that at run time: the two forms produce equal stores, equal traces and equal poison
+  # sets, so this is a scan of the construction rather than of a run.
+  #
+  # ★ ITS HOME HERE IS THE SHARED `stripComments`/`sources` MACHINERY AND ONE SUBJECT READ, which
+  # is a THINNER reason than the node-eval cell's: that cell closes a gap the knot comment above
+  # admits, and this one does not. Declared rather than borrowed.
+  #
+  # DECLARED CEILING: it pins TWO NAMES and ONE CONSTRUCTOR TOKEN in ONE FILE. A correct drive
+  # memoised through `prelude.fix` instead of `genAttrs`, or split across a third binding, REDS it
+  # — a false red, and the honest residue. It claims no coverage of the CLASS: an un-memoised
+  # recursion elsewhere in `lib/` is invisible to it. The expectation is NON-EMPTY, so a rename, a
+  # removal or a re-shaping all red and the failing value names which survived.
+  #
+  # `(builtins.head …).code` is `knotControlCarried`'s own idiom, above.
+  eagerCode = (builtins.head (lib.filter (s: s.name == "lib/eager.nix") sources)).code;
+  driveNames = [
+    "moved"
+    "enq"
+  ];
+  memoToken = n: "${n} = prelude.genAttrs rank.order (";
+  memoisedDrives = lib.concatMap (
+    line: lib.filter (n: genPrelude.hasInfix (memoToken n) line) driveNames
+  ) (lib.splitString "\n" eagerCode);
+
+  # The drive predicate's own two-sided live control, three literal lines written inside this file:
+  # the memoised form, and the two function-valued forms it must not accept. Same label shape as
+  # `memoisedDrives`, so a broken predicate names itself.
+  driveControlLines = [
+    "      enq = prelude.genAttrs rank.order ("
+    "      enq = id: builtins.any (d: enq d) (deps id);"
+    "moved = d: hashMoved (hashGuarded ctx.hashOf builtStore.\${d}) null;"
+  ];
+  driveControlHits = lib.concatMap (
+    line: lib.filter (n: genPrelude.hasInfix (memoToken n) line) driveNames
+  ) driveControlLines;
 
   # ★ THE IMPORT ROUTE, which the token arm above does NOT close and which is the likelier way the
   # knot comes back. A `lib/` file that writes `import ../reference/schedule.nix` and calls
@@ -431,6 +533,45 @@ in
     test-store-fix-scan-is-live = {
       expr = knotControlSites;
       expected = [ "reference/schedule.nix" ];
+    };
+
+    # ★ THE OTHER SPELLING OF THE KNOT, ENUMERATED AT SITE GRANULARITY. The label repeats once per
+    # APPLICATION, so a fifth application added to a file already on the list reds this cell — the
+    # direction a deduplicated file-label list absorbs silently, and the reason this cell exists.
+    #
+    # The one remaining member is `runScc`'s ascent in `lib/restabilize.nix`, exempt here as a
+    # separate carrier's subject and not as a clean construct. Its removal reds this cell too: the
+    # expectation is non-empty, so unlike every `[ ]` cell in this file it needs no composition
+    # partner and a severed subject reds it directly.
+    test-node-eval-applications-are-pinned = {
+      expr = nodeEvalSites;
+      expected = [ "lib/restabilize.nix" ];
+    };
+
+    # The application predicate fires and discriminates all three needles. Its subject is four
+    # literal lines written inside this file, so it is UNSEVERABLE from the tree and stands outside
+    # the composition rule — it neither needs a pair nor could honour one.
+    test-node-eval-scan-is-live = {
+      expr = nodeEvalControlHits;
+      expected = [ "control: an application" ];
+    };
+
+    # ★ THE DRIVE SHAPE, which no run-time cell can reach. The memoised drive and a function-valued
+    # one produce equal stores, equal traces and equal poison sets while differing 30,467× in
+    # evaluation cost, so the only observable is the CONSTRUCTION. Source order, evaluated.
+    test-eager-drive-is-domain-keyed = {
+      expr = memoisedDrives;
+      expected = [
+        "moved"
+        "enq"
+      ];
+    };
+
+    # The drive predicate fires on the memoised form and is silent on both function-valued forms.
+    # Literal lines inside this file; unseverable, so no composition partner.
+    test-eager-drive-scan-is-live = {
+      expr = driveControlHits;
+      expected = [ "enq" ];
     };
 
     # The content half of the store-fix CONTROL's own subject pinning (§4's C4, n=1 case): the

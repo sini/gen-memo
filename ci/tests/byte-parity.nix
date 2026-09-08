@@ -61,7 +61,9 @@ let
   build = genMemo.build engine;
   override = genMemo.override engine;
   propagate = genMemo.propagate engine;
-  inherit (genMemo) propagateEager batch restabilize;
+  propagateEager = genMemo.propagateEager engine;
+  restabilize = genMemo.restabilize engine;
+  inherit (genMemo) batch;
 
   # The plane's own admission projection, imported the way the guards are — directly, because
   # it is internal to hashing and not on the export surface. It is what the comparator below IS,
