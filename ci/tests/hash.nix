@@ -200,5 +200,37 @@ in
         a.me.me.me.x;
       expected = 1;
     };
+
+    # ── R§10.1, RIDER 3 — THE RETIREMENT RECORD SURVIVES ──
+    # `lib/hash.nix` carries, immediately above `hashGuarded`, the record of what gen-resolve's
+    # retired `classKey` construct's stated ceiling — a conservative key needing a byte-identity
+    # gate as its total correctness oracle — means for this binding, which decides reuse on a
+    # digest with no such gate behind it — R§10.1 (a retirement names what it carries forward or
+    # it is a deletion). This cell pins that the record SURVIVES, never that it is true; the
+    # record itself states the ceiling is unmet here and neither installs the gate nor repairs
+    # the collision class `den-hoag-c5cj` already measures (`den-hoag-p3y9`).
+    #
+    # ★ THE LIVE CONTROL IS THE SECOND ARM OF THIS SAME EXPR, not a second cell — a one-armed
+    # `present = true` would still pass against a `match` that has stopped discriminating.
+    # `absentControl` is a probe DERIVED from the file's own content (its sha256), not a literal
+    # typed here: a hardcoded random string, once committed, is itself a published token that a
+    # later sweep can quote back as a false live control (measured, `den-hoag-n3or2`). A content
+    # hash is reproducible, changes automatically if the file changes, and cannot occur as a
+    # literal substring of the text it was hashed from.
+    test-r10-1-rider-classkey-ceiling-record-survives =
+      let
+        src = builtins.readFile ../../lib/hash.nix;
+        absentToken = builtins.hashString "sha256" src;
+      in
+      {
+        expr = {
+          present = builtins.match ".*ANCHOR: R10\\.1-RIDER-CLASSKEY-CEILING.*" src != null;
+          absentControl = builtins.match ".*${absentToken}.*" src != null;
+        };
+        expected = {
+          present = true;
+          absentControl = false;
+        };
+      };
   };
 }

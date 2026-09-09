@@ -100,6 +100,31 @@ in
   # Projection preserves functions (they fall through unchanged), so the discrimination
   # the null rule rests on is untouched: a function beside a derivation still answers
   # true. What changes is that the derivation no longer takes the evaluation down first.
+  #
+  # **`gen-resolve.classKey` RETIRED WITH NO SUCCESSOR CONSTRUCT, and its CEILING did not
+  # retire with it.** `classKey` was a stable digest of a consumer-designated attribute's
+  # resolved value, offered as a CONSERVATIVE KEY AND EXPLICITLY NOT A SOUNDNESS PROOF: it
+  # NARROWS reuse candidates and does not prove two nodes interchangeable. Its stated term
+  # on every consumer was that reuse keyed on it MUST be backed by a BYTE-IDENTITY GATE —
+  # drvPath equality of the materialized output — as the total correctness oracle. **Key
+  # narrows; gate decides.** Inheriting a key without that term makes it a claim it was
+  # never written to be.
+  #
+  # **HALF OF THAT TERM IS VACUOUS HERE, BY THIS PLANE'S OWN DESIGN.** The warning was
+  # scoped to a cross-invocation cache, and this plane holds no cross-invocation persistence
+  # in any form. There is no such consumer to warn.
+  #
+  # **THE OTHER HALF IS LIVE AND UNGUARDED, AND IT IS THIS BINDING.** The intra-evaluation
+  # reuse decision is keyed on `hashGuarded` and decided by `hashEq`/`hashMoved`, with NO
+  # byte-identity gate behind it — the digest is the whole oracle. `project` is
+  # non-injective by the theorem stated above, and its residual direction is FALSE-CLEAN,
+  # the unsound one. So the retired key's term reads here as: *this plane is the consumer
+  # that was told to install a gate, and it has not.* Whether it should is open work
+  # (`den-hoag-c5cj` measures one instance of the collision class; the suite's
+  # `literalTagStillCollides` pins only its literal-tag sub-class), and this comment records
+  # the term rather than discharging it.
+  #
+  # ANCHOR: R10.1-RIDER-CLASSKEY-CEILING
   hashGuarded =
     hashOf: value:
     let
