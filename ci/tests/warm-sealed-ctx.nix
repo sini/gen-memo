@@ -22,6 +22,7 @@
 # fixture carrying that field exercises everything the entry does with a schedule. What validated
 # the grammar is the scheduler's concern and is asserted where the scheduler lives.
 {
+  graph,
   genMemo,
   genScope,
   engine,
@@ -49,6 +50,18 @@ let
     };
 
   equations = {
+    # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). gen-scope refuses a descent from an
+    # evaluation that declares no containment relation rather than answering `{ }` and reporting a
+    # partial tree. `mkScope` declares no `parentGraph`, so both nodes are roots and `{ }` is the
+    # true answer; the shape is `fold-equations.nix`'s own `children` equation, an `nta` on the
+    # structural stratum.
+    children = {
+      name = "children";
+      kind = "nta";
+      readsAttrs = [ ];
+      stratum = "structural";
+      compute = _self: _id: { };
+    };
     imports = {
       name = "imports";
       kind = "synthesized";
@@ -75,13 +88,29 @@ let
 
   # The declared relation must over-declare the cross-node read for the cone to be sound — the same
   # contract `warm-override-cross-node.nix` states, here supplied to the real entry.
-  declaredDependencies = id: if id == "consumer" then [ "producer" ] else [ ];
+  #
+  # ★ IT IS A CONTRACTED RELATION, NOT A LAMBDA (den-hoag-6imt, the same un-migrated-consumer class
+  # as `children` above). `foldEquations` refuses a bare function by name — "must be the relation
+  # `gen-graph.mkDeclaredEdges` returns; received a lambda" — because a value it cannot tell apart
+  # from a contracted one is one it must refuse. The map below is the index the constructor
+  # normalizes, and the membership authority is the scope's own node map, so the edge goes THROUGH
+  # registration rather than around it. Shape taken from `gen-scope/ci/tests/_fixtures/declared.nix`.
+  contractedFor =
+    scope: rel:
+    graph.mkDeclaredEdges (
+      builtins.mapAttrs (
+        _: ids: map (graph.mkNodeRef { isRegistered = id: scope.nodes ? ${id}; }) ids
+      ) rel
+    );
 
   sealed =
     v:
-    genScope.foldEquations {
+    let
       scope = mkScope v;
-      inherit schedule declaredDependencies;
+    in
+    genScope.foldEquations {
+      inherit scope schedule;
+      declaredDependencies = contractedFor scope { consumer = [ "producer" ]; };
       parseParent = _: null;
     };
 

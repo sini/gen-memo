@@ -16,6 +16,7 @@
 # descriptive. The cell that distinguishes a SERVED value from a recomputed one by its value alone
 # is in `warm-override-cross-node.nix`, where a stale read is observable.
 {
+  lib,
   genMemo,
   genScope,
   engine,
@@ -46,7 +47,14 @@ let
         child = "host";
       };
     };
-  attributes = {
+  # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). gen-scope refuses a descent from an
+  # evaluation that declares no containment relation rather than answering `{ }` and reporting a
+  # PARTIAL tree with nothing marking it partial. This scope HAS a containment relation —
+  # `parentGraph` above — so the honest declaration is that relation; `{ }` would drop `child` from
+  # the materialization and every cell below would read a smaller node set without saying so.
+  # Parameterised on the scope because that is where the relation lives.
+  attributesFor = scope: {
+    children = _self: id: lib.filterAttrs (_: n: n.parent == id) scope.nodes;
     self-v = self: id: (self.node id).decls.v;
     plus-one = self: id: self.get id "self-v" + 1;
     imports = _self: _id: [ ];
@@ -65,6 +73,7 @@ let
       declaredDependencies ? (_: [ ]),
     }:
     let
+      attributes = attributesFor scope;
       eval = genScope.eval { inherit scope attributes parseParent; };
     in
     {

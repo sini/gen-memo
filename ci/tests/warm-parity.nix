@@ -58,6 +58,11 @@ let
       # top alone left this suite's arm silently inert on 2/5 of its domain.
       crossed =
         self: id: if id == "other" then self.get "node" (aName (n - 1)) + self.get "node" (aName 0) else 0;
+      # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). `scopeFor` declares no
+      # `parentGraph`, so both nodes are roots and `{ }` is the true containment answer; gen-scope
+      # refuses the UNDECLARED case because a walk that descends nothing is indistinguishable from
+      # a scope whose nodes have no children.
+      children = _self: _id: { };
     };
 
   # The vocabulary these nodes' kinds are names in. A kind is a name in a REGISTERED vocabulary

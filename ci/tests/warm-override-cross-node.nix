@@ -41,6 +41,11 @@ let
       };
     };
   attributes = {
+    # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). gen-scope refuses a descent from an
+    # evaluation that declares no containment relation. This scope declares no `parentGraph` — its
+    # only relation is the import edge above — so every node is a root and `{ }` is the true answer
+    # rather than a silenced one.
+    children = _self: _id: { };
     imports = self: id: (self.node id).decls.__edges.I or [ ];
     p-val = self: id: (self.node id).decls.v or 0;
     # The cross-node read: a resolutional attribute of one node reading a resolutional attribute of

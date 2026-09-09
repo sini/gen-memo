@@ -35,6 +35,10 @@ let
       };
     };
   attributes = {
+    # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). This scope declares no `parentGraph`,
+    # so both nodes are roots and `{ }` is the true containment answer; gen-scope refuses the
+    # UNDECLARED case because it cannot tell that apart from a partial walk.
+    children = _self: _id: { };
     self-v = self: id: (self.node id).decls.v;
     plus-one = self: id: self.get id "self-v" + 1;
     imports = _self: _id: [ ];
