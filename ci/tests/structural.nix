@@ -260,7 +260,6 @@ let
           (_: {
             bottom = 0;
             join = _: v: v;
-            eq = a: b: a == b;
             maxIter = 100;
           });
     };
@@ -323,7 +322,6 @@ let
           (_: {
             bottom = 0;
             join = _: v: v;
-            eq = a: b: a == b;
             maxIter = 100;
           });
     };

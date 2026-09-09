@@ -202,14 +202,14 @@ let
     acc: s: m:
     lib.foldl' lib.max (acc.nodeData m).weight (map (d: s.${d}) (acc.dependencies m));
 
-  # Overwrite "lattice" per node: bottom = 0, join keeps the new iterate, eq is
-  # structural ==. Not a semilattice join (no ⊑ order); naive iterate-to-
-  # stabilization, which converges because maxRecompute is monotone + bounded.
+  # Overwrite "lattice" per node: bottom = 0, join keeps the new iterate. Not a
+  # semilattice join (no ⊑ order); naive iterate-to-stabilization, which
+  # converges because maxRecompute is monotone + bounded. Quiescence is
+  # structural `==` (runScc's only member equality since den-hoag-m6y9p).
   maxLattices = {
     lattices = lib.genAttrs [ "b1" "b2" "a1" "a2" ] (_: {
       bottom = 0;
       join = _prev: v: v;
-      eq = a: b: a == b;
       maxIter = 100;
     });
   };

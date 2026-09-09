@@ -37,7 +37,6 @@ let
   setLattice = {
     bottom = [ ];
     join = x: y: lib.sort builtins.lessThan (lib.unique (x ++ y));
-    eq = (a: b: a == b);
     maxIter = 100;
   };
   reachLattices = {
@@ -88,7 +87,6 @@ let
   overwriteLattice = {
     bottom = 0;
     join = _prev: v: v; # OVERWRITE: a no-op "join", not a semilattice join.
-    eq = (a: b: a == b);
     maxIter = 100;
   };
   agreeLattices = {
@@ -153,7 +151,6 @@ let
     x = {
       bottom = 0;
       join = _: v: v;
-      eq = (a: b: a == b);
       maxIter = 5;
     };
   };
@@ -167,72 +164,6 @@ let
     recompute = divergeRecompute;
     scc = [ "x" ];
     lattices = divergeLattices;
-  };
-
-  # --- Fixture 4: per-member eq is read per node ---
-  # 2-member SCC p<->q. p uses default `==`. q uses a custom eq that treats two
-  # values equal when they agree mod 10. recompute drives p to 7 and q to 23.
-  # q's true iterate would oscillate 13 -> 23 (both ≡ 3 mod 10), so q quiesces
-  # ONLY because its OWN eq (mod-10) declares 13 and 23 equal. If a single
-  # whole-SCC eq or whole-attrset == drove quiescence, q would never settle and
-  # this would diverge. Proves lattices.${m}.eq is read per node.
-  perMemberAccessor = fx.mkPlaneAccessor {
-    edges = [
-      {
-        from = "p";
-        to = "q";
-      }
-      {
-        from = "q";
-        to = "p";
-      }
-    ];
-    nodeData = {
-      p = { };
-      q = { };
-    };
-  };
-  perMemberLattices = {
-    # p: ordinary overwrite + default ==. Reaches 7 and stays.
-    p = {
-      bottom = 0;
-      join = _: v: v;
-      eq = (a: b: a == b);
-      maxIter = 100;
-    };
-    # q: overwrite, but eq is mod-10 congruence. 13 and 23 are eq under it.
-    q = {
-      bottom = 0;
-      join = _: v: v;
-      eq = (a: b: lib.mod a 10 == lib.mod b 10);
-      maxIter = 100;
-    };
-  };
-  # p -> 7 (constant). q: bottom 0 -> reads p (0) +13 = 13 -> reads p (7) +13 = 20?
-  # Make it deterministic: q = p_dep + 13. Iteration: prev q from ⊥ chain.
-  # iter0 seed: p=0,q=0. iter1: p=7, q = p_prev(0)+13 = 13. iter2: p=7 (eq, settled),
-  # q = p_prev(7)+13 = 20. iter3: q = 20 (p stable) ... 20 vs 20 default-eq, but the
-  # interesting witness is q reaching a value that under mod-10 == its successor.
-  # To exercise mod-10 eq, drive q to oscillate between 13 and 23:
-  #   q = if q_prev == 13 then 23 else 13. Under default == this never quiesces;
-  #   under mod-10 eq, 13 ≡ 23 (mod 10 = 3) so q quiesces at iter where prev=13,next=23.
-  perMemberRecompute =
-    _a: s: m:
-    if m == "p" then
-      7
-    else
-      # q oscillates 13 <-> 23; quiesces only under q's own mod-10 eq.
-      (if s.q == 13 then 23 else 13);
-  perMemberResult = runScc {
-    accessor = perMemberAccessor;
-    store = { };
-    higherStrata = { };
-    recompute = perMemberRecompute;
-    scc = [
-      "p"
-      "q"
-    ];
-    lattices = perMemberLattices;
   };
 
   # ==========================================================================
@@ -308,7 +239,6 @@ let
     lattices = lib.genAttrs acyclicIds (_: {
       bottom = 0;
       join = _: v: v;
-      eq = (a: b: a == b);
       maxIter = 100;
     });
   };
@@ -390,7 +320,6 @@ let
     lattices = lib.genAttrs mixedIds (_: {
       bottom = 0;
       join = _: v: v;
-      eq = (a: b: a == b);
       maxIter = 100;
     });
   };
@@ -514,17 +443,6 @@ in
     test-diverge-catchable = {
       expr = (builtins.tryEval (builtins.deepSeq divergeRun true)).success;
       expected = false;
-    };
-
-    # --- Fixture 4: per-member eq drives quiescence (q's mod-10 eq) ---
-    # q settles at 23 (its prev was 13; mod-10 eq declares them equal -> quiesce).
-    test-per-member-q-settles = {
-      expr = perMemberResult.q;
-      expected = 23;
-    };
-    test-per-member-p-settles = {
-      expr = perMemberResult.p;
-      expected = 7;
     };
 
     # === restabilize ========================================================

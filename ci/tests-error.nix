@@ -43,12 +43,14 @@
 # and nothing here should be read as closing that gap. Both local copies carry the SAME
 # generalization in this change, so they do not drift from EACH OTHER on this axis.
 #
-# ── THE SECOND SUBJECT IN THIS FILE: `runScc`'s TWO REFUSALS, READ AS MESSAGES ────────────────────
-# `ci/tests/restabilize.nix` asserts both of them as `(tryEval …).success == false`, which is a claim
-# that SOMETHING threw and says nothing about WHAT. A combinator carrying any one refusal satisfies
-# a bare boolean, and the blame set — the members that owe a declaration, the members still moving
-# and by how much — is the whole content of these two throws. Reading it needs `expectedError`, and
-# `expectedError` needs a cell whose `expr` may abort, which is what this file is for.
+# ── THE SECOND SUBJECT IN THIS FILE: `runScc`'s THREE REFUSALS, READ AS MESSAGES ──────────────────
+# `ci/tests/restabilize.nix` asserts the exhausted-bound and undeclared-bound pair as
+# `(tryEval …).success == false`, which is a claim that SOMETHING threw and says nothing about WHAT.
+# A combinator carrying any one refusal satisfies a bare boolean, and the blame set — the members
+# that owe a declaration, the members still moving and by how much, or the member that still
+# carries the retired `eq` key (den-hoag-m6y9p / den-hoag-k2p6 OQ-1) — is the whole content of
+# these three throws. Reading it needs `expectedError`, and `expectedError` needs a cell whose
+# `expr` may abort, which is what this file is for.
 #
 # ★ `msg` IS A POSIX ERE, NOT A LITERAL, and the messages are JSON blobs: every `{`, `}`, `[` and `]`
 # below is escaped. Unescaped, the run does not fail — it ERRORS with
@@ -176,7 +178,6 @@ let
       x = {
         bottom = 0;
         join = _: v: v;
-        eq = (a: b: a == b);
         maxIter = 5;
       };
     };
@@ -207,25 +208,62 @@ let
   overwriteLattice = {
     bottom = 0;
     join = _prev: v: v;
-    eq = (a: b: a == b);
     maxIter = 100;
   };
+  agreeRecompute2b =
+    a: s: m:
+    let
+      dep = builtins.head (a.dependencies m);
+    in
+    if (a.nodeData m).self > s.${dep} then (a.nodeData m).self else s.${dep};
   undeclaredRun = runScc {
     accessor = agreeAccessor;
     store = { };
     higherStrata = { };
-    recompute =
-      a: s: m:
-      let
-        dep = builtins.head (a.dependencies m);
-      in
-      if (a.nodeData m).self > s.${dep} then (a.nodeData m).self else s.${dep};
+    recompute = agreeRecompute2b;
     scc = [
       "a"
       "b"
     ];
     lattices = {
       a = removeAttrs overwriteLattice [ "maxIter" ];
+      b = overwriteLattice;
+    };
+  };
+
+  # ── THE THIRD REFUSAL (den-hoag-m6y9p / den-hoag-k2p6 OQ-1): a lattice record carrying the
+  # RETIRED `eq` key. Same accessor and SCC as `undeclaredRun` above, member `a`'s lattice
+  # otherwise complete (bottom/join/maxIter all present) but for the one offending key, so the
+  # refusal below is caused by `eq` alone and by nothing else.
+  eqKeyedRun = runScc {
+    accessor = agreeAccessor;
+    store = { };
+    higherStrata = { };
+    recompute = agreeRecompute2b;
+    scc = [
+      "a"
+      "b"
+    ];
+    lattices = {
+      a = overwriteLattice // {
+        eq = (a: b: a == b);
+      };
+      b = overwriteLattice;
+    };
+  };
+  # THE LIVE CONTROL — the identical accessor/SCC/recompute, neither member's lattice carrying
+  # `eq`, settles under structural `==` in the same run.
+  cleanRun = runScc {
+    accessor = agreeAccessor;
+    store = { };
+    higherStrata = { };
+    recompute = agreeRecompute2b;
+    scc = [
+      "a"
+      "b"
+    ];
+    lattices = {
+      a = overwriteLattice;
       b = overwriteLattice;
     };
   };
@@ -263,7 +301,7 @@ let
 in
 {
   config = {
-    # ── `runScc`'s TWO REFUSALS, AT BLAME-SET GRANULARITY ──
+    # ── `runScc`'s THREE REFUSALS, AT BLAME-SET GRANULARITY ──
     # Anchored at both ends, so a message that merely CONTAINS the expected text does not pass, and
     # written out in full rather than summarised: the blame set is the content, and a cell asserting
     # only the prefix would go green on a refusal that named the wrong members.
@@ -287,6 +325,34 @@ in
           type = "ThrownError";
           msg = ''^gen-memo: cyclic member declares no maxIter: \{"nodes":\["a"\],"scc":\["a","b"\],"why":"undeclared-maxiter"\}$'';
         };
+      };
+      # THE RETIRED-KEY REFUSAL (den-hoag-m6y9p / den-hoag-k2p6 OQ-1). `nodes` is the member that
+      # still carries `eq` and `scc` is the whole component, DIFFERENT lists here for the same
+      # reason as above: a refusal that blamed the component rather than the offending member
+      # would satisfy any predicate that read only one of them. `key` names the offending field —
+      # `eq` is the only lattice key this refusal ever fires on.
+      test-a-retired-eq-key-blames-the-member-that-carries-it = {
+        expr = builtins.deepSeq eqKeyedRun true;
+        expectedError = {
+          type = "ThrownError";
+          msg = ''^gen-memo: cyclic member declares retired lattice key: \{"key":"eq","nodes":\["a"\],"scc":\["a","b"\],"why":"retired-eq-key"\}$'';
+        };
+      };
+    };
+
+    # THE LIVE CONTROL for the retired-key refusal, same predicate class as `runScc-refusals`
+    # above but a SUCCESS cell: the identical accessor, SCC and recompute as `eqKeyedRun`, neither
+    # member's lattice carrying `eq`, settles under structural `==` — in the SAME run. Without
+    # this cell, a `runScc` that refused every lattice unconditionally would satisfy the refusal
+    # test above for the wrong reason.
+    flake.tests.runScc-eq-retirement-control = {
+      test-clean-lattice-settles-under-structural-eq-a = {
+        expr = cleanRun.a;
+        expected = 5;
+      };
+      test-clean-lattice-settles-under-structural-eq-b = {
+        expr = cleanRun.b;
+        expected = 5;
       };
     };
 

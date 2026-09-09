@@ -56,15 +56,21 @@ let
   #   recompute,           # accessor -> store -> id -> value (the node-eval)
   #   scc,                 # [id] — the SCC member ids (M)
   #   higherStrata,        # { <id> = value } — already-solved lower-stratum results
-  #   lattices,            # per-NODE { bottom; join; maxIter; eq ? (==); widen ? null; }
+  #   lattices,            # per-NODE { bottom; join; maxIter; widen ? null; }
   # } -> { <id> = value }   # the fixed-point iterate for each SCC member
   #
   # ★ THE LOOP IS THE EVALUATOR'S AND ARRIVES HANDED IN, WHICH IS THE SAME SEAM `restabilize` BELOW
   # TAKES ITS ENGINE THROUGH. `ascend` is gen-scope's content-free bounded-ascent driver: it carries
   # the seed, the round counter, the per-member settlement quantifier and the per-round forcing, and
   # it knows nothing about a lattice. Everything lattice-shaped stays on THIS side — the merged view,
-  # `join`, `widen`, each member's `eq`, the declared bound, and BOTH refusals below — because the
-  # driver holds no refusals and a located blame needs to know what a member is.
+  # `join`, `widen`, the declared bound, and every refusal below — because the driver holds no
+  # refusals and a located blame needs to know what a member is.
+  #
+  # ★ NO PER-MEMBER `eq`. den-hoag-k2p6 OQ-1 (owner-ruled 2026-09-09): gen-scope's closeCycle keeps
+  # its quotient ruling — a coarse-equality carrier is not driven in a shared round — so a per-member
+  # equality predicate published here is content the ruled engine will never honour. Quiescence is
+  # structural `==` for EVERY member; a lattice record still carrying `eq` is refused by name below,
+  # not silently accepted (ADR-0008 item 2: this plane decides reuse and never evaluates).
   #
   # It is CURRIED rather than taken as a module argument, and the reason is scope: `build.nix` binds
   # this function in a top-level `let`, outside the `engine:` lambda, so `engine.ascend` is not
@@ -81,8 +87,19 @@ let
     }:
     let
       M = scc;
-      # Per-member equality, defaulting to structural `==` when the lattice omits eq.
-      eqOf = m: lattices.${m}.eq or (a: b: a == b);
+      # Quiescence is structural `==` for every member — the retired `eq` term's only surviving
+      # value (den-hoag-m6y9p / den-hoag-k2p6 OQ-1).
+      structEq = a: b: a == b;
+
+      # A lattice record that still carries the retired `eq` key is refused BY NAME (member id +
+      # the offending key), never silently ignored.
+      eqKeyed = prelude.filter (m: lattices.${m} ? eq) M;
+      eqKeyedBlame = {
+        why = "retired-eq-key";
+        key = "eq";
+        nodes = eqKeyed;
+        scc = M;
+      };
 
       # The declared iteration bound: the largest per-member maxIter in the component.
       # Every member must declare one — see the header. The members that do not are the
@@ -134,9 +151,9 @@ let
         # Per-member ⊥ seed (Arntzenius iterate-from-bottom).
         bottomOf = m: lattices.${m}.bottom;
         inherit advance;
-        # Per-MEMBER eq: each node's OWN eq predicate drives its quiescence. `eqOf m` IS the
-        # driver's `member -> prev -> next -> bool`, so nothing adapts it.
-        settledBy = eqOf;
+        # Structural `==` for every member. `settledBy` IS the driver's
+        # `member -> prev -> next -> bool`; the member argument goes unused.
+        settledBy = _m: structEq;
         bound = prelude.range 1 maxI;
       };
 
@@ -145,7 +162,7 @@ let
       blame =
         let
           next = advance final.values;
-          moving = prelude.filter (m: !(eqOf m final.values.${m} next.${m})) M;
+          moving = prelude.filter (m: !(structEq final.values.${m} next.${m})) M;
         in
         {
           why = "fixpoint-diverged";
@@ -159,8 +176,10 @@ let
           });
         };
     in
-    # Bound-overrun blame: a tryEval-CATCHABLE thrown blame, never Nix infinite recursion.
-    if undeclaredBound != [ ] then
+    # Refused-by-name blames are tryEval-CATCHABLE thrown blames, never Nix infinite recursion.
+    if eqKeyed != [ ] then
+      throw "gen-memo: cyclic member declares retired lattice key: ${builtins.toJSON eqKeyedBlame}"
+    else if undeclaredBound != [ ] then
       throw "gen-memo: cyclic member declares no maxIter: ${builtins.toJSON undeclaredBoundBlame}"
     else if final.settled then
       final.values
