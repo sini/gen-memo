@@ -11,7 +11,9 @@ let
   build = genMemo.build engine;
   override = genMemo.override engine;
   restabilize = genMemo.restabilize engine;
-  inherit (genMemo) runScc;
+  # Curried on the evaluator's bounded-ascent driver, exactly as the three entries above are curried
+  # on the engine. Applying it once here leaves every fixture and every cell below unchanged.
+  runScc = genMemo.runScc engine.ascend;
 
   # --- Fixture 1: genuine-join reachability SCC (Arntzenius Lemma-4 ascent) ---
   # 2-node cycle a<->b. Per-node lattice = powerset of {a,b} under union.

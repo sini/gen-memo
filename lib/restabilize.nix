@@ -50,7 +50,7 @@ let
 
   # runScc — solve one SCC to its least fixed point (per-member iterate-from-⊥).
   #
-  # runScc :: {
+  # runScc :: ascend -> {
   #   accessor,            # any object exposing .dependencies / .nodeData (topology oracle)
   #   store,               # externals map (lower-stratum / fixed inputs)
   #   recompute,           # accessor -> store -> id -> value (the node-eval)
@@ -58,7 +58,19 @@ let
   #   higherStrata,        # { <id> = value } — already-solved lower-stratum results
   #   lattices,            # per-NODE { bottom; join; maxIter; eq ? (==); widen ? null; }
   # } -> { <id> = value }   # the fixed-point iterate for each SCC member
+  #
+  # ★ THE LOOP IS THE EVALUATOR'S AND ARRIVES HANDED IN, WHICH IS THE SAME SEAM `restabilize` BELOW
+  # TAKES ITS ENGINE THROUGH. `ascend` is gen-scope's content-free bounded-ascent driver: it carries
+  # the seed, the round counter, the per-member settlement quantifier and the per-round forcing, and
+  # it knows nothing about a lattice. Everything lattice-shaped stays on THIS side — the merged view,
+  # `join`, `widen`, each member's `eq`, the declared bound, and BOTH refusals below — because the
+  # driver holds no refusals and a located blame needs to know what a member is.
+  #
+  # It is CURRIED rather than taken as a module argument, and the reason is scope: `build.nix` binds
+  # this function in a top-level `let`, outside the `engine:` lambda, so `engine.ascend` is not
+  # visible where the binding is made. Both call sites sit inside that lambda and apply it there.
   runScc =
+    ascend:
     {
       accessor,
       store,
@@ -83,10 +95,11 @@ let
       };
       maxI = prelude.foldl' (acc: m: prelude.max acc lattices.${m}.maxIter) 0 M;
 
-      # One ascent step. In-SCC deps read the current iterate (prev); externals read
-      # store / higherStrata. The // merge gives `recompute` the unified view.
+      # One ascent step — the whole round, which is what the driver takes as `advance`. In-SCC deps
+      # read the current iterate (prev); externals read store / higherStrata. The // merge gives
+      # `recompute` the unified view.
       # PINNED DETAIL 1: widen applies AFTER join, per-member.
-      ascend =
+      advance =
         prev:
         let
           cur = prelude.genAttrs M (m: recompute accessor (store // higherStrata // prev) m);
@@ -99,57 +112,47 @@ let
           if (lattices.${m}.widen or null) != null then lattices.${m}.widen prev.${m} j else j
         ) cur;
 
-      # THE ASCENT IS A BOUNDED ITERATION, NOT A RECURSION, AND THAT IS LOAD-BEARING.
+      # THE ASCENT IS A BOUNDED ITERATION, NOT A RECURSION, AND THAT IS LOAD-BEARING — but the
+      # encoding is no longer written here. A loop written as a self-applying lambda costs one
+      # evaluator frame per round (Nix does not reuse the frame of a tail call), so its descent depth
+      # IS the round count and past the call-depth limit it aborts UNCATCHABLY: `tryEval` does not
+      # contain a stack overflow, so a recursive ascent would lose precisely the catchable blame the
+      # bound below exists to raise. The driver settles that by folding — `prelude.iterateBounded`,
+      # whose frame cost is constant in the round count — and it forces the loop-carried fields on
+      # every intermediate state, because a field the control flow never reads chains thunk-on-thunk
+      # across rounds and overflows the C stack instead, a second and distinct uncatchable abort. The
+      # hand-written `strict` that used to name three fields here is GONE rather than relocated: the
+      # forcing is derived from the accumulator's own fields on the driver's side, so a field added
+      # later is forced without anyone re-applying the discipline.
       #
-      # A loop written as a self-applying lambda costs one evaluator frame per round —
-      # Nix does not reuse the frame of a tail call — so its descent depth IS the round
-      # count and past the call-depth limit it aborts UNCATCHABLY. `tryEval` does not
-      # contain a stack overflow, so a recursive ascent loses precisely the catchable
-      # blame the bound exists to raise: the guard would disappear at the depth it is
-      # for. `iterateBounded` is `foldl'` — a C-level loop whose frame cost is constant
-      # in the round count — and it forces the named loop-carried fields on every
-      # intermediate state, because a field the control flow never reads chains
-      # thunk-on-thunk across rounds and overflows the C stack instead, a second and
-      # distinct uncatchable abort that no call-depth setting bounds. All three fields
-      # are named below: forcing some of them measures the same as forcing none.
-      #
-      # The primitive applies `step` once per bound element and needs `step` to be the
-      # IDENTITY once no work remains — which quiescence already is, so the surplus
-      # rounds idle and the result is the fixed point a recursion would have reached.
-      step =
-        st:
-        if st.settled then
-          st
-        else
-          let
-            next = ascend st.values;
-          in
-          {
-            values = next;
-            # Per-MEMBER eq: each node's OWN eq predicate drives its quiescence.
-            settled = prelude.all (m: eqOf m st.values.${m} next.${m}) M;
-            iters = st.iters + 1;
-          };
-      strict = st: builtins.seq st.values (builtins.seq st.settled st.iters);
-
-      final = prelude.iterateBounded strict step {
+      # WHAT THIS SIDE STILL OWES, because the driver claims neither: that the ascent reaches a fixed
+      # point at all (Arntzenius's monotonicity and finite height — unchecked, per the header), and
+      # that `maxI` is long enough to get there. The refusals below are where the second one is
+      # answered, and they are answered by name.
+      final = ascend {
+        members = M;
         # Per-member ⊥ seed (Arntzenius iterate-from-bottom).
-        values = prelude.genAttrs M (m: lattices.${m}.bottom);
-        settled = false;
-        iters = 0;
-      } (prelude.range 1 maxI);
+        bottomOf = m: lattices.${m}.bottom;
+        inherit advance;
+        # Per-MEMBER eq: each node's OWN eq predicate drives its quiescence. `eqOf m` IS the
+        # driver's `member -> prev -> next -> bool`, so nothing adapts it.
+        settledBy = eqOf;
+        bound = prelude.range 1 maxI;
+      };
 
       # PINNED DETAIL 2: lastDelta = the still-moving members' prev/next pairs — the
       # step the bound refused to take, so the blame shows what was still moving.
       blame =
         let
-          next = ascend final.values;
+          next = advance final.values;
           moving = prelude.filter (m: !(eqOf m final.values.${m} next.${m})) M;
         in
         {
           why = "fixpoint-diverged";
           scc = M;
-          inherit (final) iters;
+          # The driver counts `rounds`; the blame has always published `iters` and the name is part
+          # of the message consumers match on, so it is renamed here rather than in the driver.
+          iters = final.rounds;
           lastDelta = prelude.genAttrs moving (m: {
             prev = final.values.${m};
             next = next.${m};
@@ -262,8 +265,10 @@ let
             else if isCyclicStratum then
               # Whole SCC is in the cone (mutual reachability ⇒ all-or-none); re-solve
               # the component once to its lfp, reading acc (lower strata) as externals.
+              # The ascent loop is the ENGINE's, handed in here exactly as `schedule` is
+              # below.
               acc
-              // runScc {
+              // runScc engine.ascend {
                 inherit recompute;
                 accessor = accessor';
                 store = { };

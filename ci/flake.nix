@@ -51,10 +51,11 @@
       # store of its own — it hands a domain, a base and a decision to an engine and lets the
       # engine produce the values — so every entry point that reaches a store takes one. A test
       # is a caller like any other and brings the evaluation environment it has: `evalWarm` is
-      # the real evaluator, and the reference scheduler stands in on the cold paths, which have
-      # no gen-scope entry to route through yet. Both live outside `../lib`, which is the point.
+      # the real evaluator and `ascend` its bounded-ascent driver, the loop `runScc` assembles
+      # arguments for; the reference scheduler stands in on the cold paths, which have no
+      # gen-scope entry to route through yet. All of it lives outside `../lib`, which is the point.
       engine = (import ../reference/schedule.nix { inherit prelude; }) // {
-        inherit (gen-scope.lib) evalWarm;
+        inherit (gen-scope.lib) evalWarm ascend;
       };
 
       # Fixture constructors. They live outside ./tests so the harness does not collect them as a

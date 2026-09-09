@@ -42,10 +42,25 @@
 # two, `walkCopy` is copy three; a drift between any of the three is a drift none of them can see,
 # and nothing here should be read as closing that gap. Both local copies carry the SAME
 # generalization in this change, so they do not drift from EACH OTHER on this axis.
+#
+# ── THE SECOND SUBJECT IN THIS FILE: `runScc`'s TWO REFUSALS, READ AS MESSAGES ────────────────────
+# `ci/tests/restabilize.nix` asserts both of them as `(tryEval …).success == false`, which is a claim
+# that SOMETHING threw and says nothing about WHAT. A combinator carrying any one refusal satisfies
+# a bare boolean, and the blame set — the members that owe a declaration, the members still moving
+# and by how much — is the whole content of these two throws. Reading it needs `expectedError`, and
+# `expectedError` needs a cell whose `expr` may abort, which is what this file is for.
+#
+# ★ `msg` IS A POSIX ERE, NOT A LITERAL, and the messages are JSON blobs: every `{`, `}`, `[` and `]`
+# below is escaped. Unescaped, the run does not fail — it ERRORS with
+# `Invalid range in '{}' in regular expression`, which reads as a broken subject rather than a broken
+# expectation. `type` is `ThrownError` and not `Error`: `throw` produces the former, and the
+# stack-overflow cell further down reads `Error` because an overflow is a different kind of failure.
 {
   genMerge,
   genHub,
   genMemo,
+  engine,
+  fx,
   ...
 }:
 let
@@ -133,6 +148,88 @@ let
     in
     a;
 
+  runScc = genMemo.runScc engine.ascend;
+
+  # Fixture 3 of `ci/tests/restabilize.nix`, reproduced here because that file's `let` exports
+  # nothing: a 1-member self-loop whose recompute strictly increments under an overwrite join, so it
+  # never quiesces, capped at `maxIter = 5`.
+  divergeAccessor = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "x";
+        to = "x";
+      }
+    ];
+    nodeData = {
+      x = { };
+    };
+  };
+  divergeRun = runScc {
+    accessor = divergeAccessor;
+    store = { };
+    higherStrata = { };
+    recompute =
+      _a: s: _m:
+      s.x + 1;
+    scc = [ "x" ];
+    lattices = {
+      x = {
+        bottom = 0;
+        join = _: v: v;
+        eq = (a: b: a == b);
+        maxIter = 5;
+      };
+    };
+  };
+
+  # Fixture 2b's shape: fixture 2's peer-agree SCC with member `a`'s `maxIter` removed. The ascent
+  # itself is untouched, so the refusal is caused by the missing declaration and by nothing else.
+  agreeAccessor = fx.mkPlaneAccessor {
+    edges = [
+      {
+        from = "a";
+        to = "b";
+      }
+      {
+        from = "b";
+        to = "a";
+      }
+    ];
+    nodeData = {
+      a = {
+        self = 5;
+      };
+      b = {
+        self = 3;
+      };
+    };
+  };
+  overwriteLattice = {
+    bottom = 0;
+    join = _prev: v: v;
+    eq = (a: b: a == b);
+    maxIter = 100;
+  };
+  undeclaredRun = runScc {
+    accessor = agreeAccessor;
+    store = { };
+    higherStrata = { };
+    recompute =
+      a: s: m:
+      let
+        dep = builtins.head (a.dependencies m);
+      in
+      if (a.nodeData m).self > s.${dep} then (a.nodeData m).self else s.${dep};
+    scc = [
+      "a"
+      "b"
+    ];
+    lattices = {
+      a = removeAttrs overwriteLattice [ "maxIter" ];
+      b = overwriteLattice;
+    };
+  };
+
   decls = {
     options.leaf = mkOption {
       type = types.raw;
@@ -166,6 +263,33 @@ let
 in
 {
   config = {
+    # ── `runScc`'s TWO REFUSALS, AT BLAME-SET GRANULARITY ──
+    # Anchored at both ends, so a message that merely CONTAINS the expected text does not pass, and
+    # written out in full rather than summarised: the blame set is the content, and a cell asserting
+    # only the prefix would go green on a refusal that named the wrong members.
+    flake.testsError.runScc-refusals = {
+      # The bound is exhausted at 5 rounds and the member is still moving 5 -> 6. `iters`, `scc` and
+      # `lastDelta` are all read: a driver that lost the round counter, or a blame built over the
+      # wrong component, reds here where a boolean would not.
+      test-the-exhausted-bound-blames-the-still-moving-member = {
+        expr = builtins.deepSeq divergeRun true;
+        expectedError = {
+          type = "ThrownError";
+          msg = ''^gen-memo: fixpoint did not converge: \{"iters":5,"lastDelta":\{"x":\{"next":6,"prev":5\}\},"scc":\["x"\],"why":"fixpoint-diverged"\}$'';
+        };
+      };
+      # `nodes` is the member that owes a declaration and `scc` is the whole component, and the two
+      # are DIFFERENT lists here on purpose: a refusal that blamed the component rather than the
+      # undeclared member would satisfy any predicate that read only one of them.
+      test-an-undeclared-bound-blames-the-member-that-owes-one = {
+        expr = builtins.deepSeq undeclaredRun true;
+        expectedError = {
+          type = "ThrownError";
+          msg = ''^gen-memo: cyclic member declares no maxIter: \{"nodes":\["a"\],"scc":\["a","b"\],"why":"undeclared-maxiter"\}$'';
+        };
+      };
+    };
+
     flake.testsError.non-option-cycle = {
       # LIVE CONTROL — the fixture is genuinely self-referential before anything walks it. Nix's
       # `==` on attrsets short-circuits on pointer identity, so this reads cheaply rather than

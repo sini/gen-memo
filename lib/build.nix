@@ -162,8 +162,11 @@ let
                 if isCyclicStratum then
                   # Cyclic SCC: solve to its lfp ONCE for the whole component
                   # (Arntzenius per-SCC fixpoint). Lower strata already sit in acc.
+                  # The ascent loop is the ENGINE's, handed in here exactly as `schedule` is
+                  # below — this arm assembles arguments and delegates, and the lattice
+                  # vocabulary it assembles them out of never reaches the driver.
                   acc
-                  // runScc {
+                  // runScc engine.ascend {
                     inherit accessor recompute;
                     store = { };
                     scc = members;
