@@ -14,10 +14,25 @@
 # evaluation environment the caller already has.
 #
 # THE DECISION IS THE INTERFACE, AND IT IS EXPORTED APART FROM THE FOLD. `warmDecision` is the whole
-# of what this plane contributes to a warm evaluation: two total functions, `isClean` and
-# `reusable`, and no values. The fold is decide-then-call on top of it, so a caller that wants only
-# the decision takes only the decision, and the record that crosses the boundary has nowhere to put
-# a result even if it wanted one.
+# of what this plane contributes to a warm evaluation: three total functions, `isClean`, `reusable`
+# and `identitiesHeld`, and no values. The fold is decide-then-call on top of it, so a caller that
+# wants only the decision takes only the decision, and the record that crosses the boundary has
+# nowhere to put a result even if it wanted one.
+#
+# `identitiesHeld` IS A REFUSAL, AND IT IS THE ONE DECISION HERE WITH NO DEGRADED ARM. The other two
+# answer "may this be reused"; a wrong answer there costs recomputation and nothing else, which is
+# why the reuse refusal next door (`disabledModules` on an edited module) falls back to cold with a
+# populated `reason` and keeps going. This one answers "did an instance's minted identity move
+# between the prior evaluation and this one", and falling back to cold is worthless for it: a cold
+# evaluation of the same modules emits the SAME moved identity — the move is a property of the
+# module set, not of the reuse path. So the verdict is a throw naming the coordinate, the kind and
+# both identities, and the only value an admitting caller observes is the EMPTY moved set. That
+# asymmetry is why it is a third function rather than another `reason` string.
+#
+# IT HOLDS NO VALUES, LIKE THE OTHER TWO. What crosses is two maps of coordinate → minted identity
+# STRING, never a config and never a node value. Building those maps is the FACT, and it belongs to
+# whoever holds both evaluations at once — the evaluator, not this plane. This plane decides over
+# the fact and does not go looking for it, which is the direction `isClean` already runs in.
 #
 # `isClean` IS THE COMPLEMENT OF THE DIRTY CONE, AND THE CONE IS READ RATHER THAN COMPUTED. The
 # edited ids together with their reverse-reachable dependents are `dirtySet`, which reads
@@ -97,6 +112,43 @@ let
       }) (prior.resolutional id)
     );
 
+  # The kind an identity was minted under, read off the identity itself. `hashIdentity` emits
+  # `"<kind>:<sha256>"`, so the kind travels IN the datum and the refusal needs no second argument
+  # carrying it — one less thing a caller can supply inconsistently with the maps.
+  kindOf = h: builtins.head (builtins.split ":" h);
+
+  # The MOVED set: coordinates present in BOTH evaluations whose minted identity differs. Present in
+  # both is the whole membership test — an instance that appears or disappears between the two is a
+  # different edit and this predicate says nothing about it.
+  movedIdentities =
+    priorIdentities: nextIdentities:
+    builtins.filter (p: (nextIdentities ? ${p}) && priorIdentities.${p} != nextIdentities.${p}) (
+      builtins.attrNames priorIdentities
+    );
+
+  # `remerged` names the declaration locations this re-compose re-merged — the contributing
+  # declarations, in the evaluator's own vocabulary. It is a message ingredient and nothing else, so
+  # it is defaulted and read ONLY inside the throw: on the admitting path it is never forced, which
+  # matters because enumerating it is O(declared-locs) spine work at the evaluator.
+  identitiesHeld =
+    {
+      priorIdentities,
+      nextIdentities,
+      remerged ? [ ],
+    }:
+    let
+      moved = movedIdentities priorIdentities nextIdentities;
+    in
+    if moved == [ ] then
+      moved
+    else
+      let
+        p = builtins.head moved;
+        from = priorIdentities.${p};
+        to = nextIdentities.${p};
+      in
+      throw "gen-memo.identitiesHeld: minted identity moved on a warm re-compose at '${p}' (kind '${kindOf from}', was '${from}', now '${to}', re-merged declarations: ${builtins.concatStringsSep ", " remerged}, ${toString (builtins.length moved)} instance(s) moved)";
+
   warmDecision =
     { accessor, prior }:
     seeds:
@@ -107,6 +159,11 @@ let
     {
       isClean = nid: !(dirty ? ${nid});
       reusable = prior.resolutional;
+      # Closed over nothing from this record on purpose: the two maps are the whole input, so the
+      # function is testable without constructing an accessor or a prior facade. It rides the
+      # decision record rather than the library root because it IS part of what the plane decides
+      # for one warm evaluation, and a second entry point would be a second way to ask.
+      inherit identitiesHeld;
     };
 
   # Splice a set of data-change edits into the roots, mark the union of their reverse cones dirty,
