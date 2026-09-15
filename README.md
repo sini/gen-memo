@@ -328,7 +328,7 @@ nix-unit --flake ./ci#tests              # run everything
 nix-unit --flake ./ci#tests.byte-parity  # a single suite
 ```
 
-19 suites. Beyond the migrated content's own, two are the plane's oracles:
+32 suites, 411 tests (`nix-unit --flake ./ci#tests` ⇒ `411/411 successful`, `46f9e7d`). Beyond the migrated content's own, two are the plane's oracles:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
   forced to nothing-is-clean, compared on the tagged `__drvPath` record the admission projection
