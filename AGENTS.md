@@ -123,6 +123,16 @@ byte-parity oracle is that failure, whatever it is named.
 Entry: `inputs.gen-memo.lib` (flake), or the root `default.nix` — a **function** of
 `{ prelude, graph }`, per the gen root-file convention, since the plane now has dependencies.
 
+Root `default.nix`'s `wire ? { deps, resolve }: import ./lib deps` formal is the seam that hands
+this exact substrate attrset to `./lib` as `deps`, and it is also the only channel by which the shim
+publishes anything outward — a formal is an INPUT channel and cannot carry a value out, so the
+lock-parameterised `follows` resolver rides out on the same record. Overriding `wire` is how a cell
+reads the shim's own formal-to-path map AND its own resolver, instead of restating either by hand;
+the `follows` rule is therefore declared once in this repository, in `default.nix`. The unresolved
+defaults resolve `prelude` and `graph` from `ci/flake.lock`, never the root `flake.lock` — and this
+repository's own `ci/flake.lock` is one where `gen-prelude`'s node key (`gen-prelude_4`) differs
+from the literal label, so the resolver walks the `follows` path rather than indexing by label.
+
 **31 exports, in seven groups.**
 
 ★ **TWELVE OF THEM TAKE THE ENGINE FIRST**, because they reach a store and the plane populates none
