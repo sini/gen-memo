@@ -127,7 +127,7 @@ let
   # last-segment shortcut reads a DIFFERENT node, and this library's OWN ci lock is one where it
   # does: `gen-prelude`'s node key is `gen-prelude_4`, not the label `gen-prelude`. Reading the lock
   # is pure data; nothing here fetches.
-  lock = builtins.fromJSON (builtins.readFile ../flake.lock);
+  lock = builtins.fromJSON (builtins.readFile ../../flake.lock);
 
   # ★★ THE RESOLVER IS BOUND OVER ITS LOCK, AND THAT IS WHAT MAKES ITS CONTROL EXPRESSIBLE AT ALL. A
   # `repoOf` closed over THIS lock has no free parameter, so a control could only re-assert the main
