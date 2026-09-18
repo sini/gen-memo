@@ -17,6 +17,23 @@
     # make the oracle an oracle for the stub. The asymmetry is nixpkgs's below — a test-runner input
     # is not a library input — and `ci/tests/purity.nix` scans `../lib` and enforces it.
     gen-merge.url = "github:sini/gen-merge";
+
+    # ★ AND gen-merge REACHES BACK: its ROOT flake declares `gen-memo` and builds its published
+    # `lib` with `memo = gen-memo.lib` (gen-merge `flake.nix`), so a full-flake gen-merge input
+    # puts a PUBLISHED COPY OF THIS LIBRARY inside the very engine `compose-parity.nix` hands the
+    # tree's own `warmAdmits` and `warmTrace` to. That is not only the self-input invariant
+    # gen-harness's scanner refuses — it is a WEAKER ORACLE, because the parity reading then
+    # compares the tree's two decision functions against an engine built on some other revision
+    # of the same library. The override sends that one edge onto the tree already under test, so
+    # the cell reads one gen-memo where it used to read two.
+    #
+    # THE CYCLE ITSELF IS OWNER-SANCTIONED and is NOT what this touches: gen-memo/ci declaring
+    # gen-merge for `compose-parity.nix` stands until `gen-modules` collapses gen-memo, gen-merge
+    # and gen-types. What was never sanctioned is this library testing against a published copy of
+    # itself, which is a consequence of that cycle rather than the exception it was granted.
+    gen-memo.url = "path:..";
+    gen-merge.inputs.gen-memo.follows = "gen-memo";
+
     # The gen HUB SOURCE — `flake = false`, and that is R1's discipline rather than thrift. The
     # successor compose (the construct `ci/tests/compose-parity.nix` evaluates) lives at the hub,
     # `lib/compose.nix`, parameterised on an engine and the plane's two decision functions. The
