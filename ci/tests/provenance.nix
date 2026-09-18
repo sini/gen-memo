@@ -244,7 +244,8 @@ in
         (why chainCtx {
           id = "a";
           changedId = "d";
-        }) ? paths;
+        })
+          ? paths;
       expected = false;
     };
     test-why-unaffected-no-paths = {
@@ -252,7 +253,8 @@ in
         (why chainCtx {
           id = "d";
           changedId = "a";
-        }) ? paths;
+        })
+          ? paths;
       expected = false;
     };
     # diamond multipath: a reaches d via b AND c ⇒ recomputed (≥1 live path).
