@@ -53,12 +53,20 @@
   # caller's branch where every new caller would restate it.
   #
   # THE NARROWING IS BY NAME, AND ITS FAILURE IS AT THE LOUD END OF THE RANGE. An evaluator whose
-  # decision lacks one of the five aborts the evaluation NAMING that field, at the point a consumer
-  # reads it — rather than publishing a defaulted value the consumer meets as a wrong answer. The
+  # decision lacks one of the five required fields aborts the evaluation NAMING that field, at the
+  # point a consumer reads it — rather than publishing a defaulted value the consumer meets as a wrong answer. The
   # abort is stronger than a throw and that is worth stating exactly, because it is also why no
   # cell asserts it: measured at Nix 2.34.8, a missing-attribute error propagates THROUGH
   # `builtins.tryEval` while a `throw` in the same run is caught, so a cell over this case would
   # abort the suite instead of reddening in it.
+  #
+  # `inert` IS THE ONE FIELD AN EVALUATOR MAY NOT STATE, AND WHERE IT STATES NONE THE TRACE SAYS
+  # `null`. It is the evaluator's own claim that an admitted warm pass had nothing clean to reuse
+  # (so `inert == true` implies `reused == [ ]`; `false` promises nothing). An evaluator that
+  # predates the field, or does not compute it, is not broken, so its absence is not the abort
+  # above; but it has not said the pass was live either, so it is never read as `false`. `null` is
+  # the named third value, "not stated", distinct from both answers (ADR-0020: a named third value,
+  # never silence). Only absence is defaulted: an `inert` that is present crosses as the thunk it is.
   #
   # WHAT IS NOT NARROWED IS COST: every field is carried as a thunk and forced by nothing here.
   # That is load-bearing rather than incidental — at the evaluator this record's shape was migrated
@@ -77,6 +85,7 @@
             remerged
             modules
             ;
+          inert = decision.inert or null;
         };
       }
     else

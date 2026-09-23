@@ -15,11 +15,12 @@ let
   inherit (genMemo) warmAdmits warmTrace;
 
   # An evaluator's published decision, in the shape the migrating content observed: a mode, a reason
-  # for it, the two loc partitions, and the module classification. The values are illustrative; the
-  # SHAPE is the contract.
+  # for it, the two loc partitions, the module classification, and the evaluator's own statement of
+  # whether the warm pass was inert. The values are illustrative; the SHAPE is the contract.
   decision = {
     mode = "warm";
     reason = null;
+    inert = true;
     reused = [
       "fleet.hosts"
       "fleet.environments"
@@ -164,6 +165,7 @@ in
       expected = {
         mode = "warm";
         reason = null;
+        inert = true;
         reused = [
           "fleet.hosts"
           "fleet.environments"
@@ -179,12 +181,13 @@ in
       };
     };
 
-    # And it is NARROWED to the five published fields. The fixture carries a sixth that an evaluator
+    # And it is NARROWED to the six published fields. The fixture carries a seventh that an evaluator
     # would have no reason to publish; it must not cross. This is the cell that reds if the
     # observation degenerates into passing the decision through, which every other cell here accepts.
-    test-observation-narrows-to-the-published-five = {
+    test-observation-narrows-to-the-published-six = {
       expr = builtins.attrNames (observe true (decision // { internalMemo = "not a consumer's"; })).trace;
       expected = [
+        "inert"
         "mode"
         "modules"
         "reason"
@@ -208,7 +211,7 @@ in
     };
 
     # THE OBSERVATION FORCES NOTHING, and the cell is built so that failing to hold that aborts
-    # rather than reds. Three of the fixture's five fields throw on contact; the record is still
+    # rather than reds. Four of the fixture's six fields throw on contact; the record is still
     # constructible, its names still readable, and a field that does not throw still reads. At the
     # evaluator this shape was migrated from, two of the five enumerate the whole declared-loc
     # partition when read, so an observation that forced them would charge every consumer of the
@@ -226,6 +229,7 @@ in
                 reused = throw "forced: reused";
                 remerged = throw "forced: remerged";
                 modules = throw "forced: modules";
+                inert = throw "forced: inert";
               }
             )).trace;
         in
@@ -234,8 +238,35 @@ in
           t.mode
         ];
       expected = [
-        "5"
+        "6"
         "warm"
+      ];
+    };
+
+    # `inert` IS THE EVALUATOR'S STATEMENT, AND WHERE IT MADE NONE THE TRACE SAYS `null` — never
+    # `false`. Three arms in one run: a stated `true` and a stated `false` cross verbatim, and a
+    # record that carries no `inert` at all (an evaluator that predates the field, or one that does
+    # not state it) reads `null`, the named "not stated". A defaulted `false` would read as the
+    # evaluator having said the pass was not inert, which is a fact nobody stated.
+    test-inert-crosses-verbatim-and-unstated-is-null = {
+      expr = [
+        (observe true decision).trace.inert
+        (observe true (decision // { inert = false; })).trace.inert
+        (observe true (removeAttrs decision [ "inert" ])).trace.inert
+        (builtins.attrNames (observe true (removeAttrs decision [ "inert" ])).trace)
+      ];
+      expected = [
+        true
+        false
+        null
+        [
+          "inert"
+          "mode"
+          "modules"
+          "reason"
+          "remerged"
+          "reused"
+        ]
       ];
     };
   };

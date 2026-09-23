@@ -225,10 +225,10 @@ unobservable.
 
 **The observed decision — an evaluator's warm answer, watched rather than made**
 
-| Export       | What it does                                                                                                                                                                                                    |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `warmAdmits` | Whether a caller's edit has the shape a warm pass may be asked for: its key set is exactly the one reuse-bearing argument named, so every other argument is unchanged by construction rather than by comparison |
-| `warmTrace`  | The evaluator's published decision, narrowed to the five fields a consumer reads, attached only to a result that was reached through an edit                                                                    |
+| Export       | What it does                                                                                                                                                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `warmAdmits` | Whether a caller's edit has the shape a warm pass may be asked for: its key set is exactly the one reuse-bearing argument named, so every other argument is unchanged by construction rather than by comparison                                                            |
+| `warmTrace`  | The evaluator's published decision, narrowed to the six fields a consumer reads (`mode` `reason` `reused` `remerged` `modules` `inert`), attached only to a result that was reached through an edit; an evaluator that states no `inert` reads `null` there, never `false` |
 
 **These two OBSERVE; the group above DECIDES, and that split is why `warmTrace` is not called
 `warmDecision`.** `warmDecision` is this plane's own answer — two total functions over a declared
