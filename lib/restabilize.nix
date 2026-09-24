@@ -91,6 +91,17 @@ let
       # value (den-hoag-m6y9p / den-hoag-k2p6 OQ-1).
       structEq = a: b: a == b;
 
+      # A member with no lattice at all is refused BY NAME before any `lattices.${m}` read: that
+      # read would abort as a missing attribute, which `tryEval` cannot contain. `build` and
+      # `restabilize` precheck this themselves, but `runScc` is public and a direct caller does not
+      # pass through either.
+      undeclaredLattice = prelude.filter (m: !(lattices ? ${m})) M;
+      undeclaredLatticeBlame = {
+        why = "undeclared-lattice";
+        nodes = undeclaredLattice;
+        scc = M;
+      };
+
       # A lattice record that still carries the retired `eq` key is refused BY NAME (member id +
       # the offending key), never silently ignored.
       eqKeyed = prelude.filter (m: lattices.${m} ? eq) M;
@@ -177,7 +188,9 @@ let
         };
     in
     # Refused-by-name blames are tryEval-CATCHABLE thrown blames, never Nix infinite recursion.
-    if eqKeyed != [ ] then
+    if undeclaredLattice != [ ] then
+      throw "gen-memo: cyclic member declares no lattice: ${builtins.toJSON undeclaredLatticeBlame}"
+    else if eqKeyed != [ ] then
       throw "gen-memo: cyclic member declares retired lattice key: ${builtins.toJSON eqKeyedBlame}"
     else if undeclaredBound != [ ] then
       throw "gen-memo: cyclic member declares no maxIter: ${builtins.toJSON undeclaredBoundBlame}"

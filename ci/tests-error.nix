@@ -133,6 +133,23 @@ let
       b = overwriteLattice;
     };
   };
+  # ── THE FOURTH REFUSAL (den-hoag-8iw8): a DIRECT caller that supplies no lattice for member `b`.
+  # `build`'s own precheck never reaches `runScc` with an undeclared member, but `runScc` is public,
+  # and without its own guard the first `lattices.${m}` read aborts with `attribute 'b' missing`,
+  # which `tryEval` cannot contain. Same accessor and SCC as above, `a`'s lattice complete.
+  undeclaredLatticeRun = runScc {
+    accessor = agreeAccessor;
+    store = { };
+    higherStrata = { };
+    recompute = agreeRecompute2b;
+    scc = [
+      "a"
+      "b"
+    ];
+    lattices = {
+      a = overwriteLattice;
+    };
+  };
   # THE LIVE CONTROL — the identical accessor/SCC/recompute, neither member's lattice carrying
   # `eq`, settles under structural `==` in the same run.
   cleanRun = runScc {
@@ -188,6 +205,17 @@ in
         expectedError = {
           type = "ThrownError";
           msg = ''^gen-memo: cyclic member declares retired lattice key: \{"key":"eq","nodes":\["a"\],"scc":\["a","b"\],"why":"retired-eq-key"\}$'';
+        };
+      };
+      # THE MISSING-LATTICE REFUSAL (den-hoag-8iw8). `type` is the load-bearing half: before the
+      # guard this read was an uncatchable `TypeError` (`attribute 'b' missing`), and a named
+      # `ThrownError` is what makes it catchable. `nodes` (the member lacking a lattice) and `scc`
+      # (the component) differ on purpose, as above.
+      test-a-missing-lattice-blames-the-member-that-lacks-one = {
+        expr = builtins.deepSeq undeclaredLatticeRun true;
+        expectedError = {
+          type = "ThrownError";
+          msg = ''^gen-memo: cyclic member declares no lattice: \{"nodes":\["b"\],"scc":\["a","b"\],"why":"undeclared-lattice"\}$'';
         };
       };
     };
