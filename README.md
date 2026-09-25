@@ -445,57 +445,16 @@ a plane output must be byte-identical to a cold evaluation.
 
 ## Limitations
 
-- **A node value is hashed only if a BOUNDED walk finishes on it; otherwise it is always-dirty.**
-  The null-hash rule records the first partiality — Nix's hash is partial on function-bearing
-  values, so those get `hash = null` and are conservatively always-dirty. That rule has **no paper
-  behind it**; it is an operational Nix fact. The second partiality is a value whose walk never
-  ends — a self-loop, a two-cycle, an unboundedly generated value — which an unbounded walker met at
-  the evaluator's call-depth ceiling, aborting where the cold evaluation had a value. A Nix
-  derivation is the ordinary member (`drv.all`'s first element is the derivation itself), and it is
-  **removed at every depth by the admission projection** — a shape test applied before descending,
-  which yields a tagged `{ __drvPath = …; }` record and never walks into the derivation;
-  `ci/tests/byte-parity.nix` drives derivation-valued nodes through the plane. **Everything else
-  lands on the null rule:** "finite" is only semi-decidable, and the walk is its bounded run — past
-  either bound below it ends `exhausted` and the value is always-dirty, a change of cost and never of
-  answer (`ci/tests/hash.nix`, and `ci/tests/eager.nix` through the plane: cold parity, the null
-  hash, and every host behind a self-referential node recomputed where a plain one is cut).
-- **The two bounds are engine constants, derived and re-derived** (`lib/hash.nix`; OQ-1 of
-  `den-hoag-5ahw` ruled them engine constants rather than consumer fields). Re-derive both when an
-  evaluator, its `max-call-depth` default or the walk changes.
-  - **D = 5000 levels, a real ceiling.** The walk (breadth-first, one frame per level) and a
-    recursive `hashOf` such as `toJSON` each need about one call frame per level against a default
-    `max-call-depth` of 10000; D takes half and leaves half to the caller. ONE value on upstream Nix,
-    Determinate and Lix. It admits every depth the unbounded walker could finish (4997 before).
-    Measured: the deepest admitted value (containers to depth 4999) hashes under up to 4990 open
-    caller frames on all three evaluators and aborts at 4991; the plane's own call sites above the
-    guard spend about 13 (`build`) to 20 (`propagateEager`) of them.
-
-  - **B = 32768 positions, a cost number.** A well-founded value larger than B stays correct and loses
-    reuse. B is the largest power of two at which the worst case — an exhausted walk, which is pure
-    waste — costs no more than one empty evaluation of the same evaluator. Curve (wall seconds,
-    median of 9, net of the empty evaluation t0; worst of a binary loop, a 180-wide and a 1000-wide
-    loop):
-
-    | B         | upstream Nix 2.34.8 (t0 0.018) | Determinate 3.22.5 (t0 0.021) | Lix 2.95.2 (t0 0.016) |
-    | --------- | ------------------------------ | ----------------------------- | --------------------- |
-    | 16384     | 0.005                          | 0.008                         | 0.006                 |
-    | **32768** | **0.010**                      | **0.016**                     | **0.008**             |
-    | 65536     | 0.020 ✗                        | 0.031 ✗                       | 0.016                 |
-    | 131072    | 0.037 ✗                        | 0.066 ✗                       | 0.030 ✗               |
-
-    The walk counts each level before it forces it and stops counting past B, so a loop of many
-    wide containers costs Θ(B + its widest container) and not its fan-out.
-- **The enumerated exception to the walk's totality (ADR-0025 item 1).** The certificate is scoped to
-  a caller at most `max-call-depth` − D frames deep (4990 measured). A caller deeper than that still
-  meets the uncatchable abort on its deepest admitted values — as it did before, and at the same
-  place. `ci/tests/hash.nix`'s `test-depth-bound-leaves-caller-margin` certifies 4500 frames; a
-  lowered `max-call-depth` setting shrinks the margin with it.
-- **The fallback is silent.** Nothing tells a consumer that its node went always-dirty on a bound;
-  the reason is internal to `lib/hash.nix` (`classify`, read by tests). Emitting it is owed through
-  the warned-outcome channel `den-hoag-3yh6` ruled (the result carrying its own provenance).
-- **The walk forces what cold may never force.** A lazy `throw` inside a node value fails the guard
-  (catchably) where a cold read that never touches it succeeds. Which such value throws depends on
-  visit order, which is depth-first for small values and breadth-first past them.
+- **The store's admissible values are function-free, and acyclic apart from derivations.** The
+  null-hash rule records the first partiality — Nix's hash is partial on function-bearing values, so
+  those get `hash = null` and are conservatively always-dirty. That rule has **no paper behind it**;
+  it is an operational Nix fact. The second partiality is not conservative: the guard's structural
+  walk has no cycle guard, so a **self-referential value aborts with a stack overflow that `tryEval`
+  does not catch**. A Nix derivation is self-referential (`drv.all`'s first element is the derivation
+  itself), and that class is **removed at every depth by the admission projection** — a shape test
+  applied before descending, which yields a tagged `{ __drvPath = …; }` record and never walks into
+  the derivation. A package inside a config value is the ordinary shape, so refusing it was never an
+  option; `ci/tests/byte-parity.nix` now drives derivation-valued nodes through the plane.
 - **The projection is not injective, and cannot be.** Its codomain is a subset of its domain, so a
   value and its image can be distinct with the same image: an attrset written literally as
   `{ __drvPath = "…"; }` still compares equal to a projected derivation. The tag **narrows** the
@@ -518,6 +477,10 @@ a plane output must be byte-identical to a cold evaluation.
   token arm green. Reaching the reference scheduler from inside the plane is what would make it the
   plane's; being handed it at the call is what makes it the caller's. The path has its own cell,
   with the library's real `./hash.nix` imports as the live control.
+- **The GENERAL cyclic class is not rescued.** A plain self-referential attrset aborts the projection
+  itself, and no cell can pin that: the abort is uncatchable and would end the suite rather than fail
+  a case. A total acyclicity predicate is not constructible here — deciding it needs the descent that
+  aborts, and a depth-bounded walk would be a ceiling invented to bound a cost.
 - **No cross-invocation persistence**, by design and by the narrowing above.
 - **`batch` layers its accessor overrides**, so N deltas leave an N-deep `nodeData` closure chain
   paid on every later read. Forcing the accumulator does not flatten it; only re-expressing the
