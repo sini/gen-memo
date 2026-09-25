@@ -8,15 +8,18 @@
 # it is an operational Nix fact and not a theorem, and the disclaimer travels with
 # the rule wherever the rule goes.
 #
-# ★★ THERE IS A SECOND PARTIALITY AND IT IS NOT THE FIRST ONE'S SHAPE, WHICH IS WHY
-# IT GETS A DIFFERENT CONSTRUCTION. The null rule is CONSERVATIVE: an unhashable
-# function-bearing value is always-dirty, never false-clean, so the plane keeps
-# deciding. Cyclicity does not fall back — it ABORTS, and `tryEval` does not contain
-# the abort. A value that cannot be hashed is therefore NORMALISED BEFORE ANY WALKER
-# REACHES IT rather than met inside the hash: `project` below is a structural
-# projection applied at the hash boundary, and `hashGuarded` is its only application
-# site, so the ten call sites that hand it a whole node value are covered at one
-# place.
+# ★★ THERE IS A SECOND PARTIALITY: a value whose walk does not end. A self-loop, a
+# two-cycle or an unboundedly generated value is an ordinary readable Nix value with no
+# finite walk, and an unbounded walker meets the evaluator's call-depth ceiling on it —
+# an abort `tryEval` does not contain, where the cold evaluation it decides for has a
+# value. Two constructions meet it, both at the hash boundary, and `hashGuarded` is the
+# only application site of either, so the ten call sites that hand it a whole node value
+# are covered at one place:
+#   - a DERIVATION is the ordinary member of the class (a config value containing a
+#     package), and `project` below normalises it to a tag before anything descends;
+#   - EVERYTHING ELSE is met by a BOUNDED walk whose exhaustion lands on the null rule
+#     above — the same conservative side, so the plane keeps deciding and its answer is
+#     the cold one.
 #
 # WHY A PROJECTION AND NOT A REFUSAL. A config value containing a package is the
 # ORDINARY shape, so a plane that refused derivation-valued nodes would refuse
@@ -33,16 +36,81 @@
 # internal to hashing, not a value transformation the plane offers anyone.
 { ... }:
 let
-  containsFunction =
+  # THE ONE BOUND, an engine constant (den-hoag-5ahw). Past it the walk ends `exhausted` and the
+  # value is always-dirty, which changes what the plane COSTS and never what it ANSWERS.
+  #
+  # `maxDepth` (D) is a real ceiling. The walk below spends two evaluator call frames per level
+  # (the walker and the `builtins.any` that calls it), so D levels cost 2·D frames against a
+  # default `max-call-depth` of 10000; D = 2500 leaves the other half to whatever called the
+  # plane. ONE D for upstream Nix, Determinate and Lix. Derivation in the README (Limitations).
+  # The budget assumes a `hashOf` that spends one frame per level, as the plane's `toJSON` does;
+  # `hashOf` is the caller's, and a deeper-recursing one narrows the caller's half.
+  #
+  # WHAT THE BOUND COSTS, as properties rather than figures:
+  #   - the walker family: at most D closures per `unhashable`, built once per import of this
+  #     file and only as deep as a value has reached. Nothing per value.
+  #   - R1, a value that exhausts: Θ(D × the acyclic mass the walk completes before each step
+  #     down the cycle). A self-loop costs D steps; bulk ahead of the back edge in name order is
+  #     re-walked on every unrolling.
+  #   - R2, reuse: an acyclic value with a container at image depth ≥ D is always-dirty. The
+  #     unbounded walk hashed it only when its caller left room, at caller depth c only below
+  #     depth (10000 − c)/2, so the loss is cost and never answer.
+  #
+  # ★ THE FALLBACK IS SILENT, and that is recorded rather than accepted: nothing tells a
+  # consumer its node went always-dirty on the bound. `classify` names the reason and stays
+  # internal (tests read it); emitting it is owed through the warned-outcome channel
+  # `den-hoag-3yh6` ruled — the result carrying its own provenance — and is not built here.
+  maxDepth = 2500;
+
+  # THE DEPTH IS WHICH WALKER RUNS, NOT AN ARGUMENT. `walkerAt k` decides a position at nesting
+  # depth k, and its children are decided by the walker one level down, bound once in its closure,
+  # so a position costs exactly what the unbounded walk cost it: no counter, no partial
+  # application, no comparison. The family is built lazily, once, as deep as a value reaches.
+  # Past D the walker is `past`, which answers `true` on any container. Every walker answers
+  # `true` on a function and short-circuits, so the walk is a PREFIX of the unbounded depth-first
+  # walk in the same order: it forces nothing that walk did not force and stops no later.
+  # The builtins are bound locally: a `builtins.X` select inside a walker nested this deep
+  # walks a longer environment chain per position than the unbounded walk did.
+  walkerFrom =
+    onFunction:
+    let
+      inherit (builtins)
+        isFunction
+        isList
+        isAttrs
+        any
+        attrValues
+        ;
+      walkerAt =
+        k:
+        let
+          next = if k + 1 == maxDepth then past else walkerAt (k + 1);
+        in
+        v:
+        if isFunction v then
+          onFunction
+        else if isList v then
+          any next v
+        else if isAttrs v then
+          any next (attrValues v)
+        else
+          false;
+      past = v: isFunction v && onFunction || isList v || isAttrs v;
+    in
+    walkerAt 0;
+  unhashable = walkerFrom true;
+  exhausts = walkerFrom false;
+  classify =
     v:
-    if builtins.isFunction v then
-      true
-    else if builtins.isList v then
-      builtins.any containsFunction v
-    else if builtins.isAttrs v then
-      builtins.any containsFunction (builtins.attrValues v)
+    let
+      projected = project v;
+    in
+    if !(unhashable projected) then
+      "finite"
+    else if exhausts projected then
+      "exhausted"
     else
-      false;
+      "function";
 
   # The derivation shape, tested at EVERY position rather than at the root. A root-only
   # test fixes the root instance and leaves the class expressible one attribute deeper,
@@ -78,10 +146,13 @@ let
   # ordinary edit away — to an attrset carrying exactly the reserved key with exactly that
   # value. Injectivity is not claimed, not established and not achievable here.
   #
-  # ★ WHAT IS NOT REMOVED: the GENERAL cyclic class. A plain self-referential attrset
-  # aborts this projection exactly as it aborts the walk below, and deliberately so. A
-  # total acyclicity predicate is not constructible here: deciding it requires the descent
-  # that aborts, and a depth-bounded walk would be a ceiling invented to bound a cost.
+  # ★ WHAT IS NOT REMOVED HERE: the GENERAL non-well-founded class. The projection is
+  # lazy and passes a plain self-referential attrset through; the bounded walk above is
+  # what meets it. A total acyclicity predicate is still not constructible — deciding it
+  # needs the descent that never ends — and the walk does not decide it: it SEMI-decides
+  # bounded finiteness, and its bound falls back to always-dirty rather than refuse. A
+  # bound that refuses would be the ceiling invented to bound a cost; one that falls back
+  # changes cost only.
   project =
     v:
     if isDrv v then
@@ -94,12 +165,23 @@ let
       v;
 in
 {
-  inherit project;
+  inherit
+    project
+    classify
+    maxDepth
+    ;
 
-  # The walk runs over the PROJECTED value, never the raw one, and so does `hashOf`.
+  # `hashOf` runs over the PROJECTED value, and the walk reads the same image, so it certifies
+  # exactly the value `hashOf` is handed, a derivation's `drvPath` content included.
   # Projection preserves functions (they fall through unchanged), so the discrimination
   # the null rule rests on is untouched: a function beside a derivation still answers
-  # true. What changes is that the derivation no longer takes the evaluation down first.
+  # `null`. What changes is that the derivation no longer takes the evaluation down first.
+  #
+  # ★ THE CERTIFICATE IS SCOPED, and the scope is the enumerated exception (ADR-0025 item 1,
+  # README Limitations): the walk needs up to 2·D frames and runs to completion before a
+  # one-frame-per-level `hashOf` needs up to D, so a CALLER already deeper than `max-call-depth`
+  # − 2·D (4990 frames measured at the default, on all three evaluators) still meets the abort
+  # this walk removes everywhere else. A consumer `hashOf` that spends more per level narrows it.
   #
   # **`gen-resolve.classKey` RETIRED WITH NO SUCCESSOR CONSTRUCT, and its CEILING did not
   # retire with it.** `classKey` was a stable digest of a consumer-designated attribute's
@@ -130,10 +212,10 @@ in
     let
       projected = project value;
     in
-    if containsFunction projected then null else hashOf projected;
+    if unhashable projected then null else hashOf projected;
 
   # Null-safe hash comparison. A null hash means "unhashable / always-dirty"
-  # (lib/hash.nix containsFunction). Nix `null == null` is TRUE, so a naive
+  # (`hashGuarded`: a function, or a walk past its bound). Nix `null == null` is TRUE, so a naive
   # `nh != oh` with both null would read as unchanged ⇒ false-clean ⇒ unsound.
   # Route ALL hash comparisons through these so the guard cannot diverge.
   hashEq = nh: oh: nh != null && oh != null && nh == oh;
