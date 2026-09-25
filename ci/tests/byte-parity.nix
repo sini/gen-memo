@@ -27,11 +27,10 @@
 #   against a cold build of the same edited input.
 #
 #   THE DERIVATION BRANCH is armed twice, and the second arming is what the first one was waiting
-#   for. `hash.nix`'s `containsFunction` walks a value structurally with no cycle guard, and a Nix
-#   derivation IS self-referential — `drv.all`'s first element is the derivation itself (measured:
-#   `(builtins.elemAt drv.all 0) == drv` is true) — so a raw derivation handed to the hash guard
-#   used to descend forever and abort with a stack overflow that `builtins.tryEval` DOES NOT
-#   CONTAIN. No cell can pin an uncatchable abort; it takes the whole evaluation with it. The
+#   for. A Nix derivation IS self-referential — `drv.all`'s first element is the derivation itself
+#   (measured: `(builtins.elemAt drv.all 0) == drv` is true) — so a raw derivation handed to the
+#   hash guard's old unbounded walk used to descend forever and abort with a stack overflow that
+#   `builtins.tryEval` DOES NOT CONTAIN. No cell can pin an uncatchable abort; it takes the whole evaluation with it. The
 #   admission projection removes that class at every depth by recognising the derivation shape
 #   BEFORE descending, so both armings now exist:
 #
@@ -44,11 +43,11 @@
 #   projection, so the isolated arming and the end-to-end one cannot drift apart into a suite
 #   that arms a shape the plane never produces.
 #
-#   ⇒ The consequence, stated plainly rather than left to be inferred: the store's admissible
-#   values are function-free, and acyclic apart from derivations. The null-hash rule records the
-#   first partiality of Nix hashing; cyclicity is a second one, and it is not conservative the way
-#   the first is — it does not fall back to always-dirty, it aborts, which is why derivations are
-#   normalised at admission and the GENERAL cyclic class remains open.
+#   ⇒ The consequence, stated plainly rather than left to be inferred: a derivation is hashed on its
+#   tag, and any OTHER value whose walk does not end — a self-loop, a two-cycle, a generated value —
+#   falls back to always-dirty on the walk's bounds (`lib/hash.nix`; through the plane in
+#   `ci/tests/eager.nix`). The null-hash rule records the first partiality of Nix hashing; that
+#   fallback is how the second one joins it.
 {
   genMemo,
   graph,

@@ -5,6 +5,8 @@ let
     hashMoved
     hashGuarded
     project
+    classify
+    maxDepth
     ;
 
   # A literal system, never `builtins.currentSystem`: nothing here is built, and
@@ -22,6 +24,48 @@ let
     };
   drv = mkDrv "gen-memo-projection-fixture";
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
+
+  # Non-well-founded values: a self-loop, a branching loop, a two-cycle and an unboundedly
+  # generated value. Each is an ordinary, readable Nix value; none has a finite walk.
+  selfLoop =
+    let
+      x = {
+        s = x;
+        v = 1;
+      };
+    in
+    x;
+  branching =
+    let
+      x = {
+        a = x;
+        b = x;
+      };
+    in
+    x;
+  twoCycle =
+    let
+      a = {
+        s = b;
+      };
+      b = {
+        s = a;
+      };
+    in
+    a;
+  generated =
+    let
+      f = n: {
+        s = f (n + 1);
+        inherit n;
+      };
+    in
+    f 0;
+  # A well-founded chain nesting `n` attrsets inside the root: its containers sit at depths 0..n.
+  chain = n: builtins.foldl' (acc: _: { s = acc; }) { } (builtins.genList (x: x) n);
+  # `k` evaluator call frames open around `f`. Nix does not eliminate tail calls, so each level
+  # holds one frame (measured: the same caller-frame ceiling as a pending `0 +` at every level).
+  underFrames = k: f: if k == 0 then f null else underFrames (k - 1) f;
 in
 {
   flake.tests."hash" = {
@@ -183,22 +227,101 @@ in
       };
     };
 
-    # (2) The GENERAL cyclic class is NOT rescued, and it CANNOT BE PINNED HERE. A plain
-    # self-referential attrset aborts the projection the same way it aborts the walk, and
-    # that abort is uncatchable — `tryEval` does not contain a stack overflow — so a cell
-    # asserting it would end this suite rather than fail. What is assertable is that the
-    # witness is a live, ordinary, reachable value and not a contrived one: reads through
-    # it work to any finite depth. It is the projection that cannot decide it.
+    # (2) THE GENERAL NON-WELL-FOUNDED CLASS FALLS BACK TO ALWAYS-DIRTY (den-hoag-5ahw). Each of
+    # these ended the whole evaluation with `stack overflow; max-call-depth exceeded` before the
+    # walk was bounded, and `tryEval` did not contain it. They are now `null`, which the plane reads
+    # as always-dirty: a change of cost, never of answer.
+    test-self-loop-is-always-dirty = {
+      expr = {
+        hash = hashGuarded hashOf selfLoop;
+        caught = builtins.tryEval (hashGuarded hashOf selfLoop);
+        reason = classify selfLoop;
+      };
+      expected = {
+        hash = null;
+        caught = {
+          success = true;
+          value = null;
+        };
+        reason = "exhausted";
+      };
+    };
+    test-branching-loop-is-always-dirty = {
+      expr = hashGuarded hashOf branching;
+      expected = null;
+    };
+    test-two-cycle-is-always-dirty = {
+      expr = hashGuarded hashOf twoCycle;
+      expected = null;
+    };
+    test-generated-value-is-always-dirty = {
+      expr = hashGuarded hashOf generated;
+      expected = null;
+    };
+    # A deep WELL-FOUNDED value past the depth bound loses reuse and nothing else. At depth 5000
+    # the cell asserts only that the guard RETURNS — a hash or null — because which of the two is
+    # a property of D, not of this cell; at 50000, past every evaluator's ceiling, it is null.
+    test-deep-acyclic-returns = {
+      expr = {
+        d5000 =
+          let
+            r = builtins.tryEval (hashGuarded hashOf (chain 5000));
+          in
+          r.success && (r.value == null || builtins.isString r.value);
+        d50000 = hashGuarded hashOf (chain 50000);
+      };
+      expected = {
+        d5000 = true;
+        d50000 = null;
+      };
+    };
+    # The value is live, and only its walk is bounded: reads through it work to any finite depth.
     test-cyclic-residue-witness-is-live = {
-      expr =
-        let
-          a = {
-            me = a;
-            x = 1;
-          };
-        in
-        a.me.me.me.x;
+      expr = selfLoop.s.s.s.v;
       expected = 1;
+    };
+
+    # CONTROLS: an acyclic value under both bounds hashes to exactly the digest it had before the
+    # walk was bounded (the literals were read at gen-memo 3336b88 and are unchanged at 80dc2f0).
+    test-control-acyclic-hash-unchanged = {
+      expr = hashGuarded hashOf {
+        a = 1;
+        b = [
+          2
+          3
+          { c = "x"; }
+        ];
+      };
+      expected = "490a8b50fc8d89b1894ebbbfc75566c0d9aa4f3e4a8fcdbf84a6c54f83e321f7";
+    };
+    test-control-deep-acyclic-hash-unchanged = {
+      expr = hashGuarded hashOf (chain 3000);
+      expected = "b13977a3b7d5f7995a3a46756b4a8b1929150541b82ac6f154557c2ce5e47c11";
+    };
+
+    # THE DEPTH BOUND LEAVES THE CALLER HALF THE EVALUATOR'S BUDGET, and this is the certificate.
+    # Under 4500 open caller frames, the deepest value D admits (containers down to depth D - 1)
+    # is still hashed by the plane's own `hashOf`, and the value whose walk runs longest (the
+    # self-loop, exhausted on D) still returns. The next depth is refused, so the pair is
+    # two-sided. The measured ceiling is 4990 caller frames on upstream Nix, Determinate and Lix at
+    # the default `max-call-depth`; past it the abort this bound exists to prevent comes back.
+    test-depth-bound-leaves-caller-margin = {
+      expr = underFrames 4500 (_: {
+        deepestAdmitted = builtins.isString (hashGuarded hashOf (chain (maxDepth - 1)));
+        firstRefused = hashGuarded hashOf (chain maxDepth);
+        selfLoop = hashGuarded hashOf selfLoop;
+      });
+      expected = {
+        deepestAdmitted = true;
+        firstRefused = null;
+        selfLoop = null;
+      };
+    };
+    # THE WALK'S OWN CALL DEPTH DOES NOT GROW WITH B. A value that exhausts on B, a loop whose width
+    # doubles every level, is classified under 9000 open caller frames.
+    test-walk-call-depth-independent-of-size-bound = {
+      expr = underFrames 9000 (_: classify branching);
+      expected = "exhausted";
     };
 
     # ── R§10.1, RIDER 3 — THE RETIREMENT RECORD SURVIVES ──
