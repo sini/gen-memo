@@ -323,10 +323,15 @@ which it must be revisited; `ci/tests/accessor-modes.nix` pins both halves.
 ## Testing
 
 ```bash
-nix flake check ./ci                     # what CI runs
-nix-unit --flake ./ci#tests              # run everything
-nix-unit --flake ./ci#tests.byte-parity  # a single suite
+nix develop ./ci --command ci            # run everything, guarded
+nix develop ./ci --command ci byte-parity  # a single suite, guarded
+nix flake check ./ci                     # what CI runs; unguarded
+nix-unit --flake ./ci#tests              # run everything; unguarded
 ```
+
+`ci` refuses when anything under a declared read root is unknown to git — any extension or name,
+`_`-prefixed included — and the remedy is `git add` or a move. The unguarded forms read a
+git-filtered copy of the tree, so an untracked cell is silently absent and the run stays green.
 
 32 suites, 411 tests (`nix-unit --flake ./ci#tests` ⇒ `411/411 successful`, `46f9e7d`). Beyond the migrated content's own, two are the plane's oracles:
 
