@@ -60,7 +60,7 @@ it is not re-proposed.
 | [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base                                                                                                                   |
 | [gen-scope](https://github.com/sini/gen-scope)     | Demand-driven attribute grammar evaluator — **the sole evaluator**, which this plane decides over and never replaces                                 |
 | [gen-graph](https://github.com/sini/gen-graph)     | Accessor-based graph query combinators — supplies the reverse reachability the dependent cone is read from, and the one published SCC partition door |
-| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: search monad, records, intensional functions                                                                                       |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Pure Nix algebra: records, intensional functions                                                                                                     |
 | **gen-memo**                                       | **This lib** — the incremental plane (the reuse decision, defined by byte-parity against cold)                                                       |
 
 ## Design Principles
