@@ -513,7 +513,8 @@ a plane output must be byte-identical to a cold evaluation.
 - **The residue: an uncatchable bottom still aborts.** A missing attribute, a type error, `abort`
   or a stack overflow in the walk's prefix is outside what `tryEval` contains, so it takes the
   evaluation down where a cold read that never touches it succeeds — unchanged from before the
-  catch. No Nix construction contains it; it is the enumerated exception (ADR-0025 item 1).
+  catch. No Nix construction contains it; it is the one enumerated exception to the rule that every
+  operation returns a value or a named, catchable refusal.
 - **What the catch costs.**
   - Per hash, a constant independent of value size (operation census, `NIX_SHOW_STATS`, identical
     on upstream Nix, Determinate and Lix, A/A 0): +0 function calls, +1 primop call (the
@@ -521,8 +522,9 @@ a plane output must be byte-identical to a cold evaluation.
     0.9998–1.0004): +~2415 on upstream Nix, +~3400 on Determinate, +~1950 on Lix.
   - As a ratio that constant is largest where the hash is cheapest: a bare-int node hashes
     1.105–1.156× slower (Lix 1.105, upstream 1.144, Determinate 1.156), a small record 1.06–1.09×,
-    a config-shaped record 1.02×. That band is recorded as the acceptance figure (ADR-0032) and
-    read at the recurring gate.
+    a config-shaped record 1.02×. That band is a benchmark acceptance bound, not a production
+    constraint: it states what has been verified, and it is reviewed at the recurring performance
+    gate rather than enforced automatically.
   - Always-dirty is not the cold cost. The walk still pays to reach its verdict, in addition to
     the recompute, and a value the throw used to end early now pays for the whole walk and
     evaluates: a node holding `pkgs.perlPackages` walks +1.28 M thunks past the import floor per
