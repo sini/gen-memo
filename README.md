@@ -463,7 +463,8 @@ a plane output must be byte-identical to a cold evaluation.
   lands on the null rule:** "finite" is only semi-decidable, and the walk is its bounded run — past
   the depth bound below it ends `exhausted` and the value is always-dirty, a change of cost and never
   of answer (`ci/tests/hash.nix`, and `ci/tests/eager.nix` through the plane: cold parity, the null
-  hash, and every host behind a self-referential node recomputed where a plain one is cut).
+  hash, and every host behind a self-referential node recomputed where a plain one is cut). The
+  third partiality is a catchable bottom the walk reaches and no cold read does (below).
 - **The walk reads the image `hashOf` is handed.** It runs over `project value`, so a derivation's
   `drvPath` content is walked like any other position: a function there answers null, and a loop
   there meets the bound.
@@ -488,19 +489,45 @@ a plane output must be byte-identical to a cold evaluation.
     unbounded walk hashed such values only when its caller left room — at caller depth c, only
     below depth (10000 − c)/2 — so the loss is reuse and never an answer.
 - **The enumerated exception to the walk's totality.** The certificate is scoped to a caller at
-  most `max-call-depth` − 2·D frames deep (4990 measured, on all three evaluators). A caller deeper
+  most `max-call-depth` − 2·D frames deep (measured with the suite's `underFrames`, on all three
+  evaluators: 4990 open frames for the self-loop, 4992 for the deepest admitted chain, one below
+  the walk before it ran under `tryEval`). A caller deeper
   than that still meets the uncatchable abort on its deepest admitted values — as it did before,
   and at the same place. `ci/tests/hash.nix`'s `test-depth-bound-leaves-caller-margin` certifies
   4500 frames; a lowered `max-call-depth` setting shrinks the margin with it. The budget assumes a
   `hashOf` that spends one frame per level, as the plane's `toJSON` does: `hashOf` is supplied by
   the caller, and one that recurses deeper per level narrows the caller's half.
 - **The fallback is silent.** Nothing tells a consumer that its node went always-dirty on the
-  bound; the reason is internal to `lib/hash.nix` (`classify`, read by tests). Emitting it is owed
+  bound or on a throw; the reason is internal to `lib/hash.nix` (`classify`, read by tests). Emitting it is owed
   through a warned-outcome channel: the result carrying its own provenance.
-- **The walk forces what cold may never force.** A lazy `throw` inside a node value fails the guard
-  (catchably) where a cold read that never touches it succeeds. The walk visits depth-first in
-  attribute-name and list order and stops at the first function, so which such value throws depends
-  on that order; a throw only past depth D is never reached, and the value is always-dirty instead.
+- **A walk that throws is always-dirty.** The walk forces every position of the value up to the
+  first function (depth-first, in attribute-name and list order), which is strictly more than a
+  cold read that forces only what its consumer reads. A lazy `throw` or `assert` the walk reaches
+  and no consumer does is caught around the walk, and the value hashes to `null`: the plane
+  recomputes the node and answers what the cold evaluation answers. This is the ordinary case, not
+  an edge — nixpkgs signals "do not evaluate this" with lazy throws (the first attribute of `pkgs`
+  in name order, aliases, the unfree/broken/insecure meta checks), so a node value carrying `pkgs`,
+  a package set or an inadmissible package lands here (`ci/tests/hash.nix`, and
+  `ci/tests/eager.nix` through the plane). The catch is never around the caller's `hashOf`: a throw
+  from `hashOf` is the caller's own error and stays loud.
+- **The residue: an uncatchable bottom still aborts.** A missing attribute, a type error, `abort`
+  or a stack overflow in the walk's prefix is outside what `tryEval` contains, so it takes the
+  evaluation down where a cold read that never touches it succeeds — unchanged from before the
+  catch. No Nix construction contains it; it is the enumerated exception (ADR-0025 item 1).
+- **What the catch costs.**
+  - Per hash, a constant independent of value size (operation census, `NIX_SHOW_STATS`, identical
+    on upstream Nix, Determinate and Lix, A/A 0): +0 function calls, +1 primop call (the
+    `tryEval`), +2 thunks, +3 lookups. In user-space instructions (`perf stat`, 3 reps, A/A within
+    0.9998–1.0004): +~2415 on upstream Nix, +~3400 on Determinate, +~1950 on Lix.
+  - As a ratio that constant is largest where the hash is cheapest: a bare-int node hashes
+    1.105–1.156× slower (Lix 1.105, upstream 1.144, Determinate 1.156), a small record 1.06–1.09×,
+    a config-shaped record 1.02×. That band is recorded as the acceptance figure (ADR-0032) and
+    read at the recurring gate.
+  - Always-dirty is not the cold cost. The walk still pays to reach its verdict, in addition to
+    the recompute, and a value the throw used to end early now pays for the whole walk and
+    evaluates: a node holding `pkgs.perlPackages` walks +1.28 M thunks past the import floor per
+    first hash. That cost is the walk's own strictness, unchanged by the catch; what the catch
+    changes is that the value reaches it instead of failing.
 - **The projection is not injective, and cannot be.** Its codomain is a subset of its domain, so a
   value and its image can be distinct with the same image: an attrset written literally as
   `{ __drvPath = "…"; }` still compares equal to a projected derivation. The tag **narrows** the

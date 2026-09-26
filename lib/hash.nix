@@ -8,18 +8,30 @@
 # it is an operational Nix fact and not a theorem, and the disclaimer travels with
 # the rule wherever the rule goes.
 #
-# ★★ THERE IS A SECOND PARTIALITY: a value whose walk does not end. A self-loop, a
-# two-cycle or an unboundedly generated value is an ordinary readable Nix value with no
-# finite walk, and an unbounded walker meets the evaluator's call-depth ceiling on it —
-# an abort `tryEval` does not contain, where the cold evaluation it decides for has a
-# value. Two constructions meet it, both at the hash boundary, and `hashGuarded` is the
-# only application site of either, so the ten call sites that hand it a whole node value
-# are covered at one place:
-#   - a DERIVATION is the ordinary member of the class (a config value containing a
-#     package), and `project` below normalises it to a tag before anything descends;
-#   - EVERYTHING ELSE is met by a BOUNDED walk whose exhaustion lands on the null rule
-#     above — the same conservative side, so the plane keeps deciding and its answer is
-#     the cold one.
+# ★★ THERE ARE THREE PARTIALITIES, and all three land on that null rule. `hashGuarded` is the
+# only application site of the constructions below, so the ten call sites that hand it a whole
+# node value are covered at one place.
+#   1. FUNCTION-BEARING — the rule above.
+#   2. NON-WELL-FOUNDED — a value whose walk does not end. A self-loop, a two-cycle or an
+#      unboundedly generated value is an ordinary readable Nix value with no finite walk, and
+#      an unbounded walker meets the evaluator's call-depth ceiling on it — an abort `tryEval`
+#      does not contain, where the cold evaluation it decides for has a value. A DERIVATION is
+#      the ordinary member of the class (a config value containing a package), and `project`
+#      below normalises it to a tag before anything descends; EVERYTHING ELSE is met by a
+#      BOUNDED walk whose exhaustion lands on null.
+#   3. A CATCHABLE BOTTOM IN THE WALK'S PREFIX. A cold read forces only what its consumer
+#      reads; the walk forces every position up to the first function, so it is strictly
+#      stricter, and a lazy `throw` (or `assert`) no consumer reads fails the walk where the
+#      cold read returns. nixpkgs is the ordinary case: its first attribute in name order, its
+#      aliases and its meta checks (unfree, broken, insecure) are lazy throws. A walk that
+#      throws is caught and lands on null. The catch is around the WALK and never around
+#      `hashOf`: the walk forces a superset of what `hashOf` forces, so a throw out of
+#      `hashOf` is the caller's own and stays loud.
+#
+# THE RESIDUE, the enumerated exception (ADR-0025 item 1): a missing attribute, a type error,
+# `abort` and a stack overflow in the walk's prefix are UNCATCHABLE by any Nix construction,
+# so they still take the evaluation down where a cold read succeeds — unchanged from before
+# the catch existed.
 #
 # WHY A PROJECTION AND NOT A REFUSAL. A config value containing a package is the
 # ORDINARY shape, so a plane that refused derivation-valued nodes would refuse
@@ -100,14 +112,21 @@ let
     walkerAt 0;
   unhashable = walkerFrom true;
   exhausts = walkerFrom false;
+  # `exhausts` walks PAST functions, so it can reach a throw `unhashable` stopped short of. If
+  # `unhashable` returned true without throwing and `exhausts` throws, `unhashable` stopped at a
+  # function: a bound reached first is reached identically by `exhausts`, which then answers true.
   classify =
     v:
     let
       projected = project v;
+      r = builtins.tryEval (unhashable projected);
+      e = builtins.tryEval (exhausts projected);
     in
-    if !(unhashable projected) then
+    if !r.success then
+      "throws"
+    else if !r.value then
       "finite"
-    else if exhausts projected then
+    else if e.success && e.value then
       "exhausted"
     else
       "function";
@@ -177,11 +196,19 @@ in
   # the null rule rests on is untouched: a function beside a derivation still answers
   # `null`. What changes is that the derivation no longer takes the evaluation down first.
   #
+  # The walk runs under `tryEval`, so a walk that throws is null (the third partiality): the
+  # node is always-dirty and recomputed, and its answer is the cold one. That is not the cold
+  # COST: the walk still pays to reach its verdict, on top of the recompute, so a node carrying
+  # a package set that the throw used to end early now pays for the walk (a node holding
+  # `pkgs.perlPackages`: +1.28 M thunks over the import floor, per first hash).
+  #
   # ★ THE CERTIFICATE IS SCOPED, and the scope is the enumerated exception (ADR-0025 item 1,
   # README Limitations): the walk needs up to 2·D frames and runs to completion before a
   # one-frame-per-level `hashOf` needs up to D, so a CALLER already deeper than `max-call-depth`
-  # − 2·D (4990 frames measured at the default, on all three evaluators) still meets the abort
-  # this walk removes everywhere else. A consumer `hashOf` that spends more per level narrows it.
+  # − 2·D still meets the abort this walk removes everywhere else — 4990 open caller frames
+  # for the self-loop and 4992 for the deepest admitted chain, measured with the suite's
+  # `underFrames` at the default on all three evaluators, one frame below the unguarded walk
+  # (the `tryEval`). A consumer `hashOf` that spends more per level narrows it.
   #
   # **`gen-resolve.classKey` RETIRED WITH NO SUCCESSOR CONSTRUCT, and its CEILING did not
   # retire with it.** `classKey` was a stable digest of a consumer-designated attribute's
@@ -211,11 +238,12 @@ in
     hashOf: value:
     let
       projected = project value;
+      r = builtins.tryEval (unhashable projected);
     in
-    if unhashable projected then null else hashOf projected;
+    if !r.success || r.value then null else hashOf projected;
 
   # Null-safe hash comparison. A null hash means "unhashable / always-dirty"
-  # (`hashGuarded`: a function, or a walk past its bound). Nix `null == null` is TRUE, so a naive
+  # (`hashGuarded`: a function, a walk past its bound, or a walk that throws). Nix `null == null` is TRUE, so a naive
   # `nh != oh` with both null would read as unchanged ⇒ false-clean ⇒ unsound.
   # Route ALL hash comparisons through these so the guard cannot diverge.
   hashEq = nh: oh: nh != null && oh != null && nh == oh;

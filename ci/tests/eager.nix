@@ -575,6 +575,15 @@ let
         h: !(builtins.tryEval (builtins.deepSeq warm.store.${h}.w true)).success
       ) hostsBehindCap
     );
+  lazyThrowNode = w: {
+    inherit w;
+    broken = throw "gen-memo test: a lazy throw no cold read forces";
+  };
+  observeW = st: [
+    st.a.w
+    st.c.w
+  ];
+  caught = e: builtins.tryEval (builtins.deepSeq e e);
 in
 {
   flake.tests.eager = {
@@ -822,6 +831,50 @@ in
       };
       expected = {
         selfRef = 10;
+        plain = 0;
+      };
+    };
+    test-lazy-throw-values-plane-eq-cold = {
+      expr = {
+        plane = caught (observeW (selfRefEager lazyThrowNode).store);
+        parity =
+          (caught (observeW (selfRefEager lazyThrowNode).store)).value
+          == observeW (oracle (selfRefFx lazyThrowNode) selfRefChanges);
+      };
+      expected = {
+        plane = {
+          success = true;
+          value = [
+            211
+            200
+          ];
+        };
+        parity = true;
+      };
+    };
+    test-lazy-throw-values-hash-null = {
+      expr = {
+        lazyThrow = caught (selfRefEager lazyThrowNode).trace.c.hash;
+        plain = builtins.isString (selfRefEager plainNode).trace.c.hash;
+      };
+      expected = {
+        lazyThrow = {
+          success = true;
+          value = null;
+        };
+        plain = true;
+      };
+    };
+    # A FALSE-CLEAN GUARD, NOT A RED DISCRIMINATOR: `hostsRecomputed` counts a host whose read
+    # throws as recomputed, so a guard that throws passes this cell too. A constant digest on a
+    # caught throw reds it (the stale weight reads as reused).
+    test-lazy-throw-value-is-always-dirty = {
+      expr = {
+        lazyThrow = hostsRecomputed lazyThrowNode;
+        plain = hostsRecomputed plainNode;
+      };
+      expected = {
+        lazyThrow = 10;
         plain = 0;
       };
     };

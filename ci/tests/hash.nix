@@ -23,6 +23,10 @@ let
       ];
     };
   drv = mkDrv "gen-memo-projection-fixture";
+  lazyThrow = {
+    a = throw "gen-memo test: lazy";
+    b = 1;
+  };
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
   # Non-well-founded values: a self-loop, a branching loop, a two-cycle and an unboundedly
@@ -281,6 +285,39 @@ in
       expected = 1;
     };
 
+    test-lazy-throw-is-always-dirty = {
+      expr = {
+        caught = builtins.tryEval (hashGuarded hashOf lazyThrow);
+        cold = lazyThrow.b;
+      };
+      expected = {
+        caught = {
+          success = true;
+          value = null;
+        };
+        cold = 1;
+      };
+    };
+    # `exhausts` walks past functions, so it can reach a throw `unhashable` never reaches: the
+    # function-first member is the case where only the second walk throws.
+    test-classify-names-a-throwing-walk = {
+      expr = {
+        throwFirst = classify lazyThrow;
+        fnFirst = classify {
+          a = x: x;
+          b = throw "gen-memo test: after a function";
+        };
+      };
+      expected = {
+        throwFirst = "throws";
+        fnFirst = "function";
+      };
+    };
+    test-caller-hashof-throw-stays-loud = {
+      expr =
+        (builtins.tryEval (hashGuarded (_: throw "gen-memo test: caller hashOf") { w = 1; })).success;
+      expected = false;
+    };
     # CONTROLS: an acyclic value under the bound hashes to exactly the digest it had before the
     # walk was bounded (the literals were read at gen-memo 3336b88 and are unchanged at 80dc2f0).
     test-control-acyclic-hash-unchanged = {
@@ -303,8 +340,9 @@ in
     # Under 4500 open caller frames, the deepest value D admits (containers down to depth D - 1)
     # is still hashed by the plane's own `hashOf`, and the value whose walk runs longest (the
     # self-loop, exhausted on D) still returns. The next depth is refused, so the pair is
-    # two-sided. The measured ceiling is 4990 caller frames on upstream Nix, Determinate and Lix at
-    # the default `max-call-depth`; past it the abort this bound exists to prevent comes back.
+    # two-sided. The measured ceiling is 4990 `underFrames` levels for the self-loop (4992 for the
+    # deepest admitted chain) on upstream Nix, Determinate and Lix at the default `max-call-depth`;
+    # past it the abort this bound exists to prevent comes back.
     test-depth-bound-leaves-caller-margin = {
       expr = underFrames 4500 (_: {
         deepestAdmitted = builtins.isString (hashGuarded hashOf (chain (maxDepth - 1)));
