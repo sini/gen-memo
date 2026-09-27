@@ -77,16 +77,11 @@ in
       # to hash it, the engine alone calls `recompute`, and reuse here is the ABSENCE of
       # that call. The self-reference resolves for the same reason it always did — the
       # hash of a node is demanded only after that node's value is.
-      mustEval =
-        id:
-        (changedSet ? ${id})
-        || prelude.any (
-          cid:
-          needsEval {
-            inherit (ctx) trace;
-            inherit coneSet newHashOf accessor';
-          } cid id
-        ) changedIds;
+      needsEval' = needsEval {
+        inherit (ctx) trace;
+        inherit coneSet newHashOf accessor';
+      };
+      mustEval = id: (changedSet ? ${id}) || prelude.any (cid: needsEval' cid id) changedIds;
 
       builtStore =
         ctx.store

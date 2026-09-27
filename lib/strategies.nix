@@ -16,16 +16,19 @@ let
 in
 {
   verify =
-    ctx: args: id:
+    ctx: args:
     let
       checked = prelude.checkRequired "gen-memo.verify" [ "accessor'" "spliced" ] args;
       inherit (checked) accessor' spliced;
+    in
+    assert builtins.isAttrs checked;
+    id:
+    let
       depsMatch = ctx.trace.${id}.deps == accessor'.dependencies id;
       allDepsClean = builtins.all (
         d: hashEq (hashGuarded ctx.hashOf spliced.${d}) (ctx.trace.${d}.hash or null)
       ) (accessor'.dependencies id);
     in
-    assert builtins.isAttrs checked;
     if depsMatch && allDepsClean then
       {
         reuse = true;

@@ -162,14 +162,12 @@ rec {
         # unsound early-cutoff (RTD §5.3 only licenses reuse for nodes whose inputs are
         # ALL unchanged). The dependents (non-seed cone nodes) still ride the hash-moved
         # gate, seeded at the head — they recompute iff a cone dep's hash moved.
-        mustEval =
-          id:
-          (seedSet ? ${id})
-          || needsEval {
-            inherit trace;
-            coneSet = unionSet;
-            inherit newHashOf accessor';
-          } (prelude.head seeds) id;
+        needsEval' = needsEval {
+          inherit trace;
+          coneSet = unionSet;
+          inherit newHashOf accessor';
+        } (prelude.head seeds);
+        mustEval = id: (seedSet ? ${id}) || needsEval' id;
 
         builtStore =
           ctx.store

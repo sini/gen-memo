@@ -122,7 +122,7 @@ in
       "accessor'" = acc;
       spliced = ctx.store;
     };
-    call = args: genMemo.verify ctx args "c";
+    call = args: genMemo.verify ctx args;
   };
 
   # The first record: `{ hashOf }`.
