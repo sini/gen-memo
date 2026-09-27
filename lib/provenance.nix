@@ -170,13 +170,20 @@ let
   # BOUNDED out-degree — and carries NO paths key when `cutoffs == {}`;
   # paths/cutNodes are materialized only under a non-empty cutoff overlay (or
   # explain mode).
+  #
+  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
   why =
-    ctx:
-    {
-      id,
-      changedId,
-      cutoffs ? { },
-    }:
+    ctx: args:
+    let
+      checked = prelude.checkOptions "gen-memo.why" [
+        "id"
+        "changedId"
+        "cutoffs"
+      ] (prelude.checkRequired "gen-memo.why" [ "id" "changedId" ] args);
+      inherit (checked) id changedId;
+      cutoffs = checked.cutoffs or { };
+    in
+    assert builtins.isAttrs checked;
     # l∈C : `id` is in changedId's recompute cone iff it can reach changedId over
     # forward edges (or IS changedId — the change origin, always recomputed). No
     # transpose: canReach already walks consumer→producer.
@@ -209,16 +216,21 @@ let
   # verdict still enumerates paths per id through `graph.pathsBetween` (exponential
   # worst case), identically to `why`: the cone decides who is in the cone, never
   # which paths are cut. No claim is made here about the overlay path's cost.
+  #
+  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
   whyFor =
-    ctx:
-    {
-      changedId,
-      cutoffs ? { },
-    }:
+    ctx: args:
     let
+      checked = prelude.checkOptions "gen-memo.whyFor" [
+        "changedId"
+        "cutoffs"
+      ] (prelude.checkRequired "gen-memo.whyFor" [ "changedId" ] args);
+      inherit (checked) changedId;
+      cutoffs = checked.cutoffs or { };
       # Bound HERE — once per (ctx, changedId), whatever the caller spends it on.
       cone = prelude.genAttrs (dirtySet ctx [ changedId ]) (_: true);
     in
+    assert builtins.isAttrs checked;
     _verdict ctx { inherit changedId cutoffs; } (i: cone ? ${i});
 
   # whyNot : the negative operator query — why `id` was NOT recomputed.

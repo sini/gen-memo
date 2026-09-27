@@ -130,15 +130,21 @@ let
   # declarations, in the evaluator's own vocabulary. It is a message ingredient and nothing else, so
   # it is defaulted and read ONLY inside the throw: on the admitting path it is never forced, which
   # matters because enumerating it is O(declared-locs) spine work at the evaluator.
+  #
+  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
   identitiesHeld =
-    {
-      priorIdentities,
-      nextIdentities,
-      remerged ? [ ],
-    }:
+    args:
     let
+      checked = prelude.checkOptions "gen-memo.identitiesHeld" [
+        "priorIdentities"
+        "nextIdentities"
+        "remerged"
+      ] (prelude.checkRequired "gen-memo.identitiesHeld" [ "priorIdentities" "nextIdentities" ] args);
+      inherit (checked) priorIdentities nextIdentities;
+      remerged = checked.remerged or [ ];
       moved = movedIdentities priorIdentities nextIdentities;
     in
+    assert builtins.isAttrs checked;
     if moved == [ ] then
       moved
     else
@@ -149,8 +155,14 @@ let
       in
       throw "gen-memo.identitiesHeld: minted identity moved on a warm re-compose at '${p}' (kind '${kindOf from}', was '${from}', now '${to}', re-merged declarations: ${builtins.concatStringsSep ", " remerged}, ${toString (builtins.length moved)} instance(s) moved)";
 
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   warmDecision =
-    { accessor, prior }:
+    args:
+    let
+      checked = prelude.checkRequired "gen-memo.warmDecision" [ "accessor" "prior" ] args;
+      inherit (checked) accessor prior;
+    in
+    assert builtins.isAttrs checked;
     seeds:
     let
       # Set rather than list: membership is asked once per node per attribute.
@@ -248,9 +260,14 @@ in
 {
   inherit warmDecision;
 
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   warmOverride =
-    engine: ctx:
-    { id, newDecls }:
+    engine: ctx: args:
+    let
+      checked = prelude.checkRequired "gen-memo.warmOverride" [ "id" "newDecls" ] args;
+      inherit (checked) id newDecls;
+    in
+    assert builtins.isAttrs checked;
     assert
       !(changesTopology newDecls)
       || throw "gen-memo.warmOverride: edge-move on '${id}' — this fold decides reuse from a cone read over the current topology and cannot serve an edit that reshapes it; topology change is applyEdgeDelta's.";
@@ -260,9 +277,15 @@ in
   # unions the cones, so this is a guard-and-delegate wrapper and not a second fold. It takes the
   # edits themselves rather than a list of changed ids: a pure batch has to carry the data-change
   # payload, and a bare id list cannot.
+  #
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   warmResolve =
-    engine: ctx:
-    { edits }:
+    engine: ctx: args:
+    let
+      checked = prelude.checkRequired "gen-memo.warmResolve" [ "edits" ] args;
+      inherit (checked) edits;
+    in
+    assert builtins.isAttrs checked;
     assert
       builtins.all (id: !(changesTopology edits.${id})) (builtins.attrNames edits)
       || throw "gen-memo.warmResolve: edge-move in batch — this fold decides reuse from a cone read over the current topology and cannot serve an edit that reshapes it; topology change is applyEdgeDelta's.";

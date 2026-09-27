@@ -26,13 +26,67 @@
 # `Invalid range in '{}' in regular expression`, which reads as a broken subject rather than a broken
 # expectation.
 {
+  lib,
   genMemo,
+  genScope,
   engine,
   fx,
   ...
 }:
 let
   runScc = genMemo.runScc engine.ascend;
+
+  # ── THE DOOR-CHECK BYTES (den-hoag-7gp66 P1) ──
+  # `ci/tests/door-checks.nix` pins that each door's violations are CATCHABLE; a boolean cannot see
+  # WHICH refusal fired, so WHICH — and that it names the door (R6) — is pinned here, anchored at
+  # both ends, per row of `ci/doors.nix`. `[.]`, `[(]` and `[)]` neutralise the metacharacters, as
+  # in gen-prelude's own goldens. A RECORD door has no unknown-option golden: an extra field is R5's
+  # admitted case, and there is no message for a call that answers.
+  doors = import ./doors.nix {
+    inherit
+      lib
+      genMemo
+      genScope
+      engine
+      fx
+      ;
+  };
+  quoted = names: lib.concatMapStringsSep ", " (n: "'${n}'") names;
+  doorGoldens =
+    key: row:
+    let
+      k = lib.toLower key;
+      name = "gen-memo[.]${row.door or key}";
+      missing = builtins.head row.required;
+      req = "[(]required: ${quoted row.required}[)] [(]in prelude[.]checkRequired[)]";
+    in
+    {
+      "test-${k}-missing-required-field-message" = {
+        expr = row.call (builtins.removeAttrs row.valid [ missing ]);
+        expectedError = {
+          type = "ThrownError";
+          msg = "^${name}: required field '${missing}' is missing ${req}$";
+        };
+      };
+      "test-${k}-non-attrset-argument-message" = {
+        expr = row.call 1;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^${name}: the argument must be an attrset, not a int ${req}$";
+        };
+      };
+    }
+    // lib.optionalAttrs (row.options != [ ]) {
+      "test-${k}-unknown-option-message" = {
+        expr = row.call (row.valid // { unknownField = 1; });
+        expectedError = {
+          type = "ThrownError";
+          msg = "^${name}: 'unknownField' is not an option of this door; the options are closed [(]accepted: ${
+            quoted (row.required ++ row.options)
+          }[)] [(]in prelude[.]checkOptions[)]$";
+        };
+      };
+    };
 
   # Fixture 3 of `ci/tests/restabilize.nix`, reproduced here because that file's `let` exports
   # nothing: a 1-member self-loop whose recompute strictly increments under an overwrite join, so it
@@ -170,6 +224,8 @@ let
 in
 {
   config = {
+    flake.testsError.door-checks = lib.concatMapAttrs doorGoldens doors;
+
     # ── `runScc`'s THREE REFUSALS, AT BLAME-SET GRANULARITY ──
     # Anchored at both ends, so a message that merely CONTAINS the expected text does not pass, and
     # written out in full rather than summarised: the blame set is the content, and a cell asserting

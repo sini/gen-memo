@@ -39,13 +39,25 @@ let
   # serve both accessor contracts — the caller-built relation, total over probed ids,
   # and the substrate-contracted one, fail-closed off its node set. The two domains
   # and why they cannot meet are stated once, at `graph-view.nix`.
+  #
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   mkAccessor =
-    {
-      dependencies,
-      nodes,
-      nodeData,
-      parent,
-    }:
+    args:
+    let
+      checked = prelude.checkRequired "gen-memo.mkAccessor" [
+        "dependencies"
+        "nodes"
+        "nodeData"
+        "parent"
+      ] args;
+      inherit (checked)
+        dependencies
+        nodes
+        nodeData
+        parent
+        ;
+    in
+    assert builtins.isAttrs checked;
     {
       inherit nodes nodeData parent;
       dependencies = id: prelude.unique (dependencies id);

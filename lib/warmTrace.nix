@@ -20,7 +20,7 @@
 # exists to prevent — so what is observed crosses as the observed party said it. These are not
 # this substrate's words for anything; they are data, and a translation over them would be a
 # second answer to a question that has one.
-{ ... }:
+{ prelude, ... }:
 {
   # WARM ADMISSION, SYNTACTIC OVER ARGUMENT KEYS. An edit is admissible for a warm pass exactly
   # when its key set is precisely `reuseKey` — the one argument whose change the evaluator's warm
@@ -73,8 +73,15 @@
   # from, two of the five enumerate the whole declared-loc partition when read, so an observation
   # that forced them would charge every consumer of the trace for a partition most of them never
   # look at.
+  #
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   warmTrace =
-    { edited, decision }:
+    args:
+    let
+      checked = prelude.checkRequired "gen-memo.warmTrace" [ "edited" "decision" ] args;
+      inherit (checked) edited decision;
+    in
+    assert builtins.isAttrs checked;
     if edited then
       {
         trace = {

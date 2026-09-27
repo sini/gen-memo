@@ -38,14 +38,16 @@
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
-  inherit (import ./strategies.nix { }) needsEval;
+  inherit (import ./strategies.nix { inherit prelude; }) needsEval;
   inherit (import ./graph-view.nix { }) graphView;
 in
 {
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   affectedSet =
-    engine: ctx:
-    { accessor', changedIds }:
+    engine: ctx: args:
     let
+      checked = prelude.checkRequired "gen-memo.affectedSet" [ "accessor'" "changedIds" ] args;
+      inherit (checked) accessor' changedIds;
       # Over-approx cone of all changed ids (edges fixed ⇒ cone is stable). O(1)
       # membership via genAttrs — never builtins.elem.
       cone = prelude.unique (
@@ -101,6 +103,7 @@ in
       reused = builtins.filter (id: !(builtins.elem id affected)) cone;
       hashes = prelude.genAttrs cone newHashOf;
     in
+    assert builtins.isAttrs checked;
     if cyclicInCone != [ ] then
       throw "gen-memo.affectedSet: cyclic node(s) reachable from this change's cone: ${builtins.toJSON cyclicInCone} — this decision has no fixpoint solver (the acyclic-only counterpart to restabilize.nix); use restabilize for a ctx carrying a declared fixpoint."
     else

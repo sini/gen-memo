@@ -384,7 +384,7 @@ in
 
     # THE RESIDUAL CONTENT BOUND. This cell is kept for a residue the pair below cannot reach, not
     # because non-emptiness is evidence: the live-content list is a PROPER subset of the manifest by
-    # construction, so `lib/affected.nix`, `lib/hash.nix` and `lib/strategies.nix` — the three files
+    # construction, so `lib/affected.nix`, `lib/graph-view.nix` and `lib/hash.nix` — the three files
     # that name no prelude — sit outside it. Emptying one of those three files' `code` ALONE leaves
     # the manifest green (the names are unchanged) and the live-content cell green (that label was
     # never in its list), and this is the only cell that reds it. Measured: `lib/hash.nix` code →
@@ -458,13 +458,13 @@ in
     # carrying one swells it to all seventeen. A list asserted at FULL coverage would be satisfied by
     # the second and would not discriminate it.
     #
-    # `lib/affected.nix`, `lib/graph-view.nix`, `lib/hash.nix`, `lib/strategies.nix` and
-    # `lib/warmTrace.nix` are outside the list by construction, not by accident: `affected.nix`
-    # takes `{ graph, ... }`, `graph-view.nix` takes `{ }` and is one record update, `hash.nix`
-    # takes `{ ... }` and reaches for `builtins.*` directly, `strategies.nix` takes `{ ... }` and
-    # imports `./hash.nix`, and `warmTrace.nix` takes `{ ... }` and is two functions over data with
-    # no traversal to fold. None names a prelude because none uses one. What bounds that residue is
-    # `test-scan-reads-non-empty-sources` above: emptying one of those five files' `code` alone
+    # `lib/affected.nix`, `lib/graph-view.nix` and `lib/hash.nix` are outside the list by
+    # construction, not by accident: `affected.nix` takes `{ graph, ... }`, `graph-view.nix` takes
+    # `{ }` and is one record update, and `hash.nix` takes `{ ... }` and reaches for `builtins.*`
+    # directly. None names a prelude because none uses one. (`strategies.nix` and `warmTrace.nix`
+    # joined the list when their closed doors took prelude's `checkRequired`, den-hoag-7gp66 P1.)
+    # What bounds that residue is
+    # `test-scan-reads-non-empty-sources` above: emptying one of those three files' `code` alone
     # leaves this cell green — the label was never in the list — and the floor is the only cell
     # that reds it.
     test-scan-reads-are-live = {
@@ -479,8 +479,10 @@ in
         "lib/merge.nix"
         "lib/provenance.nix"
         "lib/restabilize.nix"
+        "lib/strategies.nix"
         "lib/structural.nix"
         "lib/warm.nix"
+        "lib/warmTrace.nix"
         "flake.nix"
         "default.nix"
       ];

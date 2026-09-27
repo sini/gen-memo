@@ -62,15 +62,18 @@ let
   inherit (import ./restabilize.nix { inherit prelude graph; }) runScc;
   inherit (import ./graph-view.nix { }) graphView;
 
+  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
   build =
-    engine:
-    {
-      accessor,
-      recompute,
-      hashOf,
-      fixpoint ? null,
-    }:
+    engine: args:
     let
+      checked = prelude.checkOptions "gen-memo.build" [
+        "accessor"
+        "recompute"
+        "hashOf"
+        "fixpoint"
+      ] (prelude.checkRequired "gen-memo.build" [ "accessor" "recompute" "hashOf" ] args);
+      inherit (checked) accessor recompute hashOf;
+      fixpoint = checked.fixpoint or null;
       # Authoritative cyclic id-set (sorted) — graph.cycles (gen-graph/lib/global.nix).
       cyclic = graph.cycles (graphView accessor);
 
@@ -214,6 +217,7 @@ let
               ;
           };
     in
+    assert builtins.isAttrs checked;
     if fixpoint == null then acyclic else stratified;
 in
 {

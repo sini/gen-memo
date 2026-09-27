@@ -75,17 +75,27 @@ let
   # It is CURRIED rather than taken as a module argument, and the reason is scope: `build.nix` binds
   # this function in a top-level `let`, outside the `engine:` lambda, so `engine.ascend` is not
   # visible where the binding is made. Both call sites sit inside that lambda and apply it there.
+  #
+  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
   runScc =
-    ascend:
-    {
-      accessor,
-      store,
-      recompute,
-      scc,
-      higherStrata,
-      lattices,
-    }:
+    ascend: args:
     let
+      checked = prelude.checkRequired "gen-memo.runScc" [
+        "accessor"
+        "store"
+        "recompute"
+        "scc"
+        "higherStrata"
+        "lattices"
+      ] args;
+      inherit (checked)
+        accessor
+        store
+        recompute
+        scc
+        higherStrata
+        lattices
+        ;
       M = scc;
       # Quiescence is structural `==` for every member — the retired `eq` term's only surviving
       # value (den-hoag-m6y9p / den-hoag-k2p6 OQ-1).
@@ -187,6 +197,7 @@ let
           });
         };
     in
+    assert builtins.isAttrs checked;
     # Refused-by-name blames are tryEval-CATCHABLE thrown blames, never Nix infinite recursion.
     if undeclaredLattice != [ ] then
       throw "gen-memo: cyclic member declares no lattice: ${builtins.toJSON undeclaredLatticeBlame}"

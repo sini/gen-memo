@@ -45,7 +45,7 @@
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded hashMoved;
-  inherit (import ./strategies.nix { }) needsEval;
+  inherit (import ./strategies.nix { inherit prelude; }) needsEval;
   inherit (import ./graph-view.nix { }) graphView;
 in
 rec {
