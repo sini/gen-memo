@@ -99,7 +99,7 @@ let
             {
               why = "cycle";
               cycle = cyclic;
-              path = graph.pathsBetween (graphView accessor) a b;
+              path = graph.pathsBetween { } (graphView accessor) a b;
             };
 
           # The flat relocatable store (this library's own property, see the header).

@@ -100,7 +100,7 @@ let
           let
             o = builtins.head offenders;
           in
-          graph.pathsBetween (graphView accessor') o o;
+          graph.pathsBetween { } (graphView accessor') o o;
       };
     in
     if offenders == [ ] then

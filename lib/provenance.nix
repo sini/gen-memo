@@ -125,7 +125,7 @@ let
       # the change origin). interior p = prelude.init (prelude.tail p): tail drops `id`, init
       # drops `changedId` — a direct edge [id, changedId] has interior [].
       let
-        paths = graph.pathsBetween (graphView ctx.accessor) id changedId;
+        paths = graph.pathsBetween { } (graphView ctx.accessor) id changedId;
         # THE ORIGIN'S SELF-PATH IS THE SINGLETON, AND ITS INTERIOR IS EMPTY BY THE
         # DEFINITION ABOVE, not by a carve-out: `pathsBetween x x` is [ x ], whose endpoints
         # coincide, so no node lies strictly between them. `tail` leaves [ ] and `init [ ]`

@@ -98,9 +98,7 @@ let
   contractedFor =
     scope: rel:
     graph.mkDeclaredEdges (
-      builtins.mapAttrs (
-        _: ids: map (graph.mkNodeRef { isRegistered = id: scope.nodes ? ${id}; }) ids
-      ) rel
+      builtins.mapAttrs (_: ids: map (graph.mkNodeRef (id: scope.nodes ? ${id})) ids) rel
     );
 
   sealed =
