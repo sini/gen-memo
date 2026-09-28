@@ -222,9 +222,11 @@ let
       prior = ctx.eval.facade;
       decision = warmDecision accessor' prior ids;
 
-      eval' = engine.evalWarm {
+      # `evalWarm { parseParent; } { scope; attributes; prior; decision; }` (gen-scope P2, R7): the
+      # one option first, then the four operands as one record.
+      eval' = engine.evalWarm { inherit (ctx) parseParent; } {
         scope = scope';
-        inherit (ctx) attributes parseParent;
+        inherit (ctx) attributes;
         inherit prior decision;
       };
 

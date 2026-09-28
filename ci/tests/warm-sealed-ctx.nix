@@ -31,7 +31,7 @@
 let
   inherit (genMemo) warmOverride;
 
-  hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
+  hostKinds = genScope.mkKinds [ (genScope.mkKind { } "host") ];
 
   # `consumer` reads `producer` across a declared edge, so the cone has somewhere to reach and the
   # parity claim below is not a claim about one isolated node.
@@ -106,7 +106,7 @@ let
     let
       scope = mkScope v;
     in
-    genScope.foldEquations {
+    genScope.foldEquations { } {
       inherit scope schedule;
       declaredDependencies = contractedFor scope { consumer = [ "producer" ]; };
       parseParent = _: null;

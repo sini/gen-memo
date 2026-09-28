@@ -24,13 +24,16 @@ let
 
   # The vocabulary these nodes' kinds are names in. A kind is a name in a REGISTERED vocabulary
   # rather than a free string, so the fixture registers the one kind it declares.
-  hostKinds = genScope.mkKinds [ (genScope.mkKind { name = "host"; }) ];
+  hostKinds = genScope.mkKinds [ (genScope.mkKind { } "host") ];
 
   mkScope =
     v:
     genScope.buildRoots {
       kinds = hostKinds;
-      importGraph = genScope.edge "consumer" "producer";
+      importGraph = genScope.edge {
+        from = "consumer";
+        to = "producer";
+      };
       decls = {
         producer.v = v;
         consumer = { };
@@ -57,7 +60,9 @@ let
     { scope, declaredDependencies }:
     let
       parseParent = _: null;
-      eval = genScope.eval { inherit scope attributes parseParent; };
+      eval = genScope.eval {
+        inherit parseParent;
+      } attributes scope;
     in
     {
       inherit
