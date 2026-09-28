@@ -8,7 +8,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   affectedSet = genMemo.affectedSet engine;
   inherit (genMemo) dirtySet;
@@ -19,12 +19,12 @@ let
     seed:
     let
       c = mkCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
       overridden = override ctx c.changedId c.newDecls;
-      oracle = build {
+      oracle = build { } {
         accessor = c.acc';
         inherit (c) recompute hashOf;
       };
@@ -39,16 +39,12 @@ let
     seed:
     let
       c = mkCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
       cone = dirtySet ctx [ c.changedId ];
-      aff =
-        (affectedSet ctx {
-          accessor' = c.acc';
-          changedIds = [ c.changedId ];
-        }).affected;
+      aff = (affectedSet ctx c.acc' [ c.changedId ]).affected;
     in
     builtins.all (id: builtins.elem id cone) aff;
   affectedSupersetSeeds = builtins.filter (seed: !(affectedSubsetCone seed)) seeds;
@@ -73,7 +69,7 @@ let
       };
     };
   };
-  collisionCtx = build {
+  collisionCtx = build { } {
     accessor = collisionAcc;
     recompute = absRecompute;
     hashOf = absHashOf;
@@ -81,12 +77,12 @@ let
   # ctx.store.l = |30 - 50| = 20. Override to weight 70 ⇒ |70 - 50| = 20 (collision).
   ovCollision = override collisionCtx "l" { weight = 70; };
   collisionAffected =
-    (affectedSet collisionCtx {
-      accessor' = collisionAcc // {
+    (affectedSet collisionCtx (
+      collisionAcc
+      // {
         nodeData = id: if id == "l" then { weight = 70; } else collisionAcc.nodeData id;
-      };
-      changedIds = [ "l" ];
-    }).affected;
+      }
+    ) [ "l" ]).affected;
 
   # --- needsEval-skip via a POISON recompute on a REUSED-but-in-cone node ---
   # collision chain: a -> b -> c, abs(weight) recompute. Override c to a colliding
@@ -120,7 +116,7 @@ let
   };
   # recompute reads NO deps (pure abs of own weight) so c's revalue can't move b/a's
   # input — b/a stay clean and the gate must reuse them.
-  collisionChainCtx = build {
+  collisionChainCtx = build { } {
     accessor = collisionChainAcc;
     recompute = absRecompute;
     hashOf = absHashOf;
@@ -142,7 +138,7 @@ let
   poisonChainIsReal =
     !(builtins.tryEval (
       builtins.deepSeq
-        (build {
+        (build { } {
           accessor = collisionChainAcc;
           recompute = poisonUpper;
           hashOf = absHashOf;
@@ -183,7 +179,7 @@ let
       };
     };
   };
-  pinCtx = build {
+  pinCtx = build { } {
     accessor = pinAcc;
     recompute = pinRecompute;
     hashOf = pinHashOf;
@@ -200,7 +196,7 @@ let
 
   # chained: c:=200 then c:=300, vs a from-scratch build with c=300.
   ovCC = override ovC "c" { weight = 300; };
-  oracle300 = build {
+  oracle300 = build { } {
     accessor = pinAcc // {
       nodeData = id: if id == "c" then { weight = 300; } else pinAcc.nodeData id;
     };
@@ -235,7 +231,7 @@ let
       };
     };
   };
-  fanCtx = build {
+  fanCtx = build { } {
     accessor = fanAcc;
     recompute = pinRecompute;
     hashOf = pinHashOf;
@@ -247,7 +243,7 @@ let
   soundOn =
     accessor: changedId: newDecls:
     let
-      c = build {
+      c = build { } {
         inherit accessor;
         recompute = pinRecompute;
         hashOf = pinHashOf;
@@ -256,7 +252,7 @@ let
       acc' = accessor // {
         nodeData = id: if id == changedId then newDecls else accessor.nodeData id;
       };
-      oracle = build {
+      oracle = build { } {
         accessor = acc';
         recompute = pinRecompute;
         hashOf = pinHashOf;
@@ -305,7 +301,7 @@ let
       };
     };
   };
-  wideDiamondCtx = build {
+  wideDiamondCtx = build { } {
     accessor = wideDiamond;
     recompute = pinRecompute;
     hashOf = pinHashOf;

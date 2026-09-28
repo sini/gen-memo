@@ -17,7 +17,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   inherit (genMemo)
     support
     why
@@ -31,7 +31,7 @@ let
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   mkCtx =
     accessor:
-    build {
+    build { } {
       inherit accessor;
       recompute =
         _a: _s: id:
@@ -60,7 +60,7 @@ let
       g = { };
     };
   };
-  lambdaCtx = build {
+  lambdaCtx = build { } {
     accessor = lambdaAcc;
     recompute =
       _a: _s: id:
@@ -75,7 +75,7 @@ let
     seed:
     let
       c = mkCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
@@ -84,11 +84,7 @@ let
     builtins.all (
       id:
       let
-        recomputed =
-          (why ctx {
-            inherit id;
-            inherit (c) changedId;
-          }).verdict != "unaffected";
+        recomputed = (why { } ctx c.changedId id).verdict != "unaffected";
       in
       recomputed == builtins.elem id cone
     ) c.ids;
@@ -97,22 +93,18 @@ let
   # ===== synthetic cutoff overlay (cutNodes-as-SET) =====
   # diamond: why "a" "d" has TWO interior-disjoint paths [a,b,d] and [a,c,d].
   # Block BOTH with cutoffs {b=true; c=true;} ⇒ verdict cutoff, cutNodes={b,c}.
-  cutBoth = why diamondCtx {
-    id = "a";
-    changedId = "d";
+  cutBoth = why {
     cutoffs = {
       b = true;
       c = true;
     };
-  };
+  } diamondCtx "d" "a";
   # block only ONE branch (b) ⇒ the c-branch stays live ⇒ recomputed.
-  cutOne = why diamondCtx {
-    id = "a";
-    changedId = "d";
+  cutOne = why {
     cutoffs = {
       b = true;
     };
-  };
+  } diamondCtx "d" "a";
 in
 {
   flake.tests."provenance" = {
@@ -163,21 +155,13 @@ in
 
     # ===== why: recomputed verdict (id reaches changedId forward) =====
     test-why-recomputed = {
-      expr =
-        (why chainCtx {
-          id = "a";
-          changedId = "d";
-        }).verdict;
+      expr = (why { } chainCtx "d" "a").verdict;
       expected = "recomputed";
     };
     # trivial origin: id == changedId is always recomputed (canReach fast path /
     # depth-0; changedId is never an interior node, never cut).
     test-why-trivial-origin = {
-      expr =
-        (why chainCtx {
-          id = "d";
-          changedId = "d";
-        }).verdict;
+      expr = (why { } chainCtx "d" "d").verdict;
       expected = "recomputed";
     };
     # THE SAME ORIGIN, UNDER A NON-EMPTY CUTOFF OVERLAY — the branch the row above never
@@ -194,20 +178,16 @@ in
     # green origin row is equally consistent with an overlay that stopped biting anywhere.
     test-why-origin-under-overlay = {
       expr = {
-        origin = why chainCtx {
-          id = "d";
-          changedId = "d";
+        origin = why {
           cutoffs = {
             d = true;
           };
-        };
-        interiorCut = why chainCtx {
-          id = "a";
-          changedId = "d";
+        } chainCtx "d" "d";
+        interiorCut = why {
           cutoffs = {
             b = true;
           };
-        };
+        } chainCtx "d" "a";
       };
       expected = {
         origin = {
@@ -231,39 +211,21 @@ in
     # DIRECTION: an override of the root `a` does NOT touch the leaf `d`
     # (d does not depend on a). Proves why does NOT transpose the accessor.
     test-why-unaffected-direction = {
-      expr =
-        (why chainCtx {
-          id = "d";
-          changedId = "a";
-        }).verdict;
+      expr = (why { } chainCtx "a" "d").verdict;
       expected = "unaffected";
     };
     # the verdict-only fast path (cutoffs == {}) carries NO paths key.
     test-why-fastpath-no-paths = {
-      expr =
-        (why chainCtx {
-          id = "a";
-          changedId = "d";
-        })
-          ? paths;
+      expr = (why { } chainCtx "d" "a") ? paths;
       expected = false;
     };
     test-why-unaffected-no-paths = {
-      expr =
-        (why chainCtx {
-          id = "d";
-          changedId = "a";
-        })
-          ? paths;
+      expr = (why { } chainCtx "a" "d") ? paths;
       expected = false;
     };
     # diamond multipath: a reaches d via b AND c ⇒ recomputed (≥1 live path).
     test-why-diamond-multipath = {
-      expr =
-        (why diamondCtx {
-          id = "a";
-          changedId = "d";
-        }).verdict;
+      expr = (why { } diamondCtx "d" "a").verdict;
       expected = "recomputed";
     };
 
@@ -292,13 +254,11 @@ in
     # g is unhashable (always-dirty) ⇒ the path stays live ⇒ recomputed.
     test-why-null-hash-never-cutoff = {
       expr =
-        (why lambdaCtx {
-          id = "f";
-          changedId = "g";
+        (why {
           cutoffs = {
             g = true;
           };
-        }).verdict;
+        } lambdaCtx "g" "f").verdict;
       expected = "recomputed";
     };
 
@@ -308,10 +268,7 @@ in
     # was indistinguishable from a query that returned nothing at all, and it was the one
     # verdict of three a caller could not read a reason off.
     test-whyNot-recomputed-record = {
-      expr = whyNot chainCtx {
-        id = "a";
-        changedId = "d";
-      };
+      expr = whyNot { } chainCtx "d" "a";
       expected = {
         reason = "recomputed";
         at = [ ];
@@ -319,10 +276,7 @@ in
     };
     # unaffected ⇒ the same two fields.
     test-whyNot-unaffected-record = {
-      expr = whyNot chainCtx {
-        id = "d";
-        changedId = "a";
-      };
+      expr = whyNot { } chainCtx "a" "d";
       expected = {
         reason = "unaffected";
         at = [ ];
@@ -330,14 +284,12 @@ in
     };
     # cutoff ⇒ the same two fields, with the witnesses in `at`.
     test-whyNot-cutoff-record = {
-      expr = whyNot diamondCtx {
-        id = "a";
-        changedId = "d";
+      expr = whyNot {
         cutoffs = {
           b = true;
           c = true;
         };
-      };
+      } diamondCtx "d" "a";
       expected = {
         reason = "cutoff";
         at = [
@@ -360,22 +312,14 @@ in
             ]
           )
           [
-            (whyNot chainCtx {
-              id = "a";
-              changedId = "d";
-            })
-            (whyNot chainCtx {
-              id = "d";
-              changedId = "a";
-            })
-            (whyNot diamondCtx {
-              id = "a";
-              changedId = "d";
+            (whyNot { } chainCtx "d" "a")
+            (whyNot { } chainCtx "a" "d")
+            (whyNot {
               cutoffs = {
                 b = true;
                 c = true;
               };
-            })
+            } diamondCtx "d" "a")
           ];
       expected = true;
     };

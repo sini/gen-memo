@@ -59,21 +59,38 @@
 { prelude, graph, ... }:
 let
   inherit (import ./hash.nix { }) hashGuarded;
-  inherit (import ./restabilize.nix { inherit prelude graph; }) runScc;
+  runScc = (import ./restabilize.nix { inherit prelude graph; }).cores.runScc;
   inherit (import ./graph-view.nix { }) graphView;
 
-  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
-  build =
-    engine: args:
+  # `build { fixpoint ? null; } engine { accessor; recompute; hashOf; }` (den-hoag-7gp66 P2, R7).
+  # The option is one closed set, first, checked when `build opts` is formed. The three operands stay
+  # ONE required-argument record (R7 (a)): the accessor is the subject, and the two caller functions
+  # beside it — the node computation and the content hash — are two roles of one sort with no order
+  # between them, so a positional order would be an arbitrary one to remember. The record is a door
+  # too (open, R5), guarded against the options step (`optionsStep`): `fixpoint` given on the record
+  # instead is refused by name rather than silently dropped. Both specs are bound once, here.
+  # `cores.build` is the unchecked core this library's own callers use.
+  buildOptions = prelude.door {
+    name = "gen-memo.build";
+    optional = [ "fixpoint" ];
+  };
+  buildOperands = prelude.door {
+    name = "gen-memo.build";
+    required = [
+      "accessor"
+      "recompute"
+      "hashOf"
+    ];
+    open = true;
+    optionsStep = build;
+  };
+  build = buildOptions (o: engine: buildOperands (buildCore o engine));
+
+  buildCore =
+    o: engine: args:
     let
-      checked = prelude.checkOptions "gen-memo.build" [
-        "accessor"
-        "recompute"
-        "hashOf"
-        "fixpoint"
-      ] (prelude.checkRequired "gen-memo.build" [ "accessor" "recompute" "hashOf" ] args);
-      inherit (checked) accessor recompute hashOf;
-      fixpoint = checked.fixpoint or null;
+      inherit (args) accessor recompute hashOf;
+      fixpoint = o.fixpoint or null;
       # Authoritative cyclic id-set (sorted) — graph.cycles (gen-graph/lib/global.nix).
       cyclic = graph.cycles (graphView accessor);
 
@@ -217,9 +234,9 @@ let
               ;
           };
     in
-    assert builtins.isAttrs checked;
     if fixpoint == null then acyclic else stratified;
 in
 {
   inherit build;
+  cores.build = buildCore;
 }

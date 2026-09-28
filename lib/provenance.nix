@@ -164,34 +164,36 @@ let
           inherit paths;
         };
 
-  # why : BuiltCtx -> { id; changedId; cutoffs ? {} } -> WhyResult
+  # why : { cutoffs ? {} } -> BuiltCtx -> changedId -> id -> WhyResult
   # The verdict fast path (canReach) answers unaffected/recomputed in
   # Θ( Σ_{u ∈ reach id} (1 + outdeg u) ) — reducing to the cone's size only at
   # BOUNDED out-degree — and carries NO paths key when `cutoffs == {}`;
   # paths/cutNodes are materialized only under a non-empty cutoff overlay (or
   # explain mode).
   #
-  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
-  why =
-    ctx: args:
+  # THE ARGUMENT GRAMMAR (den-hoag-7gp66 P2, R7), shared by all four queries below: the one option,
+  # `cutoffs`, is a closed set first in the call, checked when `why opts` is formed; the ctx is the
+  # environment, the change is configuration, and the id asked about is the subject, last. Each
+  # options step is a `prelude.door` bound once here; `whyNot`/`whyNotFor` name themselves in their
+  # refusal and call the unchecked cores, so an option is checked once, by the door the caller
+  # invoked.
+  whyCore =
+    o: ctx: changedId: id:
     let
-      checked = prelude.checkOptions "gen-memo.why" [
-        "id"
-        "changedId"
-        "cutoffs"
-      ] (prelude.checkRequired "gen-memo.why" [ "id" "changedId" ] args);
-      inherit (checked) id changedId;
-      cutoffs = checked.cutoffs or { };
+      cutoffs = o.cutoffs or { };
     in
-    assert builtins.isAttrs checked;
     # l∈C : `id` is in changedId's recompute cone iff it can reach changedId over
     # forward edges (or IS changedId — the change origin, always recomputed). No
     # transpose: canReach already walks consumer→producer.
     _verdict ctx { inherit changedId cutoffs; } (
       i: i == changedId || graph.canReach (graphView ctx.accessor) i changedId
     ) id;
+  why = prelude.door {
+    name = "gen-memo.why";
+    optional = [ "cutoffs" ];
+  } whyCore;
 
-  # whyFor : BuiltCtx -> { changedId; cutoffs ? {} } -> id -> WhyResult
+  # whyFor : { cutoffs ? {} } -> BuiltCtx -> changedId -> id -> WhyResult
   #
   # THE AMORTIZED DUAL OF `why`, CURRIED ON THE CHANGE. Membership in changedId's
   # recompute cone is loop-invariant across the ids of one change, exactly as a
@@ -217,25 +219,22 @@ let
   # worst case), identically to `why`: the cone decides who is in the cone, never
   # which paths are cut. No claim is made here about the overlay path's cost.
   #
-  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
-  whyFor =
-    ctx: args:
+  whyForCore =
+    o: ctx: changedId:
     let
-      checked = prelude.checkOptions "gen-memo.whyFor" [
-        "changedId"
-        "cutoffs"
-      ] (prelude.checkRequired "gen-memo.whyFor" [ "changedId" ] args);
-      inherit (checked) changedId;
-      cutoffs = checked.cutoffs or { };
+      cutoffs = o.cutoffs or { };
       # Bound HERE — once per (ctx, changedId), whatever the caller spends it on.
       cone = prelude.genAttrs (dirtySet ctx [ changedId ]) (_: true);
     in
-    assert builtins.isAttrs checked;
     _verdict ctx { inherit changedId cutoffs; } (i: cone ? ${i});
+  whyFor = prelude.door {
+    name = "gen-memo.whyFor";
+    optional = [ "cutoffs" ];
+  } whyForCore;
 
   # whyNot : the negative operator query — why `id` was NOT recomputed.
   #
-  #   whyNot : BuiltCtx -> WhyArgs
+  #   whyNot : { cutoffs ? {} } -> BuiltCtx -> changedId -> id
   #          -> { reason :: "recomputed" | "cutoff" | "unaffected"; at :: [id] }
   #
   # THE SHAPE IS TOTAL, AND MAKING IT SO IS A CORRECTION rather than a carry. This
@@ -261,18 +260,34 @@ let
         at = [ ];
       };
 
-  whyNot = ctx: args: _reason (why ctx args);
+  whyNot =
+    prelude.door
+      {
+        name = "gen-memo.whyNot";
+        optional = [ "cutoffs" ];
+      }
+      (
+        o: ctx: changedId: id:
+        _reason (whyCore o ctx changedId id)
+      );
 
   # whyNotFor : `whyFor`'s cone with `whyNot`'s record — the amortized dual of the
   # negative query, wrapping `whyFor` exactly as `whyNot` wraps `why`. A caller
   # looping the negative query has the same loop-invariant to hoist as one looping
   # the positive, and leaving it out would amortize half of a uniform surface.
   whyNotFor =
-    ctx: args:
-    let
-      verdictFor = whyFor ctx args;
-    in
-    id: _reason (verdictFor id);
+    prelude.door
+      {
+        name = "gen-memo.whyNotFor";
+        optional = [ "cutoffs" ];
+      }
+      (
+        o: ctx: changedId:
+        let
+          verdictFor = whyForCore o ctx changedId;
+        in
+        id: _reason (verdictFor id)
+      );
 in
 {
   inherit

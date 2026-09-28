@@ -40,28 +40,34 @@ let
   # and the substrate-contracted one, fail-closed off its node set. The two domains
   # and why they cannot meet are stated once, at `graph-view.nix`.
   #
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
-  mkAccessor =
+  # A graph accessor record is a DATA record (den-hoag-7gp66 P2, rule 3; R5), so the argument stays
+  # one open record: a `prelude.door` that refuses a missing field by name, catchably, when it is
+  # applied, and admits an extra one. `mkAccessorCore` is the unchecked core this file's own
+  # structural deltas call.
+  mkAccessorCore =
     args:
     let
-      checked = prelude.checkRequired "gen-memo.mkAccessor" [
-        "dependencies"
-        "nodes"
-        "nodeData"
-        "parent"
-      ] args;
-      inherit (checked)
+      inherit (args)
         dependencies
         nodes
         nodeData
         parent
         ;
     in
-    assert builtins.isAttrs checked;
     {
       inherit nodes nodeData parent;
       dependencies = id: prelude.unique (dependencies id);
     };
+  mkAccessor = prelude.door {
+    name = "gen-memo.mkAccessor";
+    required = [
+      "dependencies"
+      "nodes"
+      "nodeData"
+      "parent"
+    ];
+    open = true;
+  } mkAccessorCore;
 
   # cycleGuard — refuse (LOCATED, tryEval-catchable, never Nix infinite recursion)
   # any `domain` that reaches a cycle in accessor'.dependencies. `domain` is the
@@ -176,7 +182,7 @@ in
       # redirected). nodeData/dependencies fall through for the surviving nodes.
       nodes' = builtins.filter (id: id != deadId) accessor.nodes;
       dependencies' = id: builtins.filter (d: d != deadId) (accessor.dependencies id);
-      accessor' = mkAccessor {
+      accessor' = mkAccessorCore {
         dependencies = dependencies';
         nodes = nodes';
         inherit (accessor) nodeData parent;
@@ -288,7 +294,7 @@ in
       # target may itself read further fresh producers). dependencies'/nodeData/parent
       # fall through for everyone else.
       nodes' = prelude.unique (accessor.nodes ++ newProducers);
-      accessor' = mkAccessor {
+      accessor' = mkAccessorCore {
         dependencies = dependencies';
         nodes = nodes';
         inherit (accessor) nodeData parent;

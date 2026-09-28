@@ -76,19 +76,31 @@ let
   # this function in a top-level `let`, outside the `engine:` lambda, so `engine.ascend` is not
   # visible where the binding is made. Both call sites sit inside that lambda and apply it there.
   #
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
-  runScc =
+  # THE RECORD (den-hoag-7gp66 P2, R7 (a)): `scc` is the subject, and the five fields beside it —
+  # the topology, the externals, the node computation, the solved lower strata and the per-member
+  # lattices — are five sorts with no order among them, so the six stay ONE required-argument record
+  # rather than an arbitrary positional order to remember. It is a `prelude.door` (open, R5): a
+  # missing field is refused by name, catchably, when the record is applied, and an extra one is
+  # admitted. The spec is bound once, here; `cores.runScc` is the unchecked core this library's own
+  # per-stratum callers use.
+  runSccRecord = prelude.door {
+    name = "gen-memo.runScc";
+    required = [
+      "accessor"
+      "store"
+      "recompute"
+      "scc"
+      "higherStrata"
+      "lattices"
+    ];
+    open = true;
+  };
+  runScc = ascend: runSccRecord (runSccCore ascend);
+
+  runSccCore =
     ascend: args:
     let
-      checked = prelude.checkRequired "gen-memo.runScc" [
-        "accessor"
-        "store"
-        "recompute"
-        "scc"
-        "higherStrata"
-        "lattices"
-      ] args;
-      inherit (checked)
+      inherit (args)
         accessor
         store
         recompute
@@ -197,7 +209,6 @@ let
           });
         };
     in
-    assert builtins.isAttrs checked;
     # Refused-by-name blames are tryEval-CATCHABLE thrown blames, never Nix infinite recursion.
     if undeclaredLattice != [ ] then
       throw "gen-memo: cyclic member declares no lattice: ${builtins.toJSON undeclaredLatticeBlame}"
@@ -311,7 +322,7 @@ let
               # The ascent loop is the ENGINE's, handed in here exactly as `schedule` is
               # below.
               acc
-              // runScc engine.ascend {
+              // runSccCore engine.ascend {
                 inherit recompute;
                 accessor = accessor';
                 store = { };
@@ -369,4 +380,5 @@ let
 in
 {
   inherit runScc restabilize;
+  cores.runScc = runSccCore;
 }

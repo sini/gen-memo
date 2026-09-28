@@ -81,7 +81,7 @@ let
       v = 6;
     };
   };
-  batch = warmResolve engine ctx { inherit edits; };
+  batch = warmResolve engine ctx edits;
   probe = c: [
     (project c "a" "plus-one")
     (project c "b" "plus-one")
@@ -95,17 +95,12 @@ in
         let
           chained =
             warmOverride engine
-              (warmOverride engine ctx {
-                id = "a";
-                newDecls = {
-                  v = 5;
-                };
+              (warmOverride engine ctx "a" {
+                v = 5;
               })
+              "b"
               {
-                id = "b";
-                newDecls = {
-                  v = 6;
-                };
+                v = 6;
               };
         in
         probe batch == probe chained;
@@ -133,13 +128,11 @@ in
       expr =
         (builtins.tryEval (
           warmResolve engine ctx {
-            edits = {
-              a = {
-                v = 5;
-              };
-              b = {
-                includes = [ "x" ];
-              };
+            a = {
+              v = 5;
+            };
+            b = {
+              includes = [ "x" ];
             };
           }
         )).success;

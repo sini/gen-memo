@@ -7,7 +7,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   inherit (genMemo)
     verify
     earlyCutoff
@@ -43,7 +43,7 @@ let
       };
     };
   };
-  ctx = build {
+  ctx = build { } {
     accessor = acc;
     inherit recompute hashOf;
   };
@@ -71,7 +71,7 @@ let
       f = { };
     };
   };
-  lambdaCtx = build {
+  lambdaCtx = build { } {
     accessor = lambdaAcc;
     recompute = _acc: _s: _id: { fn = x: x + 1; };
     inherit hashOf;
@@ -112,26 +112,17 @@ in
     # ===== earlyCutoff (RTD §4.1, POST-recompute value compare) =====
     # recomputing c to its OLD value (100) ⇒ cut (reuse).
     test-earlyCutoff-cut = {
-      expr = earlyCutoff { inherit hashOf; } {
-        oldHash = ctx.trace.c.hash;
-        newValue = 100;
-      };
+      expr = earlyCutoff hashOf ctx.trace.c.hash 100;
       expected = true;
     };
     # recomputing c to a NEW value (200) ⇒ no cut.
     test-earlyCutoff-nocut = {
-      expr = earlyCutoff { inherit hashOf; } {
-        oldHash = ctx.trace.c.hash;
-        newValue = 200;
-      };
+      expr = earlyCutoff hashOf ctx.trace.c.hash 200;
       expected = false;
     };
     # null oldHash (was unhashable) ⇒ never a cut (always recompute).
     test-earlyCutoff-null-oldhash = {
-      expr = earlyCutoff { inherit hashOf; } {
-        oldHash = null;
-        newValue = 100;
-      };
+      expr = earlyCutoff hashOf null 100;
       expected = false;
     };
 
@@ -139,30 +130,16 @@ in
     # against the UNCHANGED store: every dep hash still matches the trace ⇒ reuse.
     test-verify-reuse-clean = {
       expr =
-        (verify
-          {
-            inherit (ctx) trace store hashOf;
-          }
-          {
-            accessor' = ctx.accessor;
-            spliced = ctx.store;
-          }
-          "b"
-        ).reuse;
+        (verify {
+          inherit (ctx) trace store hashOf;
+        } ctx.accessor ctx.store "b").reuse;
       expected = true;
     };
     test-verify-reuse-value = {
       expr =
-        (verify
-          {
-            inherit (ctx) trace store hashOf;
-          }
-          {
-            accessor' = ctx.accessor;
-            spliced = ctx.store;
-          }
-          "b"
-        ).value;
+        (verify {
+          inherit (ctx) trace store hashOf;
+        } ctx.accessor ctx.store "b").value;
       expected = ctx.store.b;
     };
     # against the spliced store where c moved (100->200): b's dep c is dirty ⇒ no reuse.
@@ -170,7 +147,7 @@ in
       expr =
         (verify {
           inherit (ctx) trace store hashOf;
-        } { inherit accessor' spliced; } "b").reuse;
+        } accessor' spliced "b").reuse;
       expected = false;
     };
   };

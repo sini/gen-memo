@@ -7,12 +7,12 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   inherit (genMemo) dirtySet affected;
 
   mkCtx =
     accessor:
-    build {
+    build { } {
       inherit accessor;
       recompute =
         _a: _s: id:

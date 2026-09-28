@@ -85,7 +85,7 @@
 { prelude, graph, ... }:
 let
   inherit (import ./dirtySet.nix { inherit prelude graph; }) dirtySet;
-  inherit (import ./build.nix { inherit prelude graph; }) build;
+  build = (import ./build.nix { inherit prelude graph; }).cores.build;
 
   # The declaration keys whose presence in an edit moves an EDGE rather than a value. The fold below
   # decides reuse from a cone read over the topology as it stands; an edit that reshapes the graph
@@ -131,20 +131,33 @@ let
   # it is defaulted and read ONLY inside the throw: on the admitting path it is never forced, which
   # matters because enumerating it is O(declared-locs) spine work at the evaluator.
   #
-  # MIXED door: closed over the whole set (checkOptions over checkRequired) until P2.
-  identitiesHeld =
-    args:
+  # `identitiesHeld { remerged ? [ ]; } { priorIdentities; nextIdentities; }` (den-hoag-7gp66 P2,
+  # R7). The option is one closed set, first. The two maps are ONE record by R7 (b): they are the same
+  # sort, a before and an after, the owner's `{ from; to; }` case, and nothing but a name tells them
+  # apart. The record is a door too (open, R5), guarded against the options step (`optionsStep`), so
+  # `remerged` given on the record is refused by name rather than silently dropped. Both specs are
+  # bound once, here.
+  identitiesHeldOptions = prelude.door {
+    name = "gen-memo.identitiesHeld";
+    optional = [ "remerged" ];
+  };
+  identitiesHeldMaps = prelude.door {
+    name = "gen-memo.identitiesHeld";
+    required = [
+      "priorIdentities"
+      "nextIdentities"
+    ];
+    open = true;
+    optionsStep = identitiesHeld;
+  };
+  identitiesHeld = identitiesHeldOptions (o: identitiesHeldMaps (identitiesHeldCore o));
+  identitiesHeldCore =
+    o: args:
     let
-      checked = prelude.checkOptions "gen-memo.identitiesHeld" [
-        "priorIdentities"
-        "nextIdentities"
-        "remerged"
-      ] (prelude.checkRequired "gen-memo.identitiesHeld" [ "priorIdentities" "nextIdentities" ] args);
-      inherit (checked) priorIdentities nextIdentities;
-      remerged = checked.remerged or [ ];
+      inherit (args) priorIdentities nextIdentities;
+      remerged = o.remerged or [ ];
       moved = movedIdentities priorIdentities nextIdentities;
     in
-    assert builtins.isAttrs checked;
     if moved == [ ] then
       moved
     else
@@ -155,15 +168,10 @@ let
       in
       throw "gen-memo.identitiesHeld: minted identity moved on a warm re-compose at '${p}' (kind '${kindOf from}', was '${from}', now '${to}', re-merged declarations: ${builtins.concatStringsSep ", " remerged}, ${toString (builtins.length moved)} instance(s) moved)";
 
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
+  # `warmDecision accessor prior seeds` (den-hoag-7gp66 P2, R7): positional, the topology and the
+  # prior facade as configuration and the seeds — the edit's ids — as the subject, last.
   warmDecision =
-    args:
-    let
-      checked = prelude.checkRequired "gen-memo.warmDecision" [ "accessor" "prior" ] args;
-      inherit (checked) accessor prior;
-    in
-    assert builtins.isAttrs checked;
-    seeds:
+    accessor: prior: seeds:
     let
       # Set rather than list: membership is asked once per node per attribute.
       dirty = prelude.genAttrs (dirtySet { inherit accessor; } seeds) (_: true);
@@ -212,10 +220,7 @@ let
       # persists past this evaluation: what is reused is a result held live in the evaluation the
       # caller is already inside.
       prior = ctx.eval.facade;
-      decision = warmDecision {
-        inherit prior;
-        accessor = accessor';
-      } ids;
+      decision = warmDecision accessor' prior ids;
 
       eval' = engine.evalWarm {
         scope = scope';
@@ -239,7 +244,7 @@ let
       # growth path rather than shipped scope: taking it means handing the plane a prior it did not
       # produce, which no instrument here can tell from a matching one, and it may not be taken
       # until one exists.
-      builtCtx' = build engine {
+      builtCtx' = build { } engine {
         accessor = accessor';
         recompute =
           _acc: _store: nid:
@@ -260,14 +265,10 @@ in
 {
   inherit warmDecision;
 
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
+  # `warmOverride engine ctx id newDecls` (den-hoag-7gp66 P2, R7): positional, in `override`'s own
+  # order — the id locates the edit and the new declarations are its subject, last.
   warmOverride =
-    engine: ctx: args:
-    let
-      checked = prelude.checkRequired "gen-memo.warmOverride" [ "id" "newDecls" ] args;
-      inherit (checked) id newDecls;
-    in
-    assert builtins.isAttrs checked;
+    engine: ctx: id: newDecls:
     assert
       !(changesTopology newDecls)
       || throw "gen-memo.warmOverride: edge-move on '${id}' — this fold decides reuse from a cone read over the current topology and cannot serve an edit that reshapes it; topology change is applyEdgeDelta's.";
@@ -278,14 +279,9 @@ in
   # edits themselves rather than a list of changed ids: a pure batch has to carry the data-change
   # payload, and a bare id list cannot.
   #
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
+  # `warmResolve engine ctx edits` (den-hoag-7gp66 P2, R7): the one-field record became its field.
   warmResolve =
-    engine: ctx: args:
-    let
-      checked = prelude.checkRequired "gen-memo.warmResolve" [ "edits" ] args;
-      inherit (checked) edits;
-    in
-    assert builtins.isAttrs checked;
+    engine: ctx: edits:
     assert
       builtins.all (id: !(changesTopology edits.${id})) (builtins.attrNames edits)
       || throw "gen-memo.warmResolve: edge-move in batch — this fold decides reuse from a cone read over the current topology and cannot serve an edit that reshapes it; topology change is applyEdgeDelta's.";

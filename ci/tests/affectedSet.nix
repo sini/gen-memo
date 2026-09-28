@@ -11,7 +11,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   affectedSet = genMemo.affectedSet engine;
   inherit (genMemo) dirtySet;
 
@@ -44,7 +44,7 @@ let
       };
     };
   };
-  ctx = build {
+  ctx = build { } {
     accessor = acc;
     inherit recompute hashOf;
   };
@@ -53,19 +53,13 @@ let
   accC = acc // {
     nodeData = id: if id == "c" then { weight = 200; } else acc.nodeData id;
   };
-  affC = affectedSet ctx {
-    accessor' = accC;
-    changedIds = [ "c" ];
-  };
+  affC = affectedSet ctx accC [ "c" ];
 
   # Override root a := 5. cone = {a} (nothing depends on a). Only a moves (115).
   accA = acc // {
     nodeData = id: if id == "a" then { weight = 5; } else acc.nodeData id;
   };
-  affA = affectedSet ctx {
-    accessor' = accA;
-    changedIds = [ "a" ];
-  };
+  affA = affectedSet ctx accA [ "a" ];
 
   # --- value-collision: abs(weight - 50) so a changed-weight can keep its value ---
   absRecompute =
@@ -81,7 +75,7 @@ let
       };
     };
   };
-  collCtx = build {
+  collCtx = build { } {
     accessor = collAcc;
     recompute = absRecompute;
     hashOf = hashOf;
@@ -90,10 +84,7 @@ let
   collAcc' = collAcc // {
     nodeData = id: if id == "l" then { weight = 70; } else collAcc.nodeData id;
   };
-  affColl = affectedSet collCtx {
-    accessor' = collAcc';
-    changedIds = [ "l" ];
-  };
+  affColl = affectedSet collCtx collAcc' [ "l" ];
 
   # --- function-bearing node (hash = null) is always affected when in the cone ---
   lambdaAcc = fx.mkPlaneAccessor {
@@ -101,15 +92,12 @@ let
       f = { };
     };
   };
-  lambdaCtx = build {
+  lambdaCtx = build { } {
     accessor = lambdaAcc;
     recompute = _acc: _s: _id: { fn = x: x + 1; };
     inherit hashOf;
   };
-  affLambda = affectedSet lambdaCtx {
-    accessor' = lambdaAcc;
-    changedIds = [ "f" ];
-  };
+  affLambda = affectedSet lambdaCtx lambdaAcc [ "f" ];
 
   # ===== cyclic-cone guard (den-hoag-xyme) =====
   # Same 2-SCC {x,y}/producer p/consumer c shape as drivers.nix's/eager.nix's
@@ -162,18 +150,22 @@ let
   cyclicRecompute =
     a: s: id:
     lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
-  cyclicCtx = build {
-    accessor = cyclicAcc;
-    recompute = cyclicRecompute;
-    inherit hashOf;
-    fixpoint = {
-      lattices = lib.genAttrs cyclicIds (_: {
-        bottom = 0;
-        join = _: v: v;
-        maxIter = 100;
-      });
-    };
-  };
+  cyclicCtx =
+    build
+      {
+        fixpoint = {
+          lattices = lib.genAttrs cyclicIds (_: {
+            bottom = 0;
+            join = _: v: v;
+            maxIter = 100;
+          });
+        };
+      }
+      {
+        accessor = cyclicAcc;
+        recompute = cyclicRecompute;
+        inherit hashOf;
+      };
   cyclicAccReaches = cyclicAcc // {
     nodeData = id: if id == "p" then { weight = 50; } else cyclicAcc.nodeData id;
   };
@@ -184,18 +176,8 @@ let
   # forcing a field is required to reach the hazard), `affectedSet`'s guard IS
   # the function's own outermost expression (`if cyclicInCone != [] then throw
   # else {...}`), so a bare `tryEval` on the call already forces the branch.
-  affectedReachesCycle = builtins.tryEval (
-    affectedSet cyclicCtx {
-      accessor' = cyclicAccReaches;
-      changedIds = [ "p" ];
-    }
-  );
-  affectedMissesCycle = builtins.tryEval (
-    affectedSet cyclicCtx {
-      accessor' = cyclicAccMisses;
-      changedIds = [ "c" ];
-    }
-  );
+  affectedReachesCycle = builtins.tryEval (affectedSet cyclicCtx cyclicAccReaches [ "p" ]);
+  affectedMissesCycle = builtins.tryEval (affectedSet cyclicCtx cyclicAccMisses [ "c" ]);
 in
 {
   flake.tests."affectedSet" = {

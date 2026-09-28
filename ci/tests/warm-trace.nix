@@ -51,7 +51,7 @@ let
     provenance = 2;
   };
 
-  observe = edited: decision: projection // warmTrace { inherit edited decision; };
+  observe = edited: decision: projection // warmTrace edited decision;
 
   # The edit shapes the admission test discriminates, as ONE list, so the two cells below read the
   # same subject through two instruments. Order matters and is asserted, not incidental.

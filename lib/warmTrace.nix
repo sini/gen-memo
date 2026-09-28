@@ -74,14 +74,10 @@
   # that forced them would charge every consumer of the trace for a partition most of them never
   # look at.
   #
-  # RECORD door (R5): a missing field is refused by name, catchably; an extra one is admitted.
+  # `warmTrace edited decision` (den-hoag-7gp66 P2, R7): positional. Whether the result was reached
+  # through an edit is configuration; the evaluator's decision, the record narrowed, is the subject.
   warmTrace =
-    args:
-    let
-      checked = prelude.checkRequired "gen-memo.warmTrace" [ "edited" "decision" ] args;
-      inherit (checked) edited decision;
-    in
-    assert builtins.isAttrs checked;
+    edited: decision:
     if edited then
       {
         trace = {

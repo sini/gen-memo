@@ -104,11 +104,8 @@ let
     inherit scope;
     parseParent = pp scope;
   };
-  edited = warmOverride engine ctx {
-    id = "child";
-    newDecls = {
-      v = 5;
-    };
+  edited = warmOverride engine ctx "child" {
+    v = 5;
   };
 in
 {
@@ -147,10 +144,7 @@ in
     test-decision-cone = {
       expr =
         let
-          d = warmDecision {
-            inherit (ctx) accessor;
-            prior = ctx.eval.facade;
-          } [ "child" ];
+          d = warmDecision ctx.accessor ctx.eval.facade [ "child" ];
         in
         {
           child = d.isClean "child";
@@ -170,10 +164,7 @@ in
     test-decision-vocabulary = {
       expr =
         let
-          d = warmDecision {
-            inherit (ctx) accessor;
-            prior = ctx.eval.facade;
-          } [ "child" ];
+          d = warmDecision ctx.accessor ctx.eval.facade [ "child" ];
           names = d.reusable "parent";
         in
         {
@@ -191,11 +182,8 @@ in
     test-edge-move-throws = {
       expr =
         (builtins.tryEval (
-          warmOverride engine ctx {
-            id = "child";
-            newDecls = {
-              includes = [ "other" ];
-            };
+          warmOverride engine ctx "child" {
+            includes = [ "other" ];
           }
         )).success;
       expected = false;
@@ -212,11 +200,8 @@ in
             declaredDependencies = id: if id == "child" then [ "parent" ] else [ "child" ];
           };
         in
-        project (warmOverride engine cctx {
-          id = "child";
-          newDecls = {
-            v = 7;
-          };
+        project (warmOverride engine cctx "child" {
+          v = 7;
         }) "child" "plus-one";
       expected = 8;
     };

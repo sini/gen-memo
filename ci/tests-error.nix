@@ -36,57 +36,68 @@
 let
   runScc = genMemo.runScc engine.ascend;
 
-  # ── THE DOOR-CHECK BYTES (den-hoag-7gp66 P1) ──
-  # `ci/tests/door-checks.nix` pins that each door's violations are CATCHABLE; a boolean cannot see
+  # ── THE DOOR-CHECK BYTES (den-hoag-7gp66 P1, then P2) ──
+  # `ci/tests/door-checks.nix` pins that each step's violations are CATCHABLE; a boolean cannot see
   # WHICH refusal fired, so WHICH — and that it names the door (R6) — is pinned here, anchored at
   # both ends, per row of `ci/doors.nix`. `[.]`, `[(]` and `[)]` neutralise the metacharacters, as
-  # in gen-prelude's own goldens. A RECORD door has no unknown-option golden: an extra field is R5's
-  # admitted case, and there is no message for a call that answers.
+  # in gen-prelude's own goldens. A RECORD step has no unknown-field golden: an extra field is R5's
+  # admitted case, and there is no message for a call that answers — except a guarded record's
+  # sibling option, which is refused by name (`optionsStep`, G10).
   doors = import ./doors.nix {
     inherit
       lib
       genMemo
-      genScope
       engine
       fx
       ;
   };
   quoted = names: lib.concatMapStringsSep ", " (n: "'${n}'") names;
-  doorGoldens =
+  name = d: "gen-memo[.]${d}";
+  optionGoldens = key: row: {
+    "test-${lib.toLower key}-unknown-option-message" = {
+      expr = row.door { unknownField = 1; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^${name key}: 'unknownField' is not an option of this door; the options are closed [(]accepted: ${quoted row.optional}[)] [(]in prelude[.]checkOptions[)]$";
+      };
+    };
+  };
+  recordGoldens =
     key: row:
     let
       k = lib.toLower key;
-      name = "gen-memo[.]${row.door or key}";
-      missing = builtins.head row.required;
       req = "[(]required: ${quoted row.required}[)] [(]in prelude[.]checkRequired[)]";
     in
     {
       "test-${k}-missing-required-field-message" = {
-        expr = row.call (builtins.removeAttrs row.valid [ missing ]);
+        expr = row.step (builtins.removeAttrs row.good [ row.drop ]);
         expectedError = {
           type = "ThrownError";
-          msg = "^${name}: required field '${missing}' is missing ${req}$";
+          msg = "^${name key}: required field '${row.drop}' is missing ${req}$";
         };
       };
       "test-${k}-non-attrset-argument-message" = {
-        expr = row.call 1;
+        expr = row.step 1;
         expectedError = {
           type = "ThrownError";
-          msg = "^${name}: the argument must be an attrset, not a int ${req}$";
+          msg = "^${name key}: the argument must be an attrset, not a int ${req}$";
         };
       };
     }
-    // lib.optionalAttrs (row.options != [ ]) {
-      "test-${k}-unknown-option-message" = {
-        expr = row.call (row.valid // { unknownField = 1; });
-        expectedError = {
-          type = "ThrownError";
-          msg = "^${name}: 'unknownField' is not an option of this door; the options are closed [(]accepted: ${
-            quoted (row.required ++ row.options)
-          }[)] [(]in prelude[.]checkOptions[)]$";
+    // lib.optionalAttrs (row ? guardedBy) (
+      let
+        o = builtins.head doors.options.${row.guardedBy}.optional;
+      in
+      {
+        "test-${k}-misplaced-option-message" = {
+          expr = row.step (row.good // { ${o} = null; });
+          expectedError = {
+            type = "ThrownError";
+            msg = "^${name key}: '${o}' is an option of ${name row.guardedBy}, not a field of this record [(]in prelude[.]checkGuarded[)]$";
+          };
         };
-      };
-    };
+      }
+    );
 
   # Fixture 3 of `ci/tests/restabilize.nix`, reproduced here because that file's `let` exports
   # nothing: a 1-member self-loop whose recompute strictly increments under an overwrite join, so it
@@ -224,7 +235,8 @@ let
 in
 {
   config = {
-    flake.testsError.door-checks = lib.concatMapAttrs doorGoldens doors;
+    flake.testsError.door-checks =
+      lib.concatMapAttrs optionGoldens doors.options // lib.concatMapAttrs recordGoldens doors.records;
 
     # ── `runScc`'s THREE REFUSALS, AT BLAME-SET GRANULARITY ──
     # Anchored at both ends, so a message that merely CONTAINS the expected text does not pass, and

@@ -41,7 +41,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   propagateEager = genMemo.propagateEager engine;
   inherit (genMemo) dirtySet;
 
@@ -107,7 +107,7 @@ let
     };
   };
 
-  ctx = build {
+  ctx = build { } {
     accessor = fleetAcc;
     inherit recompute hashOf;
   };
@@ -117,7 +117,7 @@ let
   editedAcc = fleetAcc // {
     nodeData = id: if id == editHost then edit.${editHost} else fleetAcc.nodeData id;
   };
-  fullRebuild = build {
+  fullRebuild = build { } {
     accessor = editedAcc;
     inherit recompute hashOf;
   };
@@ -136,7 +136,7 @@ let
     recompute = poison;
   };
   poisonedIncremental = propagateEager poisonedCtx edit;
-  poisonedFullRebuild = build {
+  poisonedFullRebuild = build { } {
     accessor = fleetAcc;
     recompute = poison;
     inherit hashOf;

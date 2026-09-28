@@ -8,7 +8,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   restabilize = genMemo.restabilize engine;
   # Curried on the evaluator's bounded-ascent driver, exactly as the three entries above are curried
@@ -181,17 +181,25 @@ let
     seed:
     let
       c = mkCyclicCase seed;
-      ctx = build {
-        accessor = c.acc;
-        inherit (c) recompute hashOf;
-        fixpoint = c.lattices;
-      };
+      ctx =
+        build
+          {
+            fixpoint = c.lattices;
+          }
+          {
+            accessor = c.acc;
+            inherit (c) recompute hashOf;
+          };
       r = restabilize ctx c.changedId c.newDecls;
-      oracle = build {
-        accessor = c.acc';
-        inherit (c) recompute hashOf;
-        fixpoint = c.lattices;
-      };
+      oracle =
+        build
+          {
+            fixpoint = c.lattices;
+          }
+          {
+            accessor = c.acc';
+            inherit (c) recompute hashOf;
+          };
     in
     r.store == oracle.store;
   restabFailing = builtins.filter (seed: !(restabSound seed)) (lib.range 1 120);
@@ -243,14 +251,18 @@ let
     });
   };
   # restabilize ctx: built WITH a fixpoint (acyclic ⇒ all singleton strata).
-  chainCtxFix = build {
-    accessor = acyclicChain;
-    recompute = chainRecompute;
-    hashOf = chainHashOf;
-    fixpoint = acyclicSingletonFixpoint;
-  };
+  chainCtxFix =
+    build
+      {
+        fixpoint = acyclicSingletonFixpoint;
+      }
+      {
+        accessor = acyclicChain;
+        recompute = chainRecompute;
+        hashOf = chainHashOf;
+      };
   # override ctx: the SAME acyclic graph built v1-style (no fixpoint key).
-  chainCtxV1 = build {
+  chainCtxV1 = build { } {
     accessor = acyclicChain;
     recompute = chainRecompute;
     hashOf = chainHashOf;
@@ -323,12 +335,16 @@ let
       maxIter = 100;
     });
   };
-  mixedCtx = build {
-    accessor = mixedAccessor;
-    recompute = mixedRecompute;
-    hashOf = mixedHashOf;
-    fixpoint = mixedFixpoint;
-  };
+  mixedCtx =
+    build
+      {
+        fixpoint = mixedFixpoint;
+      }
+      {
+        accessor = mixedAccessor;
+        recompute = mixedRecompute;
+        hashOf = mixedHashOf;
+      };
 
   # --- Fixture C (test 3): mutate the built cyclic ctx to DROP a cyclic node's
   # lattice, triggering restabilize's OWN undeclared-cyclic-node precheck. (build
@@ -352,12 +368,16 @@ let
     nodeData = id: if id == mixedChangedId then mixedNewDecls else mixedAccessor.nodeData id;
   };
   mixedRestab = restabilize mixedCtx mixedChangedId mixedNewDecls;
-  mixedOracle = build {
-    accessor = mixedAccessor';
-    recompute = mixedRecompute;
-    hashOf = mixedHashOf;
-    fixpoint = mixedFixpoint;
-  };
+  mixedOracle =
+    build
+      {
+        fixpoint = mixedFixpoint;
+      }
+      {
+        accessor = mixedAccessor';
+        recompute = mixedRecompute;
+        hashOf = mixedHashOf;
+      };
 
   # --- Fixture F (test 6): chaining. restabilize ∘ restabilize stays cyclic-
   # capable (fixpoint threaded) and == oracle build over the twice-changed acc.
@@ -380,12 +400,16 @@ let
       else
         mixedAccessor.nodeData id;
   };
-  chainDoubleOracle = build {
-    accessor = mixedAccessorDouble;
-    recompute = mixedRecompute;
-    hashOf = mixedHashOf;
-    fixpoint = mixedFixpoint;
-  };
+  chainDoubleOracle =
+    build
+      {
+        fixpoint = mixedFixpoint;
+      }
+      {
+        accessor = mixedAccessorDouble;
+        recompute = mixedRecompute;
+        hashOf = mixedHashOf;
+      };
 in
 {
   flake.tests.restabilize = {

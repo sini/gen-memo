@@ -126,11 +126,8 @@ let
 
   warmed =
     seed:
-    warmOverride engine (mkCtx seed 3) {
-      id = "node";
-      newDecls = {
-        base = 9;
-      };
+    warmOverride engine (mkCtx seed 3) "node" {
+      base = 9;
     };
   probeNames = map aName (range n) ++ [ "crossed" ];
 in

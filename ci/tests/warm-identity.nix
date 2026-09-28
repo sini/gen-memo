@@ -13,13 +13,16 @@
 let
   # Neither field is read by `identitiesHeld`; they are supplied because the record's shape is the
   # interface and reaching the decision through a hand-built attrset would be testing a copy of it.
-  decision = genMemo.warmDecision {
-    accessor = {
-      nodes = [ ];
-      dependencies = _: [ ];
-    };
-    prior.resolutional = _: [ ];
-  } [ ];
+  decision =
+    genMemo.warmDecision
+      {
+        nodes = [ ];
+        dependencies = _: [ ];
+      }
+      {
+        resolutional = _: [ ];
+      }
+      [ ];
 
   held = decision.identitiesHeld;
 
@@ -30,7 +33,7 @@ in
 {
   flake.tests.warm-identity = {
     test-identical-maps-admit = {
-      expr = held {
+      expr = held { } {
         priorIdentities = {
           "hosts.damask" = damask;
           "hosts.pewter" = pewter;
@@ -46,7 +49,7 @@ in
     # An instance only the NEXT evaluation has. Nothing moved — there is no prior identity to have
     # moved from.
     test-an-added-instance-admits = {
-      expr = held {
+      expr = held { } {
         priorIdentities."hosts.pewter" = pewter;
         nextIdentities = {
           "hosts.damask" = damask;
@@ -60,7 +63,7 @@ in
     # predicate written over `attrNames prior` without the membership test — that one would compare
     # a present identity against a missing attribute and abort rather than admit.
     test-a-removed-instance-admits = {
-      expr = held {
+      expr = held { } {
         priorIdentities = {
           "hosts.damask" = damask;
           "hosts.pewter" = pewter;
@@ -73,7 +76,7 @@ in
     # The empty case, which is every evaluation that mints nothing: the decision is total over it and
     # costs nothing.
     test-empty-maps-admit = {
-      expr = held {
+      expr = held { } {
         priorIdentities = { };
         nextIdentities = { };
       };
@@ -86,20 +89,24 @@ in
     # contributing side and travels into the message unchanged; the kind is read off the identity
     # itself, so no caller can supply one that disagrees with the datum.
     test-a-moved-identity-refuses-by-name = {
-      expr = held {
-        priorIdentities = {
-          "hosts.damask" = damask;
-          "hosts.pewter" = pewter;
-        };
-        nextIdentities = {
-          "hosts.damask" = damask;
-          "hosts.pewter" = pewterMoved;
-        };
-        remerged = [
-          "hosts"
-          "schema"
-        ];
-      };
+      expr =
+        held
+          {
+            remerged = [
+              "hosts"
+              "schema"
+            ];
+          }
+          {
+            priorIdentities = {
+              "hosts.damask" = damask;
+              "hosts.pewter" = pewter;
+            };
+            nextIdentities = {
+              "hosts.damask" = damask;
+              "hosts.pewter" = pewterMoved;
+            };
+          };
       expectedError = {
         type = "ThrownError";
         msg = "^gen-memo\\.identitiesHeld: minted identity moved on a warm re-compose at 'hosts\\.pewter' \\(kind 'thimble', was '${pewter}', now '${pewterMoved}', re-merged declarations: hosts, schema, 1 instance\\(s\\) moved\\)$";
@@ -109,7 +116,7 @@ in
     # `remerged` is defaulted, so the refusal is total over an evaluator that supplies no contributing
     # side at all — it names an empty list rather than failing on a missing argument.
     test-a-moved-identity-refuses-without-a-contributing-side = {
-      expr = held {
+      expr = held { } {
         priorIdentities."hosts.pewter" = pewter;
         nextIdentities."hosts.pewter" = pewterMoved;
       };

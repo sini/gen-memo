@@ -19,7 +19,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   propagateEager = genMemo.propagateEager engine;
   # `propagate` is here as the RED ARM of the hash-poison pair below — the axis on which the
   # two drivers actually differ — not as a subject of this suite.
@@ -31,7 +31,7 @@ let
   # ctxOf: build a BuiltCtx from a fixture-shaped { accessor; recompute; hashOf; }.
   ctxOf =
     fx:
-    build {
+    build { } {
       accessor = fx.accessor;
       inherit (fx) recompute hashOf;
     };
@@ -47,7 +47,7 @@ let
   # oracle: from-scratch ground truth store for the CHANGED accessor.
   oracle =
     fx: changes:
-    (build {
+    (build { } {
       accessor = withChange fx.accessor changes;
       inherit (fx) recompute hashOf;
     }).store;
@@ -201,7 +201,7 @@ let
   poisonIsReal =
     !(builtins.tryEval (
       builtins.deepSeq
-        (build {
+        (build { } {
           accessor = withChange deepAcc deepChanges;
           recompute = poisonTail;
           inherit hashOf;
@@ -296,7 +296,7 @@ let
     seed:
     let
       c = mkCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
@@ -304,7 +304,7 @@ let
         ${c.changedId} = c.newDecls;
       };
       oracleStore =
-        (build {
+        (build { } {
           accessor = c.acc';
           inherit (c) recompute hashOf;
         }).store;
@@ -394,7 +394,7 @@ let
   joinPoisonIsReal =
     !(builtins.tryEval (
       builtins.deepSeq
-        (build {
+        (build { } {
           accessor = withChange joinAcc joinChanges;
           recompute = joinPoison;
           inherit hashOf;
@@ -456,18 +456,22 @@ let
   cyclicRecompute =
     a: s: id:
     lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
-  cyclicCtx = build {
-    accessor = cyclicAcc;
-    recompute = cyclicRecompute;
-    inherit hashOf;
-    fixpoint = {
-      lattices = lib.genAttrs [ "p" "x" "y" "c" ] (_: {
-        bottom = 0;
-        join = _: v: v;
-        maxIter = 100;
-      });
-    };
-  };
+  cyclicCtx =
+    build
+      {
+        fixpoint = {
+          lattices = lib.genAttrs [ "p" "x" "y" "c" ] (_: {
+            bottom = 0;
+            join = _: v: v;
+            maxIter = 100;
+          });
+        };
+      }
+      {
+        accessor = cyclicAcc;
+        recompute = cyclicRecompute;
+        inherit hashOf;
+      };
   eagerReachesCycle = builtins.tryEval (
     builtins.deepSeq (propagateEager cyclicCtx { p.weight = 50; }).store true
   );
@@ -563,7 +567,7 @@ let
   hostsRecomputed =
     mkS:
     let
-      ctx = build {
+      ctx = build { } {
         accessor = hostsAcc;
         recompute = hostsRecompute mkS false;
         inherit hashOf;

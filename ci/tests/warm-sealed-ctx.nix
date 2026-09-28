@@ -113,11 +113,8 @@ let
     };
 
   cold = sealed 1;
-  warmed = warmOverride engine cold {
-    id = "producer";
-    newDecls = {
-      v = 9;
-    };
+  warmed = warmOverride engine cold "producer" {
+    v = 9;
   };
   fresh = sealed 9;
 

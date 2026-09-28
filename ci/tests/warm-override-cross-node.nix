@@ -82,11 +82,8 @@ let
     ctx.eval.get id attr;
   bump =
     ctx:
-    warmOverride engine ctx {
-      id = "producer";
-      newDecls = {
-        v = 9;
-      };
+    warmOverride engine ctx "producer" {
+      v = 9;
     };
 
   declaredDependencies = id: if id == "consumer" then [ "producer" ] else [ ];

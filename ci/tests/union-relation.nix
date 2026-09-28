@@ -42,7 +42,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   inherit (genMemo) verify;
 
@@ -120,11 +120,11 @@ let
     (a.nodeData id).weight + lib.foldl' (sum: dep: sum + s.${dep}) 0 (a.dependencies id);
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
-  uCtx = build {
+  uCtx = build { } {
     accessor = unionAcc;
     inherit recompute hashOf;
   };
-  dCtx = build {
+  dCtx = build { } {
     accessor = declaredOnlyAcc;
     inherit recompute hashOf;
   };
@@ -136,10 +136,7 @@ let
   # makes every `reuse = false` below the deps predicate or the hash gate talking, and nothing else.
   reuseOf =
     ctx: spliced: id:
-    (verify ctx {
-      accessor' = ctx.accessor;
-      inherit spliced;
-    } id).reuse;
+    (verify ctx ctx.accessor spliced id).reuse;
 
   # A ctx whose trace carries the RAW union for one node, the accessor still deduplicating.
   seedRawTrace =

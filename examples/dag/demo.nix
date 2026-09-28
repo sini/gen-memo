@@ -10,7 +10,7 @@
 # both purely; examples/dag/default.nix wraps it with getFlake for `nix eval -f`.
 { genMemo, engine }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   inherit (genMemo) dirtySet;
 
@@ -69,7 +69,7 @@ let
 
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
-  ctx = build {
+  ctx = build { } {
     accessor = fleet;
     inherit recompute hashOf;
   };
@@ -85,7 +85,7 @@ let
   fleet' = fleet // {
     nodeData = id: if id == changedId then newDecls else fleet.nodeData id;
   };
-  fullRebuild = build {
+  fullRebuild = build { } {
     accessor = fleet';
     inherit recompute hashOf;
   };
@@ -104,7 +104,7 @@ let
     recompute = poison;
   };
   overrideWithPoison = override poisonedCtx changedId newDecls;
-  fullBuildWithPoison = build {
+  fullBuildWithPoison = build { } {
     accessor = fleet;
     recompute = poison;
     inherit hashOf;
@@ -114,7 +114,7 @@ let
   cyclicFleet = mkAcc fleetData (fleetEdges // { net = [ "gw" ]; });
   cyclicResult =
     builtins.tryEval
-      (build {
+      (build { } {
         accessor = cyclicFleet;
         inherit recompute hashOf;
       }).store;

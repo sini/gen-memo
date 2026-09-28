@@ -6,11 +6,11 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   inherit (genMemo) affected impactOf;
 
   # chain: a->b->c->d (edges a=["b"], …) — a depends on b depends on c depends on d.
-  ctx = build {
+  ctx = build { } {
     accessor = (fx.planeOf graph.fixtures.chain);
     recompute =
       _acc: _s: id:

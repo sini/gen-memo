@@ -7,7 +7,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
 
   # a depends on b depends on c (edges a=["b"], b=["c"], c=[]) — consumer→producer.
@@ -46,7 +46,9 @@ let
 
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
 
-  ctx = build { inherit accessor recompute hashOf; };
+  ctx = build { } {
+    inherit accessor recompute hashOf;
+  };
 
   # Nodes whose result carries a function: hashOf is partial (not toJSON-able), so
   # the trace hash must be null (always-dirty), not an eval error. `f` has the
@@ -58,7 +60,7 @@ let
       g = { };
     };
   };
-  lambdaCtx = build {
+  lambdaCtx = build { } {
     accessor = lambdaAccessor;
     recompute =
       _acc: _s: id:
@@ -105,7 +107,7 @@ let
     else
       # consumer reads the hashable `tag` of its function-bearing dep.
       100 + s.fnode.tag;
-  fnCtx = build {
+  fnCtx = build { } {
     accessor = fnAccessor;
     recompute = fnRecompute;
     inherit hashOf;
@@ -116,7 +118,7 @@ let
   fnAcc' = fnAccessor // {
     nodeData = id: if id == "fnode" then { tag = 5; } else fnAccessor.nodeData id;
   };
-  fnOracle = build {
+  fnOracle = build { } {
     accessor = fnAcc';
     recompute = fnRecompute;
     inherit hashOf;
@@ -214,12 +216,16 @@ let
     });
   };
 
-  twoSccCtx = build {
-    accessor = twoSccAcc;
-    recompute = maxRecompute;
-    inherit hashOf;
-    fixpoint = maxLattices;
-  };
+  twoSccCtx =
+    build
+      {
+        fixpoint = maxLattices;
+      }
+      {
+        accessor = twoSccAcc;
+        recompute = maxRecompute;
+        inherit hashOf;
+      };
 
   # Self-loop x -> [x]: x is cyclic but has no declared lattice ⇒ the relaxed
   # precheck must throw an undeclared-cyclic-node blame (catchable).
@@ -317,10 +323,12 @@ in
     # --- located cycle: catchable throw, not Nix infinite recursion ---
     test-cycle-throws-catchable = {
       expr =
-        (builtins.tryEval (build {
-          accessor = cyclic;
-          inherit recompute hashOf;
-        })).success;
+        (builtins.tryEval (
+          build { } {
+            accessor = cyclic;
+            inherit recompute hashOf;
+          }
+        )).success;
       expected = false;
     };
 
@@ -347,7 +355,7 @@ in
     # 1. ABSENT fixpoint field is the real v1 path: hand-computed chain store.
     test-fixpoint-absent-is-v1-store = {
       expr =
-        (build {
+        (build { } {
           accessor = acyclicAcc;
           inherit recompute hashOf;
         }).store;
@@ -362,13 +370,17 @@ in
     #    (relaxed precheck passes: cycles == [] ⊆ {}).
     test-fixpoint-empty-lattices-equals-v1 = {
       expr =
-        (build {
-          accessor = acyclicAcc;
-          inherit recompute hashOf;
-          fixpoint = {
-            lattices = { };
-          };
-        }).store == (build {
+        (build
+          {
+            fixpoint = {
+              lattices = { };
+            };
+          }
+          {
+            accessor = acyclicAcc;
+            inherit recompute hashOf;
+          }
+        ).store == (build { } {
           accessor = acyclicAcc;
           inherit recompute hashOf;
         }).store;
@@ -380,7 +392,7 @@ in
     test-fixpoint-null-still-throws-on-cycle = {
       expr =
         (builtins.tryEval (
-          builtins.deepSeq (build {
+          builtins.deepSeq (build { } {
             accessor = cyclic;
             inherit recompute hashOf;
           }) true
@@ -457,14 +469,18 @@ in
     test-fixpoint-undeclared-cyclic-throws = {
       expr =
         (builtins.tryEval (
-          builtins.deepSeq (build {
-            accessor = selfLoopAcc;
-            recompute = maxRecompute;
-            inherit hashOf;
-            fixpoint = {
-              lattices = { };
-            };
-          }) true
+          builtins.deepSeq (build
+            {
+              fixpoint = {
+                lattices = { };
+              };
+            }
+            {
+              accessor = selfLoopAcc;
+              recompute = maxRecompute;
+              inherit hashOf;
+            }
+          ) true
         )).success;
       expected = false;
     };

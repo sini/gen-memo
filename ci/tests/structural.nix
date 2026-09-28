@@ -16,7 +16,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   retract = genMemo.retract engine;
   applyEdgeDelta = genMemo.applyEdgeDelta engine;
@@ -51,7 +51,7 @@ let
       };
     };
   };
-  chainCtx = build {
+  chainCtx = build { } {
     accessor = chainAcc;
     inherit recompute hashOf;
   };
@@ -95,7 +95,7 @@ let
     nodeData = id: npNodeData.${id} or { };
     parent = _id: null;
   };
-  npCtx = build {
+  npCtx = build { } {
     accessor = npAccessor;
     inherit recompute hashOf;
   };
@@ -166,7 +166,7 @@ let
       };
     };
   };
-  chainOracle = build {
+  chainOracle = build { } {
     accessor = chainOracleAcc;
     inherit recompute hashOf;
   };
@@ -179,12 +179,12 @@ let
     seed:
     let
       c = mkStructuralCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
       delta = applyEdgeDelta ctx c.changedId c.newEdges;
-      oracle = build {
+      oracle = build { } {
         accessor = c.accEdge;
         inherit (c) recompute hashOf;
       };
@@ -198,12 +198,12 @@ let
     seed:
     let
       c = mkStructuralCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
       r = retract ctx c.deadId "recompute-without";
-      oracle = build {
+      oracle = build { } {
         accessor = c.accRetract;
         inherit (c) recompute hashOf;
       };
@@ -244,26 +244,30 @@ let
   cyclicRecompute =
     a: s: id:
     lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
-  cyclicCtx = build {
-    accessor = cyclicAcc;
-    recompute = cyclicRecompute;
-    inherit hashOf;
-    fixpoint = {
-      lattices =
-        lib.genAttrs
-          [
-            "p"
-            "x"
-            "y"
-            "c"
-          ]
-          (_: {
-            bottom = 0;
-            join = _: v: v;
-            maxIter = 100;
-          });
-    };
-  };
+  cyclicCtx =
+    build
+      {
+        fixpoint = {
+          lattices =
+            lib.genAttrs
+              [
+                "p"
+                "x"
+                "y"
+                "c"
+              ]
+              (_: {
+                bottom = 0;
+                join = _: v: v;
+                maxIter = 100;
+              });
+        };
+      }
+      {
+        accessor = cyclicAcc;
+        recompute = cyclicRecompute;
+        inherit hashOf;
+      };
 
   # dependentsOf(p) = {c,x,y} — retract "p"'s revCone reaches BOTH members of the
   # pre-existing {x,y} SCC even though p itself is never part of it and the edit
@@ -305,27 +309,31 @@ let
       q.weight = 0;
     };
   };
-  qCtx = build {
-    accessor = qAcc;
-    recompute = cyclicRecompute;
-    inherit hashOf;
-    fixpoint = {
-      lattices =
-        lib.genAttrs
-          [
-            "p"
-            "x"
-            "y"
-            "c"
-            "q"
-          ]
-          (_: {
-            bottom = 0;
-            join = _: v: v;
-            maxIter = 100;
-          });
-    };
-  };
+  qCtx =
+    build
+      {
+        fixpoint = {
+          lattices =
+            lib.genAttrs
+              [
+                "p"
+                "x"
+                "y"
+                "c"
+                "q"
+              ]
+              (_: {
+                bottom = 0;
+                join = _: v: v;
+                maxIter = 100;
+              });
+        };
+      }
+      {
+        accessor = qAcc;
+        recompute = cyclicRecompute;
+        inherit hashOf;
+      };
   edgeDeltaReachesCycle = builtins.tryEval (
     builtins.deepSeq (applyEdgeDelta qCtx "p" [ "q" ]).store true
   );

@@ -132,4 +132,8 @@ let
   # why, and for the pair that proves the refusal fires.
   inherit (import ./merge.nix args) mergeExports;
 in
-prelude.foldl' (acc: m: mergeExports (toString m) acc (import m args)) { } modules
+# `cores` holds a door's UNCHECKED core for this library's own callers (den-hoag-7gp66 P2: the
+# published binding is the door, and an internal caller never pays its check); it is not surface.
+prelude.foldl' (
+  acc: m: mergeExports (toString m) acc (builtins.removeAttrs (import m args) [ "cores" ])
+) { } modules

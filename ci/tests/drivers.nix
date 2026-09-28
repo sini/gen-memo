@@ -15,7 +15,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   propagate = genMemo.propagate engine;
   force = genMemo.force engine;
@@ -51,7 +51,7 @@ let
       };
     };
   };
-  chainCtx = build {
+  chainCtx = build { } {
     accessor = chainAcc;
     inherit recompute hashOf;
   };
@@ -143,7 +143,7 @@ let
     seed:
     let
       c = mkCase seed;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
@@ -175,7 +175,7 @@ let
           else
             c.acc.nodeData id;
       };
-      oracle = build {
+      oracle = build { } {
         accessor = acc'';
         inherit (c) recompute hashOf;
       };
@@ -228,7 +228,7 @@ let
       };
     };
   };
-  diamondCtx = build {
+  diamondCtx = build { } {
     accessor = wideDiamond;
     inherit recompute hashOf;
   };
@@ -248,7 +248,7 @@ let
       }
     ]
   );
-  overlapOracle = build {
+  overlapOracle = build { } {
     accessor = wideDiamond // {
       nodeData =
         id:
@@ -328,18 +328,22 @@ let
     a: s: id:
     lib.foldl' lib.max (a.nodeData id).weight (map (d: s.${d}) (a.dependencies id));
   cyclicHashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
-  cyclicCtx = build {
-    accessor = cyclicAcc;
-    recompute = cyclicRecompute;
-    hashOf = cyclicHashOf;
-    fixpoint = {
-      lattices = lib.genAttrs cyclicIds (_: {
-        bottom = 0;
-        join = _: v: v;
-        maxIter = 100;
-      });
-    };
-  };
+  cyclicCtx =
+    build
+      {
+        fixpoint = {
+          lattices = lib.genAttrs cyclicIds (_: {
+            bottom = 0;
+            join = _: v: v;
+            maxIter = 100;
+          });
+        };
+      }
+      {
+        accessor = cyclicAcc;
+        recompute = cyclicRecompute;
+        hashOf = cyclicHashOf;
+      };
   # p is the producer feeding the SCC: an override of p puts {x,y} in the cone.
   overrideReachesCycle = builtins.tryEval (override cyclicCtx "p" { weight = 50; });
   propagateReachesCycle = builtins.tryEval (propagate (applyDelta cyclicCtx "p" { weight = 50; }));

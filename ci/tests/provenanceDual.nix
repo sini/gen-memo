@@ -36,7 +36,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   inherit (genMemo)
     why
     whyFor
@@ -47,7 +47,7 @@ let
   hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
   mkCtx =
     accessor:
-    build {
+    build { } {
       inherit accessor;
       recompute =
         _a: _s: id:
@@ -69,7 +69,7 @@ let
     in
     {
       inherit seed c;
-      ctx = build {
+      ctx = build { } {
         accessor = c.acc;
         inherit (c) recompute hashOf;
       };
@@ -111,11 +111,7 @@ let
   # ===== the four differential arms =====
   # The call shape a caller writes: no cutoffs key at all, one id at a time.
   mismatchWhyFast = mismatchesBy (
-    cell:
-    why cell.ctx {
-      inherit (cell) id;
-      inherit (cell.c) changedId;
-    } == whyFor cell.ctx { inherit (cell.c) changedId; } cell.id
+    cell: why { } cell.ctx cell.c.changedId cell.id == whyFor { } cell.ctx cell.c.changedId cell.id
   );
 
   # The overlay differential, over the cells that have a value. Same element-wise shape as
@@ -125,14 +121,11 @@ let
 
   mismatchWhyOverlay = mismatchesOver overlayValueCells (
     cell:
-    why cell.ctx {
-      inherit (cell) id;
-      inherit (cell.c) changedId;
+    why {
       cutoffs = overlayOf cell;
-    } == whyFor cell.ctx {
-      inherit (cell.c) changedId;
+    } cell.ctx cell.c.changedId cell.id == whyFor {
       cutoffs = overlayOf cell;
-    } cell.id
+    } cell.ctx cell.c.changedId cell.id
   );
 
   # The origin cells, as whole records: both routes must RETURN, and return the same thing.
@@ -140,14 +133,11 @@ let
   # in the predicate.
   mismatchWhyOverlayOrigin = mismatchesOver overlayOriginCells (
     cell:
-    why cell.ctx {
-      inherit (cell) id;
-      inherit (cell.c) changedId;
+    why {
       cutoffs = overlayOf cell;
-    } == whyFor cell.ctx {
-      inherit (cell.c) changedId;
+    } cell.ctx cell.c.changedId cell.id == whyFor {
       cutoffs = overlayOf cell;
-    } cell.id
+    } cell.ctx cell.c.changedId cell.id
   );
 
   # Equality alone would be satisfied by two routes that refuse identically, which is
@@ -158,17 +148,14 @@ let
   overlayOriginParity = map (cell: {
     inherit (cell) seed id;
     perCall = survives (
-      why cell.ctx {
-        inherit (cell) id;
-        inherit (cell.c) changedId;
+      why {
         cutoffs = overlayOf cell;
-      }
+      } cell.ctx cell.c.changedId cell.id
     );
     dual = survives (
-      whyFor cell.ctx {
-        inherit (cell.c) changedId;
+      whyFor {
         cutoffs = overlayOf cell;
-      } cell.id
+      } cell.ctx cell.c.changedId cell.id
     );
   }) overlayOriginCells;
   overlayOriginDisagreements = builtins.filter (r: r.perCall != r.dual) overlayOriginParity;
@@ -180,11 +167,9 @@ let
   overlayOriginWrongVerdict = map (cell: { inherit (cell) seed id; }) (
     builtins.filter (
       cell:
-      why cell.ctx {
-        inherit (cell) id;
-        inherit (cell.c) changedId;
+      why {
         cutoffs = overlayOf cell;
-      } != {
+      } cell.ctx cell.c.changedId cell.id != {
         verdict = "recomputed";
         paths = [ [ cell.id ] ];
       }
@@ -193,22 +178,16 @@ let
 
   mismatchWhyNotFast = mismatchesBy (
     cell:
-    whyNot cell.ctx {
-      inherit (cell) id;
-      inherit (cell.c) changedId;
-    } == whyNotFor cell.ctx { inherit (cell.c) changedId; } cell.id
+    whyNot { } cell.ctx cell.c.changedId cell.id == whyNotFor { } cell.ctx cell.c.changedId cell.id
   );
 
   mismatchWhyNotOverlay = mismatchesOver overlayValueCells (
     cell:
-    whyNot cell.ctx {
-      inherit (cell) id;
-      inherit (cell.c) changedId;
+    whyNot {
       cutoffs = overlayOf cell;
-    } == whyNotFor cell.ctx {
-      inherit (cell.c) changedId;
+    } cell.ctx cell.c.changedId cell.id == whyNotFor {
       cutoffs = overlayOf cell;
-    } cell.id
+    } cell.ctx cell.c.changedId cell.id
   );
 
   # ===== the USAGE shape: bound once per change, spent over every id =====
@@ -218,22 +197,12 @@ let
   mismatchBoundOnce = lib.concatMap (
     k:
     let
-      verdictFor = whyFor k.ctx { inherit (k.c) changedId; };
+      verdictFor = whyFor { } k.ctx k.c.changedId;
     in
-    map
-      (id: {
-        inherit (k) seed;
-        inherit id;
-      })
-      (
-        builtins.filter (
-          id:
-          verdictFor id != why k.ctx {
-            inherit id;
-            inherit (k.c) changedId;
-          }
-        ) k.c.ids
-      )
+    map (id: {
+      inherit (k) seed;
+      inherit id;
+    }) (builtins.filter (id: verdictFor id != why { } k.ctx k.c.changedId id) k.c.ids)
   ) cases;
 
   # ===== the armed controls: two duals that are WRONG, through the same differential =====
@@ -254,11 +223,7 @@ let
     coneOf:
     map (cell: { inherit (cell) seed id; }) (
       builtins.filter (
-        cell:
-        wrongDual (coneOf cell) cell.id != why cell.ctx {
-          inherit (cell) id;
-          inherit (cell.c) changedId;
-        }
+        cell: wrongDual (coneOf cell) cell.id != why { } cell.ctx cell.c.changedId cell.id
       ) cells
     );
 
@@ -358,24 +323,24 @@ in
 
     # ===== fixed fixtures: the same verdicts, read by hand =====
     test-whyFor-chain-recomputed = {
-      expr = (whyFor chainCtx { changedId = "d"; } "a").verdict;
+      expr = (whyFor { } chainCtx "d" "a").verdict;
       expected = "recomputed";
     };
     # DIRECTION: an override of the root `a` does not touch the leaf `d`. The dual does not
     # transpose the accessor either — `dependentsOf` already walks consumer→producer.
     test-whyFor-chain-unaffected-direction = {
-      expr = (whyFor chainCtx { changedId = "a"; } "d").verdict;
+      expr = (whyFor { } chainCtx "a" "d").verdict;
       expected = "unaffected";
     };
     # The change origin is in its own cone: `dirtySet` unions the changed ids in, which is
     # the cell the origin-omitting control flips.
     test-whyFor-trivial-origin = {
-      expr = (whyFor chainCtx { changedId = "d"; } "d").verdict;
+      expr = (whyFor { } chainCtx "d" "d").verdict;
       expected = "recomputed";
     };
     # The fast path carries NO paths key, exactly as `why`'s does.
     test-whyFor-fastpath-no-paths = {
-      expr = (whyFor chainCtx { changedId = "d"; } "a") ? paths;
+      expr = (whyFor { } chainCtx "d" "a") ? paths;
       expected = false;
     };
     # ONE dual, spent over four ids: the shape the construction exists for, and the answers
@@ -383,7 +348,7 @@ in
     test-whyFor-one-cone-many-ids = {
       expr =
         let
-          verdictFor = whyFor chainCtx { changedId = "c"; };
+          verdictFor = whyFor { } chainCtx "c";
         in
         map (id: (verdictFor id).verdict) [
           "a"
@@ -403,13 +368,12 @@ in
     test-whyFor-cutoff-overlay = {
       expr =
         let
-          r = whyFor diamondCtx {
-            changedId = "d";
+          r = whyFor {
             cutoffs = {
               b = true;
               c = true;
             };
-          } "a";
+          } diamondCtx "d" "a";
         in
         {
           inherit (r) verdict;
@@ -430,27 +394,26 @@ in
     # The total record: `recomputed` answers with a reason and an empty witness list, not
     # with an absence.
     test-whyNotFor-recomputed-record = {
-      expr = whyNotFor chainCtx { changedId = "d"; } "a";
+      expr = whyNotFor { } chainCtx "d" "a";
       expected = {
         reason = "recomputed";
         at = [ ];
       };
     };
     test-whyNotFor-unaffected-record = {
-      expr = whyNotFor chainCtx { changedId = "a"; } "d";
+      expr = whyNotFor { } chainCtx "a" "d";
       expected = {
         reason = "unaffected";
         at = [ ];
       };
     };
     test-whyNotFor-cutoff-record = {
-      expr = whyNotFor diamondCtx {
-        changedId = "d";
+      expr = whyNotFor {
         cutoffs = {
           b = true;
           c = true;
         };
-      } "a";
+      } diamondCtx "d" "a";
       expected = {
         reason = "cutoff";
         at = [

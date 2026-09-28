@@ -107,7 +107,7 @@ The standalone entry is a function of the library's dependencies, per the gen ro
 
 ### A first build and override
 
-Every entry point that reaches a store takes the ENGINE first. The plane decides reuse and never
+Every entry point that reaches a store takes the ENGINE first among its operands. The plane decides reuse and never
 evaluates, so it populates no store of its own: it hands the engine a domain, a base and a decision,
 and the engine produces the values. A caller that has an evaluator hands that; a caller that has
 none — a test, an example — hands the reference scheduler, which ships outside `lib/` at
@@ -117,7 +117,7 @@ none — a test, an example — hands the reference scheduler, which ships outsi
 let
   engine = import "${genMemo-src}/reference/schedule.nix" { prelude = gen-prelude.lib; };
 
-  ctx = genMemo.build engine {
+  ctx = genMemo.build { } engine {
     accessor = someGraphAccessor;          # the topology oracle
     recompute = acc: store: id: /* … */;   # the node-eval
     hashOf = v: builtins.hashString "sha256" (builtins.toJSON v);
@@ -140,9 +140,8 @@ evaluator is passed in rather than depended on:
 
 ```nix
 let
-  after = genMemo.warmOverride (engine // { inherit (genScope) evalWarm; }) ctx {
-    id = "someHost";
-    newDecls = { class = "db"; };
+  after = genMemo.warmOverride (engine // { inherit (genScope) evalWarm; }) ctx "someHost" {
+    class = "db";
   };
 in
 after.eval.get "someHost" "resolved"       # re-derived; everything outside the cone is reused
@@ -160,8 +159,31 @@ back; the evaluator does every recomputation.
 
 31 exports, in seven groups.
 
+**The argument grammar.** Options come first, as one closed set; operands follow, positional, with
+configuration first and the subject last; a record is kept only where its fields have no order among
+them, and it is open (an extra field is admitted). A step taking a record is a `prelude.door`, so a
+missing field, an unknown option, or an option placed on the record instead of the options is refused
+by name, catchably, where that step is applied, and its field contract is published as `__contract`.
+The reshaped call shapes:
+
+```nix
+build { fixpoint ? null; } engine { accessor; recompute; hashOf; }
+why / whyNot { cutoffs ? { }; } ctx changedId id
+whyFor / whyNotFor { cutoffs ? { }; } ctx changedId    # then id, once per node
+needsEval { trace; coneSet; newHashOf; accessor'; } changedId id
+runScc ascend { accessor; store; recompute; scc; higherStrata; lattices; }
+mkAccessor { dependencies; nodes; nodeData; parent; }
+verify ctx accessor' spliced id
+earlyCutoff hashOf oldHash newValue
+affectedSet engine ctx accessor' changedIds
+warmDecision accessor prior seeds      # .identitiesHeld { remerged ? [ ]; } { priorIdentities; nextIdentities; }
+warmOverride engine ctx id newDecls
+warmResolve engine ctx edits
+warmTrace edited decision
+```
+
 **Which exports take the engine.** Every operation that reaches a store takes it as its FIRST
-argument: `build`, `override`, `propagate`, `force`, `forceCtx`, `retract`, `applyEdgeDelta`,
+operand (`build` after its options): `build`, `override`, `propagate`, `force`, `forceCtx`, `retract`, `applyEdgeDelta`,
 `affectedSet`, `restabilize`, `propagateEager`, and the two warm folds. The rest — the pure queries,
 the strategy predicates, the two observations, `applyDelta`, `batch`, `runScc`, `mkAccessor` — do
 not, because they populate no store.
@@ -215,7 +237,7 @@ are not the same predicate under three names.
 
 **The evaluator is a PARAMETER, not a dependency.** This library declares no evaluator input; the
 fold takes `{ evalWarm }` and calls it. So the call reads
-`warmOverride { inherit (genScope) evalWarm; } ctx { id, newDecls }`, and what comes back is the
+`warmOverride { inherit (genScope) evalWarm; } ctx id newDecls`, and what comes back is the
 context re-evaluated under the decision — every value in it produced by the evaluator, none by the
 plane.
 

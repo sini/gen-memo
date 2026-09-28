@@ -57,7 +57,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   override = genMemo.override engine;
   propagate = genMemo.propagate engine;
   propagateEager = genMemo.propagateEager engine;
@@ -194,8 +194,10 @@ let
       warmOf,
     }:
     let
-      ctx = build { inherit accessor recompute hashOf; };
-      cold = build {
+      ctx = build { } {
+        inherit accessor recompute hashOf;
+      };
+      cold = build { } {
         accessor = changedAccessor accessor changedId newDecls;
         inherit recompute hashOf;
       };
@@ -223,13 +225,13 @@ let
   valueArgs = editArgs valueRecompute;
   drvArgs = editArgs drvPathRecompute;
 
-  drvValueCtx = build {
+  drvValueCtx = build { } {
     accessor = fleetAcc;
     recompute = drvValueRecompute;
     inherit hashOf;
   };
   drvValueWarm = override drvValueCtx "shared" { w = 100; };
-  drvValueCold = build {
+  drvValueCold = build { } {
     accessor = changedAccessor fleetAcc "shared" { w = 100; };
     recompute = drvValueRecompute;
     inherit hashOf;
@@ -357,7 +359,7 @@ in
     test-parity-derivation-edit-moves-identities = {
       expr =
         let
-          base = build {
+          base = build { } {
             accessor = fleetAcc;
             recompute = drvPathRecompute;
             inherit hashOf;
@@ -377,19 +379,27 @@ in
     test-parity-restabilize = {
       expr =
         let
-          ctx = build {
-            accessor = cyclicAcc;
-            recompute = cyclicRecompute;
-            inherit hashOf;
-            fixpoint = latticeFor;
-          };
+          ctx =
+            build
+              {
+                fixpoint = latticeFor;
+              }
+              {
+                accessor = cyclicAcc;
+                recompute = cyclicRecompute;
+                inherit hashOf;
+              };
           warm = restabilize ctx "r" { w = 30; };
-          cold = build {
-            accessor = changedAccessor cyclicAcc "r" { w = 30; };
-            recompute = cyclicRecompute;
-            inherit hashOf;
-            fixpoint = latticeFor;
-          };
+          cold =
+            build
+              {
+                fixpoint = latticeFor;
+              }
+              {
+                accessor = changedAccessor cyclicAcc "r" { w = 30; };
+                recompute = cyclicRecompute;
+                inherit hashOf;
+              };
         in
         observeStore warm.store == observeStore cold.store;
       expected = true;
@@ -402,7 +412,7 @@ in
     test-parity-instrument-discriminates = {
       expr =
         let
-          ctx = build {
+          ctx = build { } {
             accessor = fleetAcc;
             recompute = valueRecompute;
             inherit hashOf;

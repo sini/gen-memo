@@ -158,13 +158,7 @@ let
     ) 0 cases;
 
   # ── THE SHIPPED SHAPE: one point query per id ──
-  shipped = countRecomputed (
-    k: id:
-    (why k.ctx {
-      inherit id;
-      inherit (k.c) changedId;
-    }).verdict
-  );
+  shipped = countRecomputed (k: id: (why { } k.ctx k.c.changedId id).verdict);
 
   # ── THE DUAL: one cone per change, spent over that change's ids ──
   # The binding is OUTSIDE the id map, which is the whole construction: move it inside and
@@ -172,7 +166,7 @@ let
   cone = countRecomputed (
     k:
     let
-      verdictFor = whyFor k.ctx { inherit (k.c) changedId; };
+      verdictFor = whyFor { } k.ctx k.c.changedId;
     in
     id: (verdictFor id).verdict
   );
@@ -182,7 +176,7 @@ let
   # the whole application inside the per-id map rebuilds it once per id. This arm exists
   # because the amortization is the CALLER's decision and a decision can be made wrongly;
   # a file that says so and does not price it is asking to be taken on trust.
-  coneInline = countRecomputed (k: id: (whyFor k.ctx { inherit (k.c) changedId; } id).verdict);
+  coneInline = countRecomputed (k: id: (whyFor { } k.ctx k.c.changedId id).verdict);
 
   # ── THE FIXTURE ALONE: the id sets forced, no verdict issued, no edge read ──
   floor = builtins.length (lib.concatMap (k: k.c.ids) cases);

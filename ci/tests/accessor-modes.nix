@@ -28,7 +28,7 @@
   ...
 }:
 let
-  build = genMemo.build engine;
+  build = opts: genMemo.build opts engine;
   applyEdgeDelta = genMemo.applyEdgeDelta engine;
   inherit (genMemo) why whyFor;
 
@@ -107,7 +107,7 @@ let
 
   ctxOf =
     deps:
-    build {
+    build { } {
       accessor = mkAcc deps;
       inherit recompute hashOf;
     };
@@ -208,12 +208,7 @@ in
 
     # `why` WALKS the relation, so it meets the refusal and aborts.
     test-why-aborts-on-a-foreign-id-in-contracted-mode = {
-      expr = completes (
-        why contractedCtx {
-          id = "ghost";
-          changedId = "c";
-        }
-      );
+      expr = completes (why { } contractedCtx "c" "ghost");
       expected = false;
     };
 
@@ -222,7 +217,7 @@ in
     # disposition: a reader who expects the pair to agree everywhere finds the exception here rather
     # than in production.
     test-whyFor-answers-unaffected-for-a-foreign-id-in-contracted-mode = {
-      expr = whyFor contractedCtx { changedId = "c"; } "ghost";
+      expr = whyFor { } contractedCtx "c" "ghost";
       expected = {
         verdict = "unaffected";
       };
@@ -232,7 +227,7 @@ in
     # for everything: a real node that reaches the change comes back `recomputed`, over the same ctx
     # in the same run. Without this, a `whyFor` broken to a constant would pass.
     test-control-whyFor-still-decides-a-real-node = {
-      expr = whyFor contractedCtx { changedId = "c"; } "a";
+      expr = whyFor { } contractedCtx "c" "a";
       expected = {
         verdict = "recomputed";
       };
@@ -242,11 +237,7 @@ in
     # run it aborts for a foreign one. Without this, the abort cell passes a `why` that aborts on
     # everything, which would misattribute the cause to the walk rather than to the domain.
     test-control-why-still-decides-a-real-node = {
-      expr =
-        (why contractedCtx {
-          id = "a";
-          changedId = "c";
-        }).verdict;
+      expr = (why { } contractedCtx "c" "a").verdict;
       expected = "recomputed";
     };
 
@@ -255,11 +246,7 @@ in
     # property of the CONTRACT rather than of `why`, and it is the cell that would red if someone
     # narrowed the caller-built domain to match the contracted one.
     test-control-why-answers-a-foreign-id-in-caller-built-mode = {
-      expr =
-        (why callerCtx {
-          id = "ghost";
-          changedId = "c";
-        }).verdict;
+      expr = (why { } callerCtx "c" "ghost").verdict;
       expected = "unaffected";
     };
   };
