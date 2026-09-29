@@ -355,7 +355,7 @@ nix-unit --flake ./ci#tests              # run everything; unguarded
 `_`-prefixed included — and the remedy is `git add` or a move. The unguarded forms read a
 git-filtered copy of the tree, so an untracked cell is silently absent and the run stays green.
 
-32 suites, 411 tests (`nix-unit --flake ./ci#tests` ⇒ `411/411 successful`, `46f9e7d`). Beyond the migrated content's own, two are the plane's oracles:
+33 suites, 432 tests (`nix-unit --flake ./ci#tests` ⇒ `432/432 successful`). Beyond the migrated content's own, two are the plane's oracles, and one more, `gen-ci-examples`, is gen-harness's examples guard (declared in `ci/tests/examples.nix`, `gen.ci.examples`), holding that `examples/` directory names equal the declared names and that every declared example forces under `deepSeq`:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
   forced to nothing-is-clean, compared on the tagged `__drvPath` record the admission projection
