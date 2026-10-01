@@ -312,6 +312,29 @@ in
         };
       };
 
+    # A NESTED DERIVATION'S `drvPath` IS NEVER READ, which is the ruled reason for sealing it:
+    # reading it instantiates whatever it reaches. R2 pins only that it does not enter the image;
+    # this pins that it is not forced. Its `drvPath` throws, so a read would make the hash null.
+    # `outermostReadIsNull` is the control that the poison fires where the image does read it.
+    test-c5cj-nested-drvpath-is-never-read =
+      let
+        poisoned = {
+          type = "derivation";
+          drvPath = throw "nested drvPath read";
+          outPath = throw "nested outPath read";
+        };
+      in
+      {
+        expr = {
+          nestedUnreadHashes = builtins.isString (hashGuarded hashOf (drv // { sub = poisoned; }));
+          outermostReadIsNull = hashGuarded hashOf { pkg = poisoned; } == null;
+        };
+        expected = {
+          nestedUnreadHashes = true;
+          outermostReadIsNull = true;
+        };
+      };
+
     # ── THE STATED RESIDUE, R1–R4 (den-hoag-c5cj, the declared ADR-0025 item 1 exception). ──
     # Each pair is distinguished by a cold evaluation and read UNCHANGED by the plane, and each is
     # pinned as a collision so that closing one is a visible change rather than a silent one:
