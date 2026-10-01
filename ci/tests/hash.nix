@@ -109,7 +109,7 @@ in
     # suite with it. They are cells now, which is itself the observation.
     test-project-drv-at-every-position = {
       expr = {
-        root = project drv;
+        root = (project drv).__drvPath == drv.drvPath;
         inAttrs = project { pkg = drv; };
         inList = project [ drv ];
         threeLevel = project {
@@ -119,7 +119,7 @@ in
         };
       };
       expected = {
-        root = project drv;
+        root = true;
         inAttrs = {
           pkg = project drv;
         };
@@ -136,7 +136,7 @@ in
       };
     };
     # The image of a derivation is its own attributes, keyed by the drvPath it reads and never by
-    # the output path it blinds. The output attributes and `all` are what make a derivation
+    # the output path, which it blinds to `__outPath` as at every other position. The output attributes and `all` are what make a derivation
     # self-referential, and they are absent from it.
     test-project-drv-image-keys = {
       expr = {
@@ -147,6 +147,7 @@ in
         keyed = true;
         keys = [
           "__drvPath"
+          "__outPath"
           "args"
           "builder"
           "drvAttrs"
@@ -289,6 +290,24 @@ in
           markerMetaAtDepth = true;
           outPathSibling = true;
           outPathString = true;
+          same = false;
+        };
+      };
+
+    # THE OUTERMOST `outPath` IS BLINDED, NOT DROPPED. An overlay of it keeps the drvPath, and a
+    # cold `"${drv}"` reads the overlaid path, so dropping it read the pair UNCHANGED outside R1–R4.
+    # `same` is the control that the separation is not bought by collapsing every pair.
+    test-c5cj-outermost-outpath-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          overlay = sep drv (drv // { outPath = "/nix/store/other"; });
+          same = sep drv (drv // { outPath = drv.outPath; });
+        };
+        expected = {
+          overlay = true;
           same = false;
         };
       };

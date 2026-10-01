@@ -152,8 +152,8 @@ let
   #
   # ★ THE IMAGE OF A DERIVATION (den-hoag-c5cj, owner-ruled 2026-09-30, arm (i)+(ii)). The
   # OUTERMOST derivation's `drvPath` is read and keys the image as `__drvPath`; every other own
-  # attribute is hashed structurally, except the attributes that make it self-referential (`all`,
-  # the output attributes, `outPath`), which are dropped. Under the bare `{ __drvPath }` image
+  # attribute is hashed structurally, except the attributes that make it self-referential (`all`
+  # and the output attributes), which are dropped; its `outPath` is blinded like any other. Under the bare `{ __drvPath }` image
   # three sub-classes read UNCHANGED where a cold evaluation distinguishes them, and the image
   # separates all three: (1) a literal record spelling the tag; (2) the marker shape, a derivation
   # overlaid with `//`, which keeps its drvPath (`drv // { meta.description = …; }`, at any depth);
@@ -224,7 +224,6 @@ let
           [
             "all"
             "drvPath"
-            "outPath"
           ]
           ++ (v.outputs or [ (v.outputName or "out") ])
         );

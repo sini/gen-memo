@@ -555,8 +555,8 @@ a plane output must be byte-identical to a cold evaluation.
     changes is that the value reaches it instead of failing.
 - **The image of a derivation, and what it reads UNCHANGED** (`den-hoag-c5cj`, owner-ruled
   2026-09-30; the declared ADR-0025 item 1 exception). The outermost derivation's `drvPath` keys
-  the image; its other own attributes are hashed structurally, without `all`, the output
-  attributes and `outPath`. `outPath` and `__toString` are blinded at every position, so `toJSON`
+  the image; its other own attributes are hashed structurally, without `all` and the output
+  attributes. `outPath` and `__toString` are blinded at every position, the outermost included, so `toJSON`
   no longer reads an attrset carrying `outPath` as that string alone. A literal tag, a derivation
   overlaid with `//` (at any depth) and an attrset beside an `outPath` therefore separate. Inside
   a derivation's attributes a function, a nested derivation (its `drvPath` never read), `passthru`,
