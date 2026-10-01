@@ -119,26 +119,42 @@ in
         };
       };
       expected = {
-        root = {
-          __drvPath = drv.drvPath;
-        };
+        root = project drv;
         inAttrs = {
-          pkg = {
-            __drvPath = drv.drvPath;
-          };
+          pkg = project drv;
         };
-        inList = [ { __drvPath = drv.drvPath; } ];
+        inList = [ (project drv) ];
         threeLevel = {
           a = {
             b = [
               {
-                c = {
-                  __drvPath = drv.drvPath;
-                };
+                c = project drv;
               }
             ];
           };
         };
+      };
+    };
+    # The image of a derivation is its own attributes, keyed by the drvPath it reads and never by
+    # the output path it blinds. The output attributes and `all` are what make a derivation
+    # self-referential, and they are absent from it.
+    test-project-drv-image-keys = {
+      expr = {
+        keyed = (project drv).__drvPath == drv.drvPath;
+        keys = builtins.attrNames (project drv);
+      };
+      expected = {
+        keyed = true;
+        keys = [
+          "__drvPath"
+          "args"
+          "builder"
+          "drvAttrs"
+          "name"
+          "outputName"
+          "system"
+          "type"
+        ];
       };
     };
 
@@ -150,9 +166,7 @@ in
       expr = {
         nested =
           hashGuarded hashOf { pkg = drv; } == hashOf {
-            pkg = {
-              __drvPath = drv.drvPath;
-            };
+            pkg = project drv;
           };
         functionBesideDrv = hashGuarded hashOf {
           pkg = drv;
@@ -204,9 +218,11 @@ in
 
     # ── THE RESIDUE, STATED AS CELLS RATHER THAN AS PROSE. ──
     # (1) The projection is IDEMPOTENT and NOT the identity, so some value and its image are
-    # distinct with the same image: an attrset written literally with the reserved key still
-    # compares equal to a projected derivation. No tag closes that — the codomain is a subset
-    # of the domain — so injectivity is narrowed here, never achieved.
+    # distinct with the same image: a derivation's image written out literally compares equal to
+    # the derivation, and a literal `__outPath` equal to the blinded `outPath` (R4 below). No tag
+    # closes that — the codomain is a subset of the domain — so injectivity is narrowed here, never
+    # achieved. The bare `{ __drvPath }` record no longer collides: a derivation's image carries
+    # its own attributes beside the key.
     test-projection-is-not-injective = {
       expr = {
         idempotentAtRoot = project (project drv) == project drv;
@@ -221,15 +237,118 @@ in
             };
           };
         notTheIdentity = project drv != drv;
-        literalTagStillCollides = project { __drvPath = drv.drvPath; } == project drv;
+        literalImageCollides = project (project drv) == project drv && project drv != drv;
+        literalTagSeparates = project { __drvPath = drv.drvPath; } != project drv;
       };
       expected = {
         idempotentAtRoot = true;
         idempotentThreeLevel = true;
         notTheIdentity = true;
-        literalTagStillCollides = true;
+        literalImageCollides = true;
+        literalTagSeparates = true;
       };
     };
+
+    # ── den-hoag-c5cj: THE COLLISIONS A DERIVATION'S IMAGE NOW SEPARATES. ──
+    # Each pair is two values a cold evaluation distinguishes, and each read UNCHANGED under the
+    # bare `{ __drvPath }` image: (1) a literal tag against the derivation; (2) the marker shape, a
+    # derivation overlaid with `//`, which keeps its drvPath, at the root and inside a config value;
+    # (3) the output-path coercion, under which `toJSON` reads an attrset carrying `outPath` as
+    # that string alone. `same` is the control that the separation is not bought by collapsing
+    # every pair.
+    test-c5cj-image-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+        atDepth = d: {
+          x.y = [ d ];
+        };
+      in
+      {
+        expr = {
+          literalTag = sep { __drvPath = drv.drvPath; } drv;
+          marker = sep (drv // { version = "1"; }) (drv // { version = "2"; });
+          markerMetaAtDepth = sep (atDepth (drv // { meta.description = "a"; })) (
+            atDepth (drv // { meta.description = "b"; })
+          );
+          outPathSibling =
+            sep
+              {
+                outPath = "x";
+                a = 1;
+              }
+              {
+                outPath = "x";
+                a = 2;
+              };
+          outPathString = sep "x" { outPath = "x"; };
+          same = sep (atDepth (drv // { version = "1"; })) (atDepth (drv // { version = "1"; }));
+        };
+        expected = {
+          literalTag = true;
+          marker = true;
+          markerMetaAtDepth = true;
+          outPathSibling = true;
+          outPathString = true;
+          same = false;
+        };
+      };
+
+    # ── THE STATED RESIDUE, R1–R4 (den-hoag-c5cj, the declared ADR-0025 item 1 exception). ──
+    # Each pair is distinguished by a cold evaluation and read UNCHANGED by the plane, and each is
+    # pinned as a collision so that closing one is a visible change rather than a silent one:
+    # (R1) a changed function inside a derivation's attributes, sealed present/absent;
+    # (R2) a nested derivation swapped where it does not feed the outer drvPath, sealed
+    # present/absent and its drvPath never read; (R3) any change inside `passthru` or `tests`, or
+    # in a top-level attribute named in `passthru`; (R4) a literal `__outPath` against the blinded
+    # `outPath`. The controls are the edges of each seal: presence separates, and a nested
+    # derivation that IS a build input separates through the outer drvPath.
+    test-c5cj-residue-is-stated =
+      let
+        same = a: b: hashEq (hashGuarded hashOf a) (hashGuarded hashOf b);
+        e = mkDrv "gen-memo-residue-e";
+        f = mkDrv "gen-memo-residue-f";
+        withInput =
+          dep:
+          derivation {
+            name = "gen-memo-residue-outer";
+            system = "x86_64-linux";
+            builder = "/bin/sh";
+            args = [
+              "-c"
+              "true"
+            ];
+            inherit dep;
+          };
+        withPassthru = k: drv // { passthru.k = k; } // { inherit k; };
+      in
+      {
+        expr = {
+          r1Function = same (drv // { f = _: 1; }) (drv // { f = _: 2; });
+          r2NestedSwap = same (drv // { sub = e; }) (drv // { sub = f; });
+          r2NestedSwapAtDepth = same (drv // { x.y = [ e ]; }) (drv // { x.y = [ f ]; });
+          r3Tests = same (drv // { tests.x = 1; }) (drv // { tests.x = 2; });
+          r3Passthru = same (withPassthru 1) (withPassthru 2);
+          r4OutPath = same { __outPath = "x"; } { outPath = "x"; };
+          controlFunctionPresence = same (drv // { f = _: 1; }) (drv // { f = 1; });
+          controlNestedPresence = same (drv // { sub = e; }) (drv // { sub = "x"; });
+          controlTestsPresence = same drv (drv // { tests = { }; });
+          controlBuildInput = same (withInput e) (withInput f);
+          controlOutermostSwap = same { pkg = e; } { pkg = f; };
+        };
+        expected = {
+          r1Function = true;
+          r2NestedSwap = true;
+          r2NestedSwapAtDepth = true;
+          r3Tests = true;
+          r3Passthru = true;
+          r4OutPath = true;
+          controlFunctionPresence = false;
+          controlNestedPresence = false;
+          controlTestsPresence = false;
+          controlBuildInput = false;
+          controlOutermostSwap = false;
+        };
+      };
 
     # (2) THE GENERAL NON-WELL-FOUNDED CLASS FALLS BACK TO ALWAYS-DIRTY (den-hoag-5ahw). Each of
     # these ended the whole evaluation with `stack overflow; max-call-depth exceeded` before the

@@ -17,7 +17,7 @@
 #      an unbounded walker meets the evaluator's call-depth ceiling on it — an abort `tryEval`
 #      does not contain, where the cold evaluation it decides for has a value. A DERIVATION is
 #      the ordinary member of the class (a config value containing a package), and `project`
-#      below normalises it to a tag before anything descends; EVERYTHING ELSE is met by a
+#      below normalises it to a keyed, sealed image before anything descends; EVERYTHING ELSE is met by a
 #      BOUNDED walk whose exhaustion lands on null.
 #   3. A CATCHABLE BOTTOM IN THE WALK'S PREFIX. A cold read forces only what its consumer
 #      reads; the walk forces every position up to the first function, so it is strictly
@@ -150,20 +150,41 @@ let
   # it FIRST never descends. Recognising before descending is what removes the class at
   # every depth rather than at the root.
   #
-  # ★ THE TAG, RATHER THAN A BARE drvPath STRING, AND THE DIRECTION IS THE POINT. Under
-  # a bare-string projection a derivation and a plain string equal to its drvPath project
-  # to the identical value, so the plane would hash the two the same and read that swap
-  # as UNCHANGED — a FALSE-CLEAN collision, the unsound direction, and the opposite of
-  # the null rule's always-dirty. The `__` prefix is the reserved-name convention.
+  # ★ THE IMAGE OF A DERIVATION (den-hoag-c5cj, owner-ruled 2026-09-30, arm (i)+(ii)). The
+  # OUTERMOST derivation's `drvPath` is read and keys the image as `__drvPath`; every other own
+  # attribute is hashed structurally, except the attributes that make it self-referential (`all`,
+  # the output attributes, `outPath`), which are dropped. Under the bare `{ __drvPath }` image
+  # three sub-classes read UNCHANGED where a cold evaluation distinguishes them, and the image
+  # separates all three: (1) a literal record spelling the tag; (2) the marker shape, a derivation
+  # overlaid with `//`, which keeps its drvPath (`drv // { meta.description = …; }`, at any depth);
+  # (3) the output-path coercion, under which `toJSON` reads any attrset carrying `outPath` as that
+  # string alone, so `outPath` (and `__toString`) is BLINDED, renamed under the reserved prefix, at
+  # every position.
   #
-  # ★★ AND NO TAG COULD HAVE CLOSED IT, WHICH IS A THEOREM AND NOT A HEDGE. `project`'s
+  # ★ INSIDE A DERIVATION'S ATTRIBUTES THE IMAGE SEALS, and what it seals is the residue. Reading
+  # a nested `drvPath`, or walking `passthru`, instantiates whatever that value reaches (NixOS
+  # tests, package sets, alias throws): measured over 2855 nixpkgs packages, 19.8x thunks, past
+  # 6 GB on a single package, and 8 of 29 chunks dead. Pure Nix cannot decide those positions
+  # without forcing them, so they are sealed present/absent:
+  #   - a function is `{ __sealed = true; }`;
+  #   - a nested derivation is `{ __nestedDrv = true; }`, and its `drvPath` is never read;
+  #   - `passthru`, `tests` and every top-level attribute named in `passthru` are
+  #     `{ __sealed = true; }`.
+  # THE DECLARED EXCEPTION (ADR-0025 item 1; the suite's `test-c5cj-residue-is-stated`): two values
+  # read UNCHANGED that differ only at (R1) a changed function inside a derivation's attributes;
+  # (R2) a nested derivation swapped where it does not feed the outer `drvPath` (a build input
+  # still separates through it); (R3) anything inside `passthru` or `tests`, or in a top-level
+  # attribute named in `passthru`; (R4) a literal `__outPath` against the blinded `outPath`.
+  # Presence separates at every seal. 12 of the 2855 packages carry a package set outside
+  # `passthru` (Haskell `scope`, Lisp `pkgs`) whose walk throws: caught, so always-dirty.
+  #
+  # ★★ AND NO IMAGE COULD HAVE CLOSED IT, WHICH IS A THEOREM AND NOT A HEDGE. `project`'s
   # codomain is a subset of its domain — its output is an ordinary Nix value and hence a
   # legal input — so it is idempotent while not being the identity, which means some `x`
   # and `project x` are distinct values with the same image. NO admission-time normalising
-  # projection over Nix values can be injective, whatever it projects to. What the tag
-  # buys is a NARROWING of the collision class: from any string equal to a drvPath — one
-  # ordinary edit away — to an attrset carrying exactly the reserved key with exactly that
-  # value. Injectivity is not claimed, not established and not achievable here.
+  # projection over Nix values can be injective, whatever it projects to. The reserved
+  # `__` prefix NARROWS the collision class to a literal record spelling an image (R4 is
+  # its plainest instance); injectivity is not claimed, not established and not achievable here.
   #
   # ★ WHAT IS NOT REMOVED HERE: the GENERAL non-well-founded class. The projection is
   # lazy and passes a plain self-referential attrset through; the bounded walk above is
@@ -172,14 +193,57 @@ let
   # bounded finiteness, and its bound falls back to always-dirty rather than refuse. A
   # bound that refuses would be the ceiling invented to bound a cost; one that falls back
   # changes cost only.
+  blind =
+    v: m:
+    if v ? outPath || v ? __toString then
+      removeAttrs m [
+        "outPath"
+        "__toString"
+      ]
+      // (if v ? outPath then { __outPath = m.outPath; } else { })
+      // (if v ? __toString then { ____toString = m.__toString; } else { })
+    else
+      m;
+  inDrv =
+    v:
+    if builtins.isFunction v then
+      { __sealed = true; }
+    else if isDrv v then
+      { __nestedDrv = true; }
+    else if builtins.isList v then
+      map inDrv v
+    else if builtins.isAttrs v then
+      blind v (builtins.mapAttrs (_: inDrv) v)
+    else
+      v;
   project =
     v:
     if isDrv v then
-      { __drvPath = v.drvPath; }
+      let
+        own = removeAttrs v (
+          [
+            "all"
+            "drvPath"
+            "outPath"
+          ]
+          ++ (v.outputs or [ (v.outputName or "out") ])
+        );
+        sealedKeys = [
+          "passthru"
+          "tests"
+        ]
+        ++ builtins.attrNames (v.passthru or { });
+      in
+      builtins.mapAttrs (k: x: if builtins.elem k sealedKeys then { __sealed = true; } else inDrv x) (
+        blind own own
+      )
+      // {
+        __drvPath = v.drvPath;
+      }
     else if builtins.isList v then
       map project v
     else if builtins.isAttrs v then
-      builtins.mapAttrs (_: project) v
+      blind v (builtins.mapAttrs (_: project) v)
     else
       v;
 in
@@ -192,9 +256,11 @@ in
 
   # `hashOf` runs over the PROJECTED value, and the walk reads the same image, so it certifies
   # exactly the value `hashOf` is handed, a derivation's `drvPath` content included.
-  # Projection preserves functions (they fall through unchanged), so the discrimination
-  # the null rule rests on is untouched: a function beside a derivation still answers
-  # `null`. What changes is that the derivation no longer takes the evaluation down first.
+  # Projection preserves functions OUTSIDE a derivation (they fall through unchanged), so the
+  # discrimination the null rule rests on is untouched there: a function beside a derivation
+  # still answers `null`. A function INSIDE a derivation's attributes is sealed (R1), so a
+  # package carrying one still hashes. What changes is that the derivation no longer takes the
+  # evaluation down first.
   #
   # The walk runs under `tryEval`, so a walk that throws is null (the third partiality): the
   # node is always-dirty and recomputed, and its answer is the cold one. That is not the cold
@@ -228,10 +294,9 @@ in
   # byte-identity gate behind it — the digest is the whole oracle. `project` is
   # non-injective by the theorem stated above, and its residual direction is FALSE-CLEAN,
   # the unsound one. So the retired key's term reads here as: *this plane is the consumer
-  # that was told to install a gate, and it has not.* Whether it should is open work
-  # (`den-hoag-c5cj` measures one instance of the collision class; the suite's
-  # `literalTagStillCollides` pins only its literal-tag sub-class), and this comment records
-  # the term rather than discharging it.
+  # that was told to install a gate, and it has not.* `den-hoag-c5cj` narrowed the class to
+  # the declared R1–R4 above (the suite's `test-c5cj-residue-is-stated` pins each as a collision)
+  # and did not install the gate; this comment records the term rather than discharging it.
   #
   # ANCHOR: R10.1-RIDER-CLASSKEY-CEILING
   hashGuarded =

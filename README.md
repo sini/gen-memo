@@ -355,11 +355,11 @@ nix-unit --flake ./ci#tests              # run everything; unguarded
 `_`-prefixed included — and the remedy is `git add` or a move. The unguarded forms read a
 git-filtered copy of the tree, so an untracked cell is silently absent and the run stays green.
 
-33 suites, 432 tests (`nix-unit --flake ./ci#tests` ⇒ `432/432 successful`). Beyond the migrated content's own, two are the plane's oracles, and one more, `gen-ci-examples`, is gen-harness's examples guard (declared in `ci/tests/examples.nix`, `gen.ci.examples`), holding that `examples/` directory names equal the declared names and that every declared example forces under `deepSeq`:
+33 suites, 435 tests (`nix-unit --flake ./ci#tests` ⇒ `435/435 successful`). Beyond the migrated content's own, two are the plane's oracles, and one more, `gen-ci-examples`, is gen-harness's examples guard (declared in `ci/tests/examples.nix`, `gen.ci.examples`), holding that `examples/` directory names equal the declared names and that every declared example forces under `deepSeq`:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
-  forced to nothing-is-clean, compared on the tagged `__drvPath` record the admission projection
-  produces wherever the output holds a derivation, and on the value otherwise. **The comparator IS
+  forced to nothing-is-clean, compared on the image the admission projection produces wherever
+  the output holds a derivation (keyed by its `drvPath`), and on the value otherwise. **The comparator IS
   that projection**, not a second implementation of it, and the sharing is load-bearing in two
   directions: a comparator returning a bare `drvPath` string observes a derivation and a plain
   string equal to that `drvPath` as the same value — a false-clean collision in the one instrument
@@ -480,7 +480,8 @@ a plane output must be byte-identical to a cold evaluation.
   the evaluator's call-depth ceiling, aborting where the cold evaluation had a value. A Nix
   derivation is the ordinary member (`drv.all`'s first element is the derivation itself), and it is
   **removed at every depth by the admission projection** — a shape test applied before descending,
-  which yields a tagged `{ __drvPath = …; }` record and never walks into the derivation;
+  which yields an image keyed by the derivation's `drvPath` and never walks into its
+  self-referential attributes (below, *the image of a derivation*);
   `ci/tests/byte-parity.nix` drives derivation-valued nodes through the plane. **Everything else
   lands on the null rule:** "finite" is only semi-decidable, and the walk is its bounded run — past
   the depth bound below it ends `exhausted` and the value is always-dirty, a change of cost and never
@@ -552,12 +553,28 @@ a plane output must be byte-identical to a cold evaluation.
     evaluates: a node holding `pkgs.perlPackages` walks +1.28 M thunks past the import floor per
     first hash. That cost is the walk's own strictness, unchanged by the catch; what the catch
     changes is that the value reaches it instead of failing.
+- **The image of a derivation, and what it reads UNCHANGED** (`den-hoag-c5cj`, owner-ruled
+  2026-09-30; the declared ADR-0025 item 1 exception). The outermost derivation's `drvPath` keys
+  the image; its other own attributes are hashed structurally, without `all`, the output
+  attributes and `outPath`. `outPath` and `__toString` are blinded at every position, so `toJSON`
+  no longer reads an attrset carrying `outPath` as that string alone. A literal tag, a derivation
+  overlaid with `//` (at any depth) and an attrset beside an `outPath` therefore separate. Inside
+  a derivation's attributes a function, a nested derivation (its `drvPath` never read), `passthru`,
+  `tests` and every attribute named in `passthru` are sealed present/absent, because reading them
+  instantiates what they reach (measured over 2855 nixpkgs packages: 19.8× thunks and 8 of 29
+  chunks dead when they are read, 1.008× with them sealed). So two values read UNCHANGED, where a
+  cold evaluation distinguishes them, when they differ only at **(R1)** a changed function inside
+  a derivation's attributes; **(R2)** a nested derivation swapped where it does not feed the outer
+  `drvPath`; **(R3)** anything inside `passthru` or `tests`, or in an attribute named in
+  `passthru`; **(R4)** a literal `__outPath` against the blinded `outPath`. Each is pinned as a
+  collision by `ci/tests/hash.nix`'s `test-c5cj-residue-is-stated`. A package carrying a package
+  set outside `passthru` whose walk throws (Haskell `scope`, Lisp `pkgs`: 12 of the 2855) is
+  always-dirty.
 - **The projection is not injective, and cannot be.** Its codomain is a subset of its domain, so a
-  value and its image can be distinct with the same image: an attrset written literally as
-  `{ __drvPath = "…"; }` still compares equal to a projected derivation. The tag **narrows** the
-  collision class — from any string equal to a `drvPath`, one ordinary edit away, to an attrset
-  carrying exactly the reserved key with exactly that value — and the residual direction is
-  false-clean, which is the unsound one.
+  value and its image can be distinct with the same image: a derivation's image written out
+  literally compares equal to the derivation. The reserved `__` prefix **narrows** the collision
+  class to a literal record spelling an image (R4 is its plainest instance), and the residual
+  direction is false-clean, which is the unsound one.
 - **The plane holds no store fix, and that is not yet the same as holding no evaluator.** A
   self-referential store over the node set, passed into the caller's node computation, is gone from
   `lib/` — the sites that had one now hand the engine a domain, a base and a decision. But a fold

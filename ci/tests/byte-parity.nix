@@ -6,9 +6,9 @@
 # that a cold evaluation cannot is a defect.
 #
 # THE INSTRUMENT, exactly: the same input evaluated twice, once with the decision forced to
-# NOTHING IS CLEAN, compared on the tagged `__drvPath` record the plane's own admission projection
-# produces wherever the output holds a derivation, and on the value otherwise — the comparator
-# below carries why the tagged record and not a bare drvPath string. Forcing the decision to
+# NOTHING IS CLEAN, compared on the image the plane's own admission projection produces wherever
+# the output holds a derivation (keyed by its drvPath, its own attributes beside the key), and on
+# the value otherwise — the comparator below carries why that image and not a bare drvPath string. Forcing the decision to
 # nothing-is-clean is what `build` over the changed accessor already is — it consults no prior and
 # recomputes every node — so the cold arm is the decision REMOVED rather than a second
 # implementation of it.
@@ -44,7 +44,7 @@
 #   that arms a shape the plane never produces.
 #
 #   ⇒ The consequence, stated plainly rather than left to be inferred: a derivation is hashed on its
-#   tag, and any OTHER value whose walk does not end — a self-loop, a two-cycle, a generated value —
+#   image, and any OTHER value whose walk does not end — a self-loop, a two-cycle, a generated value —
 #   falls back to always-dirty on the walk's depth bound (`lib/hash.nix`; through the plane in
 #   `ci/tests/eager.nix`). The null-hash rule records the first partiality of Nix hashing; that
 #   fallback is how the second one joins it.
@@ -70,8 +70,9 @@ let
   inherit (import ../../lib/hash.nix { }) project;
 
   # THE COMPARATOR, and it is the plane's OWN admission projection rather than a second
-  # implementation of one. A derivation is compared on the tagged `__drvPath` record that
-  # projection produces — its identity as a build — and anything else on the value itself.
+  # implementation of one. A derivation is compared on the image that projection produces — keyed
+  # by its drvPath, its identity as a build, with its own attributes beside the key — and anything
+  # else on the value itself.
   # `drvPath` and not `outPath`: a derivation's identity is fixed at evaluation while its output
   # is fixed by running it, and this is a claim about evaluation.
   #
@@ -95,10 +96,13 @@ let
   # re-implemented the projection could drift from the one the plane hashes with, and the oracle
   # would then be measuring a shape nothing produces.
   #
-  # ★ WHAT THE TAG DOES NOT BUY, named here rather than left to be assumed: INJECTIVITY. It
+  # ★ WHAT THE IMAGE DOES NOT BUY, named here rather than left to be assumed: INJECTIVITY. It
   # NARROWS the collision class rather than closing it, and `lib/hash.nix` carries the argument
   # that no admission-time projection over Nix values can close it. This oracle inherits that
-  # residual and claims nothing beyond the narrowing.
+  # residual and claims nothing beyond the narrowing — and because it compares THROUGH the
+  # projection, it is blind to exactly the declared residue (den-hoag-c5cj R1–R4: a function, a
+  # nested derivation or `passthru`/`tests` content changed inside a derivation's attributes, and
+  # a literal `__outPath`). Those collisions are pinned in `ci/tests/hash.nix`, not here.
   observe = project;
   observeStore = store: lib.mapAttrs (_: observe) store;
 
@@ -441,13 +445,8 @@ in
           d = mkDrv "gen-memo-parity-control" [ ] 1;
         in
         {
-          readsTheField = observe d == { __drvPath = d.drvPath; };
-          readsTheFieldAtDepth =
-            observe { pkg = d; } == {
-              pkg = {
-                __drvPath = d.drvPath;
-              };
-            };
+          readsTheField = (observe d).__drvPath == d.drvPath && !(observe d ? outPath);
+          readsTheFieldAtDepth = (observe { pkg = d; }).pkg == observe d;
           equalsThePlainString = observe d == d.drvPath;
           equalsTheObservedString = observe d == observe d.drvPath;
           storeArmEqualsTheStringStore = observeStore { n = d; } == observeStore { n = d.drvPath; };
