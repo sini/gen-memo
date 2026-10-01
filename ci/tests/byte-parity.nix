@@ -445,7 +445,7 @@ in
           d = mkDrv "gen-memo-parity-control" [ ] 1;
         in
         {
-          readsTheField = (observe d).__drvPath == d.drvPath && !(observe d ? outPath);
+          readsTheField = (observe d).__drvPath or null == d.drvPath && !(observe d ? outPath);
           readsTheFieldAtDepth = (observe { pkg = d; }).pkg == observe d;
           equalsThePlainString = observe d == d.drvPath;
           equalsTheObservedString = observe d == observe d.drvPath;
