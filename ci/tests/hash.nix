@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ genPrelude, lib, ... }:
 let
   inherit (import ../../lib/hash.nix { })
     hashEq
@@ -439,8 +439,8 @@ in
       in
       {
         expr = {
-          present = builtins.match ".*ANCHOR: R10\\.1-RIDER-CLASSKEY-CEILING.*" src != null;
-          absentControl = builtins.match ".*${absentToken}.*" src != null;
+          present = genPrelude.hasInfix "ANCHOR: R10.1-RIDER-CLASSKEY-CEILING" src;
+          absentControl = genPrelude.hasInfix absentToken src;
         };
         expected = {
           present = true;
