@@ -97,12 +97,12 @@ let
   # would then be measuring a shape nothing produces.
   #
   # ★ WHAT THE IMAGE DOES NOT BUY, named here rather than left to be assumed: INJECTIVITY. It
-  # NARROWS the collision class rather than closing it, and `lib/hash.nix` carries the argument
-  # that no admission-time projection over Nix values can close it. This oracle inherits that
-  # residual and claims nothing beyond the narrowing — and because it compares THROUGH the
-  # projection, it is blind to exactly the declared residue (den-hoag-c5cj R1–R4: a function, a
-  # nested derivation or `passthru`/`tests` content changed inside a derivation's attributes, and
-  # a literal `__outPath`). Those collisions are pinned in `ci/tests/hash.nix`, not here.
+  # NARROWS the collision class rather than closing it: the image seals and drops, and
+  # `lib/hash.nix` states why those positions are not read. This oracle inherits that residual and
+  # claims nothing beyond the narrowing — and because it compares THROUGH the projection, it is
+  # blind to exactly the declared residue (den-hoag-c5cj R1–R3 and R5: a function, a nested
+  # derivation or `passthru`/`tests` content changed inside a derivation's attributes, and its
+  # output attributes or `all`). Those collisions are pinned in `ci/tests/hash.nix`, not here.
   observe = project;
   observeStore = store: lib.mapAttrs (_: observe) store;
 

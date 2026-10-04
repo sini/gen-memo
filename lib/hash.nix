@@ -161,6 +161,14 @@ let
   # string alone, so `outPath` (and `__toString`) is BLINDED, renamed under the reserved prefix, at
   # every position.
   #
+  # ★ THE KEY ESCAPE (den-hoag-x67vn, owner ruling 2026-10-04). `blind` is the only site where an
+  # attrset's keys enter the image, and it maps them through `escName`: `outPath` ↦ `__outPath`,
+  # every key beginning `__` ↦ that key with one more `_`, every other key ↦ itself. The three
+  # branches have disjoint images (`{ "__outPath" }`, keys beginning `___`, keys not beginning `__`),
+  # so the map is injective, and its image holds neither a stand-in key (`__drvPath`, `__sealed`,
+  # `__nestedDrv`) nor a key `toJSON` coerces on (`outPath`, `__toString`). No user data can spell a
+  # stand-in, at any position.
+  #
   # ★ INSIDE A DERIVATION'S ATTRIBUTES THE IMAGE SEALS, and what it seals is the residue. Reading
   # a nested `drvPath`, or walking `passthru`, instantiates whatever that value reaches (NixOS
   # tests, package sets, alias throws): measured over 2855 nixpkgs packages, 19.8x thunks, past
@@ -174,17 +182,16 @@ let
   # read UNCHANGED that differ only at (R1) a changed function inside a derivation's attributes;
   # (R2) a nested derivation swapped where it does not feed the outer `drvPath` (a build input
   # still separates through it); (R3) anything inside `passthru` or `tests`, or in a top-level
-  # attribute named in `passthru`; (R4) a literal `__outPath` against the blinded `outPath`.
-  # Presence separates at every seal. 12 of the 2855 packages carry a package set outside
+  # attribute named in `passthru`; (R5) a derivation's output attributes or `all`, which the image
+  # drops. Presence separates at every seal. 12 of the 2855 packages carry a package set outside
   # `passthru` (Haskell `scope`, Lisp `pkgs`) whose walk throws: caught, so always-dirty.
   #
-  # ★★ AND NO IMAGE COULD HAVE CLOSED IT, WHICH IS A THEOREM AND NOT A HEDGE. `project`'s
-  # codomain is a subset of its domain — its output is an ordinary Nix value and hence a
-  # legal input — so it is idempotent while not being the identity, which means some `x`
-  # and `project x` are distinct values with the same image. NO admission-time normalising
-  # projection over Nix values can be injective, whatever it projects to. The reserved
-  # `__` prefix NARROWS the collision class to a literal record spelling an image (R4 is
-  # its plainest instance); injectivity is not claimed, not established and not achievable here.
+  # ★★ WHY THE PROJECTION IS NOT INJECTIVE: IT SEALS AND DROPS, AND FOR NO OTHER REASON. Every
+  # collision above forgets information (a seal keeps presence only, a drop keeps nothing); none
+  # is a user value spelling a stand-in, because the key escape puts every stand-in outside the
+  # image of user data. `project`'s codomain is a subset of its domain, and that does NOT make it
+  # idempotent: `project (project drv)` escapes the image's `__drvPath` and so differs from
+  # `project drv`, which is how the escape separates a literal image from the value it images.
   #
   # ★ WHAT IS NOT REMOVED HERE: the GENERAL non-well-founded class. The projection is
   # lazy and passes a plain self-referential attrset through; the bounded walk above is
@@ -193,17 +200,31 @@ let
   # bounded finiteness, and its bound falls back to always-dirty rather than refuse. A
   # bound that refuses would be the ceiling invented to bound a cost; one that falls back
   # changes cost only.
+  escName =
+    k:
+    if k == "outPath" then
+      "__outPath"
+    else if builtins.substring 0 2 k == "__" then
+      "_" + k
+    else
+      k;
   blind =
     v: m:
-    if v ? outPath || v ? __toString then
-      removeAttrs m [
-        "outPath"
-        "__toString"
-      ]
-      // (if v ? outPath then { __outPath = m.outPath; } else { })
-      // (if v ? __toString then { ____toString = m.__toString; } else { })
+    let
+      touched = builtins.filter (k: k == "outPath" || builtins.substring 0 2 k == "__") (
+        builtins.attrNames v
+      );
+    in
+    if touched == [ ] then
+      m
     else
-      m;
+      removeAttrs m touched
+      // builtins.listToAttrs (
+        map (k: {
+          name = escName k;
+          value = m.${k};
+        }) touched
+      );
   inDrv =
     v:
     if builtins.isFunction v then
@@ -231,7 +252,7 @@ let
           "passthru"
           "tests"
         ]
-        ++ builtins.attrNames (v.passthru or { });
+        ++ map escName (builtins.attrNames (v.passthru or { }));
       in
       builtins.mapAttrs (k: x: if builtins.elem k sealedKeys then { __sealed = true; } else inDrv x) (
         blind own own
@@ -291,11 +312,12 @@ in
   # **THE OTHER HALF IS LIVE AND UNGUARDED, AND IT IS THIS BINDING.** The intra-evaluation
   # reuse decision is keyed on `hashGuarded` and decided by `hashEq`/`hashMoved`, with NO
   # byte-identity gate behind it — the digest is the whole oracle. `project` is
-  # non-injective by the theorem stated above, and its residual direction is FALSE-CLEAN,
-  # the unsound one. So the retired key's term reads here as: *this plane is the consumer
-  # that was told to install a gate, and it has not.* `den-hoag-c5cj` narrowed the class to
-  # the declared R1–R4 above (the suite's `test-c5cj-residue-is-stated` pins each as a collision)
-  # and did not install the gate; this comment records the term rather than discharging it.
+  # non-injective because it seals and drops (stated above), and its residual direction is
+  # FALSE-CLEAN, the unsound one. So the retired key's term reads here as: *this plane is the
+  # consumer that was told to install a gate, and it has not.* `den-hoag-c5cj` narrowed the class
+  # to the declared residue above, `den-hoag-x67vn` closed its spelling member by the key escape
+  # (the suite's `test-c5cj-residue-is-stated` pins each remaining member as a collision), and
+  # neither installed the gate; this comment records the term rather than discharging it.
   #
   # ANCHOR: R10.1-RIDER-CLASSKEY-CEILING
   hashGuarded =

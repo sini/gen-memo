@@ -218,14 +218,15 @@ in
     };
 
     # ── THE RESIDUE, STATED AS CELLS RATHER THAN AS PROSE. ──
-    # (1) The projection is IDEMPOTENT and NOT the identity, so some value and its image are
-    # distinct with the same image: a derivation's image written out literally compares equal to
-    # the derivation, and a literal `__outPath` equal to the blinded `outPath` (R4 below). No tag
-    # closes that — the codomain is a subset of the domain — so injectivity is narrowed here, never
-    # achieved. The bare `{ __drvPath }` record no longer collides: a derivation's image carries
-    # its own attributes beside the key.
+    # (1) The projection is NOT injective, and the only reason is that it seals and drops: two
+    # derivations differing in a function they carry share an image. It is NOT idempotent, though its
+    # codomain is a subset of its domain: the key escape (den-hoag-x67vn) renames the image's own
+    # `__drvPath` when the image is projected again, so a derivation's image written out literally no
+    # longer compares equal to the derivation. Before the escape all three idempotence arms read true
+    # and the literal image collided; that collision was a spelling, and it is closed by design.
     test-projection-is-not-injective = {
       expr = {
+        nonInjectiveBySealing = project (drv // { f = _: 1; }) == project (drv // { f = _: 2; });
         idempotentAtRoot = project (project drv) == project drv;
         idempotentThreeLevel =
           project (project {
@@ -242,10 +243,11 @@ in
         literalTagSeparates = project { __drvPath = drv.drvPath; } != project drv;
       };
       expected = {
-        idempotentAtRoot = true;
-        idempotentThreeLevel = true;
+        nonInjectiveBySealing = true;
+        idempotentAtRoot = false;
+        idempotentThreeLevel = false;
         notTheIdentity = true;
-        literalImageCollides = true;
+        literalImageCollides = false;
         literalTagSeparates = true;
       };
     };
@@ -295,7 +297,7 @@ in
       };
 
     # THE OUTERMOST `outPath` IS BLINDED, NOT DROPPED. An overlay of it keeps the drvPath, and a
-    # cold `"${drv}"` reads the overlaid path, so dropping it read the pair UNCHANGED outside R1–R4.
+    # cold `"${drv}"` reads the overlaid path, so dropping it read the pair UNCHANGED outside the declared residue.
     # `same` is the control that the separation is not bought by collapsing every pair.
     test-c5cj-outermost-outpath-separates =
       let
@@ -335,15 +337,19 @@ in
         };
       };
 
-    # ── THE STATED RESIDUE, R1–R4 (den-hoag-c5cj, the declared ADR-0025 item 1 exception). ──
+    # ── THE STATED RESIDUE, R1–R3 AND R5 (den-hoag-c5cj, the declared ADR-0025 item 1 exception). ──
     # Each pair is distinguished by a cold evaluation and read UNCHANGED by the plane, and each is
     # pinned as a collision so that closing one is a visible change rather than a silent one:
     # (R1) a changed function inside a derivation's attributes, sealed present/absent;
     # (R2) a nested derivation swapped where it does not feed the outer drvPath, sealed
     # present/absent and its drvPath never read; (R3) any change inside `passthru` or `tests`, or
-    # in a top-level attribute named in `passthru`; (R4) a literal `__outPath` against the blinded
-    # `outPath`. The controls are the edges of each seal: presence separates, and a nested
-    # derivation that IS a build input separates through the outer drvPath.
+    # in a top-level attribute named in `passthru` — a `tests` holding a literal `__sealed` record
+    # included, because the seal forgets content whatever spells it; (R5) a derivation's output
+    # attributes and `all`, which the image drops — overlaid or absent. All of these FORGET, and
+    # none is closed by the key escape. `r4OutPath` is the struck member (den-hoag-x67vn): a literal
+    # `__outPath` was a SPELLING of the blinded `outPath`, and the escape separates it by design.
+    # The controls are the edges of each seal: presence separates, and a nested derivation that IS
+    # a build input separates through the outer drvPath.
     test-c5cj-residue-is-stated =
       let
         same = a: b: hashEq (hashGuarded hashOf a) (hashGuarded hashOf b);
@@ -370,7 +376,14 @@ in
           r2NestedSwapAtDepth = same (drv // { x.y = [ e ]; }) (drv // { x.y = [ f ]; });
           r3Tests = same (drv // { tests.x = 1; }) (drv // { tests.x = 2; });
           r3Passthru = same (withPassthru 1) (withPassthru 2);
+          r3TestsSealSpelled = same (drv // { tests.x = 1; }) (drv // { tests.__sealed = true; });
           r4OutPath = same { __outPath = "x"; } { outPath = "x"; };
+          r5OutOverlay = same drv (drv // { out = e; });
+          r5AllOverlay = same drv (drv // { all = [ e ]; });
+          r5MarkerRecord = same (removeAttrs drv [
+            "all"
+            "out"
+          ]) drv;
           controlFunctionPresence = same (drv // { f = _: 1; }) (drv // { f = 1; });
           controlNestedPresence = same (drv // { sub = e; }) (drv // { sub = "x"; });
           controlTestsPresence = same drv (drv // { tests = { }; });
@@ -383,12 +396,148 @@ in
           r2NestedSwapAtDepth = true;
           r3Tests = true;
           r3Passthru = true;
-          r4OutPath = true;
+          r3TestsSealSpelled = true;
+          r4OutPath = false;
+          r5OutOverlay = true;
+          r5AllOverlay = true;
+          r5MarkerRecord = true;
           controlFunctionPresence = false;
           controlNestedPresence = false;
           controlTestsPresence = false;
           controlBuildInput = false;
           controlOutermostSwap = false;
+        };
+      };
+
+    # ── den-hoag-x67vn: THE KEY ESCAPE SEPARATES EVERY SPELLING, ONE CELL PER SPELLING. ──
+    # Each `pair` is a value whose data literally spells a stand-in the image writes, against the
+    # value that stand-in replaces. Each read UNCHANGED before the escape, and separates because no
+    # user key's escaped name is a stand-in key. `same` is the control that the separation is not
+    # bought by separating everything.
+    test-x67vn-literal-sealed-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          pair = sep (drv // { f = _: 1; }) (drv // { f.__sealed = true; });
+          same = sep (drv // { f = _: 1; }) (drv // { f = _: 1; });
+        };
+        expected = {
+          pair = true;
+          same = false;
+        };
+      };
+    test-x67vn-literal-nested-drv-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+        e = mkDrv "gen-memo-residue-e";
+      in
+      {
+        expr = {
+          pair = sep (drv // { s = e; }) (drv // { s.__nestedDrv = true; });
+          same = sep (drv // { s = e; }) (drv // { s = e; });
+        };
+        expected = {
+          pair = true;
+          same = false;
+        };
+      };
+    test-x67vn-literal-blinded-tostring-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          pair = sep (drv // { m.____toString.__sealed = true; }) (drv // { m.__toString = _: "x"; });
+          same = sep (drv // { m.__toString = _: "x"; }) (drv // { m.__toString = _: "x"; });
+        };
+        expected = {
+          pair = true;
+          same = false;
+        };
+      };
+    test-x67vn-literal-outpath-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          pair = sep { __outPath = "x"; } { outPath = "x"; };
+          atDepth = sep { a.b = [ { __outPath = "x"; } ]; } { a.b = [ { outPath = "x"; } ]; };
+          same = sep { outPath = "x"; } { outPath = "x"; };
+        };
+        expected = {
+          pair = true;
+          atDepth = true;
+          same = false;
+        };
+      };
+    test-x67vn-outpath-shadow-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          outermost = sep drv (drv // { __outPath = "junk"; });
+          plain = sep { outPath = "x"; } {
+            outPath = "x";
+            __outPath = "junk";
+          };
+          same = sep drv (drv // { });
+        };
+        expected = {
+          outermost = true;
+          plain = true;
+          same = false;
+        };
+      };
+    test-x67vn-literal-image-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          pair = sep (project drv) drv;
+          same = sep (project drv) (project drv);
+        };
+        expected = {
+          pair = true;
+          same = false;
+        };
+      };
+    test-x67vn-literal-drvpath-separates =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          pair = sep (drv // { __drvPath = "z"; }) drv;
+          same = sep (drv // { __drvPath = "z"; }) (drv // { __drvPath = "z"; });
+        };
+        expected = {
+          pair = true;
+          same = false;
+        };
+      };
+    # THE ESCAPE IS INJECTIVE: its three branches have disjoint images, so a key and its escaped
+    # spelling never meet. An escape that merged two of them would pass every cell above and fail here.
+    test-x67vn-escape-is-injective =
+      let
+        sep = a: b: !(hashEq (hashGuarded hashOf a) (hashGuarded hashOf b));
+      in
+      {
+        expr = {
+          outPathOnce = sep { __outPath = 1; } { ___outPath = 1; };
+          outPathTwice = sep { outPath = "x"; } { ___outPath = "x"; };
+          standInEscaped = sep (drv // { f.___sealed = true; }) (drv // { f.__sealed = true; });
+          underscoreDepth = sep { _a = 1; } { __a = 1; };
+        };
+        expected = {
+          outPathOnce = true;
+          outPathTwice = true;
+          standInEscaped = true;
+          underscoreDepth = true;
         };
       };
 

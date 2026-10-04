@@ -556,8 +556,11 @@ a plane output must be byte-identical to a cold evaluation.
 - **The image of a derivation, and what it reads UNCHANGED** (a declared exception to
   "a value or a named refusal"). The outermost derivation's `drvPath` keys
   the image; its other own attributes are hashed structurally, without `all` and the output
-  attributes. `outPath` and `__toString` are blinded at every position, the outermost included, so `toJSON`
-  no longer reads an attrset carrying `outPath` as that string alone. A literal tag, a derivation
+  attributes. Every key enters the image through one injective escape, at every position, the
+  outermost included: `outPath` becomes `__outPath`, every key beginning `__` gains one more `_`,
+  and every other key is unchanged. So `toJSON` no longer reads an attrset carrying `outPath` as
+  that string alone, and no user data can spell a stand-in the image writes (`__drvPath`,
+  `__outPath`, `__sealed`, `__nestedDrv`). A literal tag, a derivation
   overlaid with `//` (at any depth) and an attrset beside an `outPath` therefore separate. Inside
   a derivation's attributes a function, a nested derivation (its `drvPath` never read), `passthru`,
   `tests` and every attribute named in `passthru` are sealed present/absent, because reading them
@@ -566,15 +569,18 @@ a plane output must be byte-identical to a cold evaluation.
   cold evaluation distinguishes them, when they differ only at **(R1)** a changed function inside
   a derivation's attributes; **(R2)** a nested derivation swapped where it does not feed the outer
   `drvPath`; **(R3)** anything inside `passthru` or `tests`, or in an attribute named in
-  `passthru`; **(R4)** a literal `__outPath` against the blinded `outPath`. Each is pinned as a
-  collision by `ci/tests/hash.nix`'s `test-c5cj-residue-is-stated`. A package carrying a package
+  `passthru`; **(R5)** a derivation's output attributes or `all`, overlaid or absent, which the
+  image drops. Each is pinned as a collision by `ci/tests/hash.nix`'s `test-c5cj-residue-is-stated`.
+  The former R4, a literal record spelling a stand-in (`{ __outPath = x; }` against
+  `{ outPath = x; }`, a literal `__sealed`/`__nestedDrv`/`__drvPath`, a derivation's image written
+  out), is closed by the escape and pinned separating by the `test-x67vn-*` cells. A package carrying a package
   set outside `passthru` whose walk throws (Haskell `scope`, Lisp `pkgs`: 12 of the 2855) is
   always-dirty.
-- **The projection is not injective, and cannot be.** Its codomain is a subset of its domain, so a
-  value and its image can be distinct with the same image: a derivation's image written out
-  literally compares equal to the derivation. The reserved `__` prefix **narrows** the collision
-  class to a literal record spelling an image (R4 is its plainest instance), and the residual
-  direction is false-clean, which is the unsound one.
+- **The projection is not injective, only because it seals and drops.** Every remaining collision
+  forgets information (R1–R3 keep presence only, R5 keeps nothing); none is user data spelling a
+  stand-in. Its codomain is a subset of its domain, and that does not make it idempotent: projecting
+  an image escapes the image's own keys, so a derivation's image written out literally separates
+  from the derivation. The residual direction is false-clean, which is the unsound one.
 - **The plane holds no store fix, and that is not yet the same as holding no evaluator.** A
   self-referential store over the node set, passed into the caller's node computation, is gone from
   `lib/` — the sites that had one now hand the engine a domain, a base and a decision. But a fold
