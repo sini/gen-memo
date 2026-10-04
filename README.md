@@ -569,7 +569,8 @@ a plane output must be byte-identical to a cold evaluation.
   cold evaluation distinguishes them, when they differ only at **(R1)** a changed function inside
   a derivation's attributes; **(R2)** a nested derivation swapped where it does not feed the outer
   `drvPath`; **(R3)** anything inside `passthru` or `tests`, or in an attribute named in
-  `passthru`; **(R5)** a derivation's output attributes or `all`, overlaid or absent, which the
+  `passthru`, an attribute named there as `outPath` or `__toString` included, since passthru
+  content is sealed and so collides by sealing, not by spelling; **(R5)** a derivation's output attributes or `all`, overlaid or absent, which the
   image drops. Each is pinned as a collision by `ci/tests/hash.nix`'s `test-c5cj-residue-is-stated`.
   The former R4, a literal record spelling a stand-in (`{ __outPath = x; }` against
   `{ outPath = x; }`, a literal `__sealed`/`__nestedDrv`/`__drvPath`, a derivation's image written

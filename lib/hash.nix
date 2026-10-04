@@ -177,7 +177,9 @@ let
   #   - a function is `{ __sealed = true; }`;
   #   - a nested derivation is `{ __nestedDrv = true; }`, and its `drvPath` is never read;
   #   - `passthru`, `tests` and every top-level attribute named in `passthru` are
-  #     `{ __sealed = true; }`.
+  #     `{ __sealed = true; }`. The names are matched in the escaped key space, so an attribute
+  #     named in `passthru` as `outPath` or `__toString` is sealed too: it collides by sealing,
+  #     never by spelling a stand-in.
   # THE DECLARED EXCEPTION (ADR-0025 item 1; the suite's `test-c5cj-residue-is-stated`): two values
   # read UNCHANGED that differ only at (R1) a changed function inside a derivation's attributes;
   # (R2) a nested derivation swapped where it does not feed the outer `drvPath` (a build input

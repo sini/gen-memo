@@ -344,7 +344,9 @@ in
     # (R2) a nested derivation swapped where it does not feed the outer drvPath, sealed
     # present/absent and its drvPath never read; (R3) any change inside `passthru` or `tests`, or
     # in a top-level attribute named in `passthru` — a `tests` holding a literal `__sealed` record
-    # included, because the seal forgets content whatever spells it; (R5) a derivation's output
+    # included, because the seal forgets content whatever spells it, and an attribute named in
+    # `passthru` as `outPath` or `__toString`, which the escape brings into the sealed set (base
+    # hashed it); (R5) a derivation's output
     # attributes and `all`, which the image drops — overlaid or absent. All of these FORGET, and
     # none is closed by the key escape. `r4OutPath` is the struck member (den-hoag-x67vn): a literal
     # `__outPath` was a SPELLING of the blinded `outPath`, and the escape separates it by design.
@@ -368,6 +370,7 @@ in
             inherit dep;
           };
         withPassthru = k: drv // { passthru.k = k; } // { inherit k; };
+        passthruNamed = name: v: drv // { passthru.${name} = 1; } // { ${name} = v; };
       in
       {
         expr = {
@@ -376,6 +379,8 @@ in
           r2NestedSwapAtDepth = same (drv // { x.y = [ e ]; }) (drv // { x.y = [ f ]; });
           r3Tests = same (drv // { tests.x = 1; }) (drv // { tests.x = 2; });
           r3Passthru = same (withPassthru 1) (withPassthru 2);
+          r3PassthruNamedOutPath = same (passthruNamed "outPath" "a") (passthruNamed "outPath" "b");
+          r3PassthruNamedToString = same (passthruNamed "__toString" "a") (passthruNamed "__toString" "b");
           r3TestsSealSpelled = same (drv // { tests.x = 1; }) (drv // { tests.__sealed = true; });
           r4OutPath = same { __outPath = "x"; } { outPath = "x"; };
           r5OutOverlay = same drv (drv // { out = e; });
@@ -396,6 +401,8 @@ in
           r2NestedSwapAtDepth = true;
           r3Tests = true;
           r3Passthru = true;
+          r3PassthruNamedOutPath = true;
+          r3PassthruNamedToString = true;
           r3TestsSealSpelled = true;
           r4OutPath = false;
           r5OutOverlay = true;
