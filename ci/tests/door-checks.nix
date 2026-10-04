@@ -150,6 +150,33 @@ in
       ) guarded;
       expected = each (_: [ ]) guarded;
     };
+    # PARITY (den-hoag-ak8va, gate C1; gating): every guarded record step is published AS DATA by
+    # its options step, `__contract.next` (past a positional node), and the nest, read without
+    # application, equals the contract the record step answers with.
+    test-every-guarded-record-step-is-its-options-step-next = {
+      expr = each (
+        d:
+        let
+          recordNext = c: if c != null && c ? positional then recordNext c.next else c;
+        in
+        recordNext (F.options.${d.guardedBy}.door.__contract.next or null) == d.step.__contract
+      ) guarded;
+      expected = each (_: true) guarded;
+    };
+    # THE STATED REACH LOSS (den-hoag-ak8va OQ-1, defaulted until den-hoag-n7ax decides `runScc`'s
+    # home): `runScc ascend` is a positional step whose answer is a record door, and a positional
+    # step is a plain lambda (P2 §p2.3.2), so its record step is published nowhere a walk can read.
+    # Pinned so that the day `runScc` gains a contract, this cell reds and the loss is revisited.
+    test-runScc-publishes-no-nest-the-stated-reach-loss = {
+      expr = {
+        published = genMemo.runScc ? __contract;
+        recordStepBehindIt = (genMemo.runScc (_: _: true)).__contract.name;
+      };
+      expected = {
+        published = false;
+        recordStepBehindIt = "gen-memo.runScc";
+      };
+    };
     # Every options door on the surface is classified: a chained one has a guarded record row, and
     # the rest are named as not chained. `surfaceOptionDoors` is pinned as the enumerator's live
     # control: a walk that found nothing would leave `unclassified` empty too.

@@ -139,9 +139,10 @@ let
   # bound once, here.
   identitiesHeldOptions = prelude.door {
     name = "gen-memo.identitiesHeld";
+    next = identitiesHeldMapsSpec;
     optional = [ "remerged" ];
   };
-  identitiesHeldMaps = prelude.door {
+  identitiesHeldMapsSpec = {
     name = "gen-memo.identitiesHeld";
     required = [
       "priorIdentities"
@@ -150,6 +151,7 @@ let
     open = true;
     optionsStep = identitiesHeld;
   };
+  identitiesHeldMaps = prelude.door identitiesHeldMapsSpec;
   identitiesHeld = identitiesHeldOptions (o: identitiesHeldMaps (identitiesHeldCore o));
   identitiesHeldCore =
     o: args:

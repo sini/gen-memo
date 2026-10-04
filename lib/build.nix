@@ -72,9 +72,13 @@ let
   # `cores.build` is the unchecked core this library's own callers use.
   buildOptions = prelude.door {
     name = "gen-memo.build";
+    next = {
+      positional = "engine";
+      next = buildOperandsSpec;
+    };
     optional = [ "fixpoint" ];
   };
-  buildOperands = prelude.door {
+  buildOperandsSpec = {
     name = "gen-memo.build";
     required = [
       "accessor"
@@ -84,6 +88,7 @@ let
     open = true;
     optionsStep = build;
   };
+  buildOperands = prelude.door buildOperandsSpec;
   build = buildOptions (o: engine: buildOperands (buildCore o engine));
 
   buildCore =
