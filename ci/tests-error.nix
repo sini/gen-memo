@@ -31,6 +31,7 @@
   genScope,
   engine,
   fx,
+  prelude,
   ...
 }:
 let
@@ -51,14 +52,17 @@ let
       fx
       ;
   };
-  quoted = names: lib.concatMapStringsSep ", " (n: "'${n}'") names;
-  name = d: "gen-memo[.]${d}";
+  # gen-prelude's refusal text, composed with this library's own literal door, field and accepted
+  # set (den-hoag-7jltk): every assertion kept, none of gen-prelude's wording copied.
+  inherit (prelude) refusals;
+  exactly = text: "^" + prelude.escapeRegex text + "$";
+  name = d: "gen-memo.${d}";
   optionGoldens = key: row: {
     "test-${lib.toLower key}-unknown-option-message" = {
       expr = row.door { unknownField = 1; };
       expectedError = {
         type = "ThrownError";
-        msg = "^${name key}: 'unknownField' is not an option of this door; the options are closed [(]accepted: ${quoted row.optional}[)] [(]in prelude[.]checkOptions[)]$";
+        msg = exactly (refusals.unknownOption (name key) row.optional "unknownField");
       };
     };
   };
@@ -66,21 +70,20 @@ let
     key: row:
     let
       k = lib.toLower key;
-      req = "[(]required: ${quoted row.required}[)] [(]in prelude[.]checkRequired[)]";
     in
     {
       "test-${k}-missing-required-field-message" = {
         expr = row.step (builtins.removeAttrs row.good [ row.drop ]);
         expectedError = {
           type = "ThrownError";
-          msg = "^${name key}: required field '${row.drop}' is missing ${req}$";
+          msg = exactly (refusals.missingField (name key) row.required row.drop);
         };
       };
       "test-${k}-non-attrset-argument-message" = {
         expr = row.step 1;
         expectedError = {
           type = "ThrownError";
-          msg = "^${name key}: the argument must be an attrset, not a int ${req}$";
+          msg = exactly (refusals.recordNotASet (name key) row.required 1);
         };
       };
     }
@@ -93,7 +96,7 @@ let
           expr = row.step (row.good // { ${o} = null; });
           expectedError = {
             type = "ThrownError";
-            msg = "^${name key}: '${o}' is an option of ${name row.guardedBy}, not a field of this record [(]in prelude[.]checkGuarded[)]$";
+            msg = exactly (refusals.guardedField (name key) (name row.guardedBy) o);
           };
         };
       }
