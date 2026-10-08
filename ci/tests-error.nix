@@ -277,11 +277,12 @@ in
       };
     };
 
-    # An extra lattice key is admitted and not read (R5's open record; whether the lattice record
-    # should be closed is a separate question, den-hoag-c54n4 OQ2): the run whose member `a`
-    # carries `eq = _: _: false` settles exactly where the clean run does. A SUCCESS cell, so that
-    # a driver which read `eq`, or refused the key, is a visible change. The two clean cells are
-    # its control and every refusal cell's above: `runScc` does not refuse every lattice.
+    # An extra lattice key is admitted and not read, the lattice record's existing disposition for
+    # any key it does not name (whether that record should be closed is den-hoag-c54n4 OQ2): the
+    # run whose member `a` carries `eq = _: _: false` settles exactly where the clean run does. A
+    # SUCCESS cell, so that a driver which read `eq`, or refused the key, is a visible change. The
+    # two clean cells are its control and every refusal cell's above: `runScc` does not refuse
+    # every lattice.
     flake.tests.runScc-extra-lattice-key = {
       test-an-eq-key-is-admitted-and-not-read = {
         expr = {
