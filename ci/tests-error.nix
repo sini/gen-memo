@@ -16,9 +16,8 @@
 # `ci/tests/restabilize.nix` asserts the exhausted-bound and undeclared-bound pair as
 # `(tryEval …).success == false`, which is a claim that SOMETHING threw and says nothing about WHAT.
 # A combinator carrying any one refusal satisfies a bare boolean, and the blame set — the members
-# that owe a declaration, the members still moving and by how much, or the member that still
-# carries the retired `eq` key (den-hoag-m6y9p / den-hoag-k2p6 OQ-1) — is the whole content of
-# these three throws. Reading it needs `expectedError`, and `expectedError` needs a cell whose
+# that owe a declaration, the members still moving and by how much, or the member that lacks a
+# lattice — is the whole content of these three throws. Reading it needs `expectedError`, and `expectedError` needs a cell whose
 # `expr` may abort, which is what this file is for.
 #
 # ★ `msg` IS A POSIX ERE, NOT A LITERAL, and the messages are JSON blobs: every `{`, `}`, `[` and `]`
@@ -181,10 +180,10 @@ let
     };
   };
 
-  # ── THE THIRD REFUSAL (den-hoag-m6y9p / den-hoag-k2p6 OQ-1): a lattice record carrying the
-  # RETIRED `eq` key. Same accessor and SCC as `undeclaredRun` above, member `a`'s lattice
-  # otherwise complete (bottom/join/maxIter all present) but for the one offending key, so the
-  # refusal below is caused by `eq` alone and by nothing else.
+  # ── AN EXTRA LATTICE KEY IS ADMITTED AND NEVER READ (den-hoag-m6y9p / den-hoag-k2p6 OQ-1):
+  # quiescence is structural `==` for every member, so an `eq` on member `a`'s lattice is an
+  # extra key of the record. `eq = _: _: false` never declares quiescence, so a driver that read
+  # it would not settle where the clean run does. Same accessor and SCC as `cleanRun` below.
   eqKeyedRun = runScc {
     accessor = agreeAccessor;
     store = { };
@@ -196,12 +195,12 @@ let
     ];
     lattices = {
       a = overwriteLattice // {
-        eq = (a: b: a == b);
+        eq = _: _: false;
       };
       b = overwriteLattice;
     };
   };
-  # ── THE FOURTH REFUSAL (den-hoag-8iw8): a DIRECT caller that supplies no lattice for member `b`.
+  # ── THE THIRD REFUSAL (den-hoag-8iw8): a DIRECT caller that supplies no lattice for member `b`.
   # `build`'s own precheck never reaches `runScc` with an undeclared member, but `runScc` is public,
   # and without its own guard the first `lattices.${m}` read aborts with `attribute 'b' missing`,
   # which `tryEval` cannot contain. Same accessor and SCC as above, `a`'s lattice complete.
@@ -218,8 +217,7 @@ let
       a = overwriteLattice;
     };
   };
-  # THE LIVE CONTROL — the identical accessor/SCC/recompute, neither member's lattice carrying
-  # `eq`, settles under structural `==` in the same run.
+  # The identical accessor/SCC/recompute, neither member's lattice carrying an extra key.
   cleanRun = runScc {
     accessor = agreeAccessor;
     store = { };
@@ -266,18 +264,6 @@ in
           msg = ''^gen-memo: cyclic member declares no maxIter: \{"nodes":\["a"\],"scc":\["a","b"\],"why":"undeclared-maxiter"\}$'';
         };
       };
-      # THE RETIRED-KEY REFUSAL (den-hoag-m6y9p / den-hoag-k2p6 OQ-1). `nodes` is the member that
-      # still carries `eq` and `scc` is the whole component, DIFFERENT lists here for the same
-      # reason as above: a refusal that blamed the component rather than the offending member
-      # would satisfy any predicate that read only one of them. `key` names the offending field —
-      # `eq` is the only lattice key this refusal ever fires on.
-      test-a-retired-eq-key-blames-the-member-that-carries-it = {
-        expr = builtins.deepSeq eqKeyedRun true;
-        expectedError = {
-          type = "ThrownError";
-          msg = ''^gen-memo: cyclic member declares retired lattice key: \{"key":"eq","nodes":\["a"\],"scc":\["a","b"\],"why":"retired-eq-key"\}$'';
-        };
-      };
       # THE MISSING-LATTICE REFUSAL (den-hoag-8iw8). `type` is the load-bearing half: before the
       # guard this read was an uncatchable `TypeError` (`attribute 'b' missing`), and a named
       # `ThrownError` is what makes it catchable. `nodes` (the member lacking a lattice) and `scc`
@@ -291,12 +277,20 @@ in
       };
     };
 
-    # THE LIVE CONTROL for the retired-key refusal, same predicate class as `runScc-refusals`
-    # above but a SUCCESS cell: the identical accessor, SCC and recompute as `eqKeyedRun`, neither
-    # member's lattice carrying `eq`, settles under structural `==` — in the SAME run. Without
-    # this cell, a `runScc` that refused every lattice unconditionally would satisfy the refusal
-    # test above for the wrong reason.
-    flake.tests.runScc-eq-retirement-control = {
+    # An extra lattice key is admitted and not read (R5's open record; whether the lattice record
+    # should be closed is a separate question, den-hoag-c54n4 OQ2): the run whose member `a`
+    # carries `eq = _: _: false` settles exactly where the clean run does. A SUCCESS cell, so that
+    # a driver which read `eq`, or refused the key, is a visible change. The two clean cells are
+    # its control and every refusal cell's above: `runScc` does not refuse every lattice.
+    flake.tests.runScc-extra-lattice-key = {
+      test-an-eq-key-is-admitted-and-not-read = {
+        expr = {
+          inherit (eqKeyedRun) a b;
+        };
+        expected = {
+          inherit (cleanRun) a b;
+        };
+      };
       test-clean-lattice-settles-under-structural-eq-a = {
         expr = cleanRun.a;
         expected = 5;

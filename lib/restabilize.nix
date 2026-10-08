@@ -69,8 +69,8 @@ let
   # ★ NO PER-MEMBER `eq`. den-hoag-k2p6 OQ-1 (owner-ruled 2026-09-09): gen-scope's closeCycle keeps
   # its quotient ruling — a coarse-equality carrier is not driven in a shared round — so a per-member
   # equality predicate published here is content the ruled engine will never honour. Quiescence is
-  # structural `==` for EVERY member; a lattice record still carrying `eq` is refused by name below,
-  # not silently accepted (ADR-0008 item 2: this plane decides reuse and never evaluates).
+  # structural `==` for EVERY member; a lattice record is `{ bottom; join; maxIter; widen ? null; }`
+  # (ADR-0008 item 2: this plane decides reuse and never evaluates).
   #
   # It is CURRIED rather than taken as a module argument, and the reason is scope: `build.nix` binds
   # this function in a top-level `let`, outside the `engine:` lambda, so `engine.ascend` is not
@@ -109,8 +109,7 @@ let
         lattices
         ;
       M = scc;
-      # Quiescence is structural `==` for every member — the retired `eq` term's only surviving
-      # value (den-hoag-m6y9p / den-hoag-k2p6 OQ-1).
+      # Quiescence is structural `==` for every member (den-hoag-m6y9p / den-hoag-k2p6 OQ-1).
       structEq = a: b: a == b;
 
       # A member with no lattice at all is refused BY NAME before any `lattices.${m}` read: that
@@ -121,16 +120,6 @@ let
       undeclaredLatticeBlame = {
         why = "undeclared-lattice";
         nodes = undeclaredLattice;
-        scc = M;
-      };
-
-      # A lattice record that still carries the retired `eq` key is refused BY NAME (member id +
-      # the offending key), never silently ignored.
-      eqKeyed = prelude.filter (m: lattices.${m} ? eq) M;
-      eqKeyedBlame = {
-        why = "retired-eq-key";
-        key = "eq";
-        nodes = eqKeyed;
         scc = M;
       };
 
@@ -212,8 +201,6 @@ let
     # Refused-by-name blames are tryEval-CATCHABLE thrown blames, never Nix infinite recursion.
     if undeclaredLattice != [ ] then
       throw "gen-memo: cyclic member declares no lattice: ${builtins.toJSON undeclaredLatticeBlame}"
-    else if eqKeyed != [ ] then
-      throw "gen-memo: cyclic member declares retired lattice key: ${builtins.toJSON eqKeyedBlame}"
     else if undeclaredBound != [ ] then
       throw "gen-memo: cyclic member declares no maxIter: ${builtins.toJSON undeclaredBoundBlame}"
     else if final.settled then
