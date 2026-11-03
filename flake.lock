@@ -5,11 +5,11 @@
         "gen-prelude": "gen-prelude"
       },
       "locked": {
-        "lastModified": 1793653136,
-        "narHash": "sha256-co26ui4dPq/pqbadI9hnSEhaV0AibU9UdcFIC/ig59M=",
+        "lastModified": 1793727726,
+        "narHash": "sha256-nYeLSosCelb1sDSSJzJabzSZ1inaPu6+jQcW15NGd4g=",
         "owner": "sini",
         "repo": "gen-graph",
-        "rev": "493af90cf3fdbe35d52afeea41825cc5ef082d5f",
+        "rev": "edfe3d51b9bf0c3a4b5abb92cd04ec27de4393b0",
         "type": "github"
       },
       "original": {
@@ -20,11 +20,11 @@
     },
     "gen-prelude": {
       "locked": {
-        "lastModified": 1793653087,
-        "narHash": "sha256-jf3MzKgEQUwX5n9eTPerizLQ6gJGWwjEcc1OBQBjMiw=",
+        "lastModified": 1793727693,
+        "narHash": "sha256-pjT+dPUh+0ctLyrOq1izIXWQfxTzObCDRKVVrmcXc24=",
         "owner": "sini",
         "repo": "gen-prelude",
-        "rev": "2a8e5faf39c1061678e837bc275fb1fdf4f014d0",
+        "rev": "18608069f1271035065edaec3e49c4bba7033c40",
         "type": "github"
       },
       "original": {
@@ -35,11 +35,11 @@
     },
     "gen-prelude_2": {
       "locked": {
-        "lastModified": 1793653087,
-        "narHash": "sha256-jf3MzKgEQUwX5n9eTPerizLQ6gJGWwjEcc1OBQBjMiw=",
+        "lastModified": 1793727693,
+        "narHash": "sha256-pjT+dPUh+0ctLyrOq1izIXWQfxTzObCDRKVVrmcXc24=",
         "owner": "sini",
         "repo": "gen-prelude",
-        "rev": "2a8e5faf39c1061678e837bc275fb1fdf4f014d0",
+        "rev": "18608069f1271035065edaec3e49c4bba7033c40",
         "type": "github"
       },
       "original": {
