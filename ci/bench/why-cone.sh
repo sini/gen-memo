@@ -2,10 +2,10 @@
 # Reads the `why-cone.nix` pairing: the allocation axes, and the wall clock under the
 # standing five-arm protocol.
 #
-#   ./ci/bench/why-cone.sh alloc                   -> arm answer list sets nrLookups
-#   ./ci/bench/why-cone.sh calibrate [rounds]      -> per-arm window gap maximum, beside the
+#   nix develop ./ci --command ./ci/bench/why-cone.sh alloc                   -> arm answer list sets nrLookups
+#   nix develop ./ci --command ./ci/bench/why-cone.sh calibrate [rounds]      -> per-arm window gap maximum, beside the
 #                                                     rows it is read from
-#   ./ci/bench/why-cone.sh wall <bound%> [rounds]  -> per-arm readings, then ADMISSIBLE | VOID
+#   nix develop ./ci --command ./ci/bench/why-cone.sh wall <bound%> [rounds]  -> per-arm readings, then ADMISSIBLE | VOID
 #
 # ★ THE WALL BOUND IS REQUIRED AND HAS NO DEFAULT, and that is P5's rule rather than a
 # usability choice: a default would certify P4 and P5 against a figure the running host
@@ -48,6 +48,16 @@
 # failure this whole apparatus exists to avoid.
 set -u
 cd "$(dirname "$0")/../.." || exit 99
+# The counted evaluations are serial (gen-harness `lib.serialEval`, which the ci devshell exports): a thunk
+# count is defined only for a serial run. Outside the devshell this refuses, rather than read unpinned.
+[ -n "${GEN_SERIAL_EVAL:-}" ] || {
+  echo "why-cone: CONTROL FAILED: GEN_SERIAL_EVAL is unset; run under nix develop ./ci" >&2
+  exit 2
+}
+# shellcheck disable=SC1090
+source "$GEN_SERIAL_EVAL"
+serialEvalOptions "$(command -v nix-instantiate)" || exit 2
+echo "why-cone: serial options: ${SERIAL_EVAL[*]:-(none)}"
 
 BENCH=./ci/bench/why-cone.nix
 MODE=${1:-alloc}
@@ -94,7 +104,7 @@ alloc)
     f="$tmp/$a.json"
     # A cell that fails prints FAILED on every column. It must never print zeros: a cell
     # that did not run is not a cell that allocated nothing.
-    if ! out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$f" nix-instantiate --eval --strict \
+    if ! out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$f" nix-instantiate "${SERIAL_EVAL[@]}" --eval --strict \
       --impure --argstr arm "$a" "$BENCH" 2>"$tmp/$a.err"); then
       printf '%-11s %8s %14s %12s %14s\n' "$a" FAILED FAILED FAILED FAILED
       cat "$tmp/$a.err" >&2
