@@ -40,6 +40,13 @@ let
       text = builtins.readFile e.path;
     }) entries;
 
+  strip =
+    entries:
+    map (e: {
+      inherit (e) name;
+      code = stripComments e.text;
+    }) entries;
+
   # THE SUBJECT: the library tree plus its two roots. `reference/schedule.nix` is deliberately NOT
   # a member — it is the store-fix control's subject, not the library scan's, and joining it would
   # widen the library cell past `lib/**` plus the two roots and move both published label lists
@@ -67,10 +74,7 @@ let
       }
     ];
 
-  sources = map (s: {
-    inherit (s) name;
-    code = stripComments s.text;
-  }) rawSources;
+  sources = strip rawSources;
 
   # Tokens that signal a nixpkgs-lib tether or the module-system (Korora-class) tier.
   forbidden = [
