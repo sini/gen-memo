@@ -27,5 +27,16 @@ rec {
   # that the plane's answer equals gen-graph's over the same relation; an oracle that reached for
   # the subject's own adapter would go green on a defect inside that adapter, which is the one
   # place a relation rename is most likely to put one.
+  # contractRelation — a fixture's relation, written as a function over the scope's root ids, put
+  # through the constructor the seal carries. A ctx the plane is handed carries that value and no
+  # other: the warm pass is armed with it, as the cold fold is.
+  contractRelation =
+    scope: dependenciesOf:
+    graph.mkDeclaredEdges (
+      builtins.mapAttrs (
+        id: _: map (graph.mkNodeRef (x: scope.nodes ? ${x})) (dependenciesOf id)
+      ) scope.nodes
+    );
+
   graphOf = a: builtins.removeAttrs a [ "dependencies" ] // { edges = a.dependencies; };
 }

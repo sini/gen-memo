@@ -326,11 +326,16 @@ which it must be revisited; `ci/tests/accessor-modes.nix` pins both halves.
 - **`warmOverride` is a data-change operation too, and refuses the other kind BY NAME.** It decides
   reuse from a cone read over the topology as it stands, so an edit carrying an edge key throws
   rather than being served a decision computed against a shape that no longer holds.
-- **The warm fold's soundness rests on the caller's declared edge relation OVER-DECLARING cross-node
-  reads.** A consumer that reads another node's attribute without declaring the edge sits outside
-  the cone, is judged clean, and is served its stale prior. That is not a defect in the cone; it is
-  what an under-declared relation means, and `ci/tests/warm-override-cross-node.nix` witnesses both
-  branches rather than only the agreeable one.
+- **The warm pass is armed with the relation the cold fold sealed.** `warmOverride` hands the ctx's
+  `declaredDependencies` to `evalWarm`, so a node it recomputes refuses an undeclared `self.node`,
+  `self.get` or `self.getRepresentative` read exactly as the cold fold does, and a reader of that
+  kind is never left outside the cone to be served a stale prior. A ctx whose `declaredDependencies`
+  is not `gen-graph.mkDeclaredEdges`' relation, a missing field included, is refused by name.
+  The guard reaches those three names only: a body reading another node through a different field
+  of its reader is not refused and, outside the cone, is still served its stale prior. For those
+  reads soundness still rests on the relation OVER-DECLARING them.
+  `ci/tests/warm-override-cross-node.nix` and `ci/tests/warm-read-seam.nix` witness the refusal and
+  a served prior.
 - **Store equality is over hashable values.** A node whose value carries a function is sound by
   being always-dirty, not by comparing equal.
 - **The cyclic path is outside the acyclic envelope.** Per-SCC convergence rests on the consumer's
@@ -355,7 +360,7 @@ nix-unit --flake ./ci#tests              # run everything; unguarded
 `_`-prefixed included — and the remedy is `git add` or a move. The unguarded forms read a
 git-filtered copy of the tree, so an untracked cell is silently absent and the run stays green.
 
-33 suites, 435 tests (`nix-unit --flake ./ci#tests` ⇒ `435/435 successful`). Beyond the migrated content's own, two are the plane's oracles, and one more, `gen-ci-examples`, is gen-harness's examples guard (declared in `ci/tests/examples.nix`, `gen.ci.examples`), holding that `examples/` directory names equal the declared names and that every declared example forces under `deepSeq`:
+35 suites, 476 tests (`nix-unit --flake ./ci#tests` ⇒ `476/476 successful`). Beyond the migrated content's own, two are the plane's oracles, and one more, `gen-ci-examples`, is gen-harness's examples guard (declared in `ci/tests/examples.nix`, `gen.ci.examples`), holding that `examples/` directory names equal the declared names and that every declared example forces under `deepSeq`:
 
 - **`byte-parity`** — the definition, armed: the same input evaluated twice, once with the decision
   forced to nothing-is-clean, compared on the image the admission projection produces wherever

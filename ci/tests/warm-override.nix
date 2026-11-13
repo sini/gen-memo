@@ -20,6 +20,7 @@
   genMemo,
   genScope,
   engine,
+  fx,
   ...
 }:
 let
@@ -77,8 +78,10 @@ let
     }:
     let
       attributes = attributesFor scope;
+      contracted = fx.contractRelation scope declaredDependencies;
       eval = genScope.eval {
         inherit parseParent;
+        declaredDependencies = contracted;
       } attributes scope;
     in
     {
@@ -87,14 +90,14 @@ let
         attributes
         parseParent
         eval
-        declaredDependencies
         ;
+      declaredDependencies = contracted;
       # The node map, published under the name the seal publishes it under. The fixture mirrors
       # `foldEquations`' shape rather than inventing one: both fields, off the one record.
       roots = scope.nodes;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        dependencies = declaredDependencies;
+        dependencies = contracted.dependencies;
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };

@@ -137,6 +137,7 @@ in
       expected = [
         "accessor"
         "attributes"
+        "declaredDependencies"
         "eval"
         "fixpoint"
         "hashOf"
@@ -160,6 +161,7 @@ in
       expr = srt dotOnly;
       expected = [
         "accessor"
+        "declaredDependencies"
         "eval"
         "fixpoint"
         "hashOf"

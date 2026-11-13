@@ -1,22 +1,26 @@
-# The cross-node warm-serve path — and the one cell in this repository that separates a SERVED
-# value from a recomputed one by its value alone.
+# The cross-node warm-serve path, and the cells that separate a SERVED value from a recomputed one.
 #
 # A `consumer` node reads a `producer` node's resolutional attribute. The plane reads the cone from
-# the DECLARED edge relation, so soundness holds exactly when that relation over-declares the
-# cross-node read:
+# the declared edge relation, and the warm pass is armed with that relation, as the cold fold is:
 #
 #   declared consumer→producer  ⇒ consumer is in the cone, re-derives, byte-identical to cold
-#   relation empty              ⇒ consumer is outside the cone, is CLEAN, and is served its stale
-#                                 prior — 101 rather than 109
+#   relation empty              ⇒ the `self.get` read is REFUSED, warm as cold, rather than served
+#                                 its stale prior
 #
-# The second is the witness. It is the only assertion here that fails against an evaluator that
-# warm-serves nothing at all, which is why the suite carries it rather than only the agreeable half:
-# an over-declaration contract with no cell for the under-declared case documents a rule whose
-# violation has never been observed.
+# The guard covers the reader's `self.node`, `self.get` and `self.getRepresentative`. A body reading
+# another node through a different field of its reader is not refused and can still be served
+# stale; this suite seeds `self.get` only.
+#
+# Reuse is witnessed without an under-declaration: the prior is evaluated under a program whose
+# `tag` differs from the one the warm pass runs, so a node outside the cone answers the PRIOR's tag
+# when it is served and the program's when it is recomputed. Without that cell a plane that served
+# nothing would pass every other one here. No `foldEquations` seals such a ctx: it is a fixture for
+# the reuse fact, not an example of a seal.
 {
   genMemo,
   genScope,
   engine,
+  fx,
   ...
 }:
 let
@@ -54,15 +58,22 @@ let
     # The cross-node read: a resolutional attribute of one node reading a resolutional attribute of
     # another. Nothing in the substrate declares this edge; the caller's relation must.
     sees = self: id: if id == "consumer" then (self.get "producer" "p-val") + 100 else 0;
+    tag = _self: _id: "program";
   };
 
   mkCtx =
-    { scope, declaredDependencies }:
+    {
+      scope,
+      declaredDependencies,
+      priorAttributes ? attributes,
+    }:
     let
       parseParent = _: null;
+      contracted = fx.contractRelation scope declaredDependencies;
       eval = genScope.eval {
         inherit parseParent;
-      } attributes scope;
+        declaredDependencies = contracted;
+      } priorAttributes scope;
     in
     {
       inherit
@@ -70,14 +81,14 @@ let
         attributes
         parseParent
         eval
-        declaredDependencies
         ;
+      declaredDependencies = contracted;
       # The node map, published under the name the seal publishes it under. The fixture mirrors
       # `foldEquations`' shape rather than inventing one: both fields, off the one record.
       roots = scope.nodes;
       accessor = {
         nodes = builtins.attrNames eval.allNodes;
-        dependencies = declaredDependencies;
+        dependencies = contracted.dependencies;
         parent = parseParent;
         nodeData = id: (eval.node id).decls or { };
       };
@@ -104,12 +115,24 @@ let
     inherit declaredDependencies;
   };
 
-  # (2) the read is NOT declared — the consumer is outside the cone and is served stale
+  # (2) the read is NOT declared — refused, warm as cold
   ctxN = mkCtx {
     scope = mkScope 1;
     declaredDependencies = _: [ ];
   };
   ctxN' = bump ctxN;
+
+  # (3) the reuse witness: the prior ran a program whose `tag` disagrees with the one the warm pass runs
+  ctxR = mkCtx {
+    scope = mkScope 1;
+    inherit declaredDependencies;
+    priorAttributes = attributes // {
+      tag = _self: _id: "prior";
+    };
+  };
+  # the edit lands on the consumer, whose reverse cone is itself, so the producer is clean
+  ctxR' = warmOverride engine ctxR "consumer" { w = 1; };
+  refuses = v: !(builtins.tryEval (builtins.deepSeq v v)).success;
 in
 {
   flake.tests.warm-override-cross-node = {
@@ -130,12 +153,28 @@ in
       expected = true;
     };
 
-    # THE WITNESS. Under-declared cross-edge: the consumer is clean, `sees` is resolutional, and the
-    # value served is the PRIOR one — 100 + the old v=1. A recompute would answer 109. Reuse is
-    # observable here and nowhere else in this suite.
-    test-undeclared-serves-stale = {
-      expr = project ctxN' "consumer" "sees";
-      expected = 101;
+    # Under-declared cross-edge: the read is refused on the cold fold and on the warm pass alike.
+    test-undeclared-read-is-refused-cold = {
+      expr = refuses (project ctxN "consumer" "sees");
+      expected = true;
+    };
+    test-undeclared-read-is-refused-warm-not-served-stale = {
+      expr = refuses (project ctxN' "consumer" "sees");
+      expected = true;
+    };
+
+    # THE REUSE WITNESS. The consumer is edited and recomputes; the producer is outside its cone and
+    # is served. `tag` reads nothing, so a served `tag` is the prior program's and a recomputed one
+    # the warm pass's: the same ctx shows both arms.
+    test-a-clean-node-is-served-its-prior = {
+      expr = [
+        (project ctxR' "consumer" "tag")
+        (project ctxR' "producer" "tag")
+      ];
+      expected = [
+        "program"
+        "prior"
+      ];
     };
   };
 }

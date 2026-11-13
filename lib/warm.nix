@@ -214,7 +214,7 @@ let
         ) ctx.scope.nodes ids;
       };
       accessor' = ctx.accessor // {
-        nodeData = nid: (scope'.nodes.${nid} or { decls = { }; }).decls;
+        nodeData = nid: (eval'.node nid).decls or { };
       };
 
       # The prior is the same evaluation's own restricted facade — `get`, `nodeIds`,
@@ -226,11 +226,28 @@ let
 
       # `evalWarm { parseParent; } { scope; attributes; prior; decision; }` (gen-scope P2, R7): the
       # one option first, then the four operands as one record.
-      eval' = engine.evalWarm { inherit (ctx) parseParent; } {
-        scope = scope';
-        inherit (ctx) attributes;
-        inherit prior decision;
-      };
+      eval' =
+        engine.evalWarm
+          {
+            inherit (ctx) parseParent;
+            # The warm pass runs under the contract the cold fold ran under, so it refuses what that fold
+            # refuses. The seal carries the contracted relation; anything else, a missing field
+            # included, is refused here by name, since `null` would reach the evaluator as "no
+            # contract" and serve an undeclared read. The check is a marker test: it holds of any
+            # value the constructor built, not of the one behind the ctx's own `accessor`.
+            declaredDependencies =
+              if ctx ? declaredDependencies && graph.isDeclaredEdges ctx.declaredDependencies then
+                ctx.declaredDependencies
+              else
+                throw "gen-memo.warm: the ctx's `declaredDependencies` must be the relation `gen-graph.mkDeclaredEdges` returns, as `foldEquations` seals it; received ${
+                  if ctx ? declaredDependencies then builtins.typeOf ctx.declaredDependencies else "no such field"
+                }. The warm pass is armed with the relation the cold fold was armed with, and a ctx that carries none would be served reads the cold fold refuses.";
+          }
+          {
+            scope = scope';
+            inherit (ctx) attributes;
+            inherit prior decision;
+          };
 
       # The verifying-trace shape (Mokhov 2018 §4.2.2): per key, its deps and a content hash. The
       # deps are the accessor's own declared dependencies, read where they live rather than through
