@@ -13,7 +13,7 @@
 # plane holding it would be a plane that accumulates its own evaluation state — the failure the
 # decision interface exists to make inexpressible. `lib/` does not import this file and
 # `lib/default.nix` does not fold it in; it reaches the plane only by being handed in, the same
-# way `evalWarm` is handed to the warm fold.
+# way `foldEquations` is handed to the warm fold.
 #
 # WHY IT SHIPS AT ALL, rather than each caller writing five lines. A caller that HAS an evaluator
 # hands that instead, and that is the intended direction. But a caller with none — a test, an

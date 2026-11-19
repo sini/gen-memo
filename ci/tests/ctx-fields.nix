@@ -123,7 +123,7 @@ let
 in
 {
   flake.tests."ctx-fields" = {
-    # ★★★ THE ORACLE. The eleven fields the plane reads, asserted by identity.
+    # ★★★ THE ORACLE. The fields the plane reads, asserted by identity.
     #
     # This cell is SELF-ARMING against a severed subject in a way the absence cells in `purity.nix`
     # are not: its expectation is a non-empty exact list, so a scan of nothing, or of constant
@@ -132,11 +132,10 @@ in
     #
     # A field ADDED to the plane's reads reds this cell with the new name in the diff; a field
     # DROPPED reds it with the name missing. Either way the interface moves loudly.
-    test-ctx-field-set-is-the-published-eleven = {
+    test-ctx-field-set-is-the-published-set = {
       expr = required;
       expected = [
         "accessor"
-        "attributes"
         "declaredDependencies"
         "eval"
         "fixpoint"
@@ -144,14 +143,16 @@ in
         "parseParent"
         "pending"
         "recompute"
+        "schedule"
         "scope"
+        "settings"
         "store"
         "trace"
       ];
     };
 
     # ★★★ THE INSTRUMENT LESSON, AS A CELL RATHER THAN A COMMENT. The dot form alone falls short of
-    # the eleven. This is the exact defect the interface spec's gate hit, and it is reproduced here
+    # the set. This is the exact defect the interface spec's gate hit, and it is reproduced here
     # so that a future editor who "simplifies" the extractor down to one form reds THIS cell and
     # reads why, instead of silently narrowing the oracle.
     #
@@ -177,9 +178,10 @@ in
     test-control-inherit-form-carries-the-rest = {
       expr = srt (lib.subtractLists dotOnly inheritOnly);
       expected = [
-        "attributes"
         "parseParent"
         "recompute"
+        "schedule"
+        "settings"
       ];
     };
 
@@ -208,7 +210,7 @@ in
 
     # ★ THE SCAN'S SUBJECT, membership half — which files were read, by identity. The oracle cell
     # reds on an emptied subject, but it cannot distinguish a scan of the whole library from a scan
-    # of the six files that happen to carry all eleven names between them. This cell is what reds
+    # of the six files that happen to carry all of the names between them. This cell is what reds
     # that narrowing, and it is where a new library file arrives.
     test-ctx-scan-subject-is-the-library-tree = {
       expr = map (s: s.name) sources;

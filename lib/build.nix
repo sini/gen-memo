@@ -18,7 +18,7 @@
 # would stand a second scheduler beside the evaluator's in a design whose premise is
 # that Nix's laziness already is the scheduler. So `build` takes the engine and CALLS
 # it, supplying the domain, the base and a decision, exactly as the warm fold takes
-# `evalWarm` and calls that. A caller of an evaluator is not an evaluator.
+# `foldEquations` and calls that. A caller of an evaluator is not an evaluator.
 #
 # Consumes a gen-graph accessor (the topology oracle) and a caller-supplied
 # `recompute` (the node-eval, `accessor -> store -> id -> value`). Pre-checks

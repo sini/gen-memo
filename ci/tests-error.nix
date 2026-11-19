@@ -305,6 +305,39 @@ in
     # SUCCESS cell, so that a driver which read `eq`, or refused the key, is a visible change. The
     # two clean cells are its control and every refusal cell's above: `runScc` does not refuse
     # every lattice.
+    # The warm fold's engine record is checked at the entry: a record carrying `evalWarm` alone, the
+    # one this fold took before its pass was sealed through `foldEquations`, is refused by name with
+    # its repair, not left to a missing-attribute abort nothing can catch.
+    flake.testsError.warm-engine-record = {
+      test-an-evalWarm-only-engine-is-refused-by-name-with-its-repair = {
+        expr =
+          let
+            scope = genScope.buildRoots {
+              kinds = genScope.mkKinds [ (genScope.mkKind { } "host") ];
+              decls.n.v = 1;
+              types.n = "host";
+            };
+            ctx = genScope.foldEquations { } {
+              inherit scope;
+              parseParent = _: null;
+              schedule.equations.v = {
+                name = "v";
+                kind = "synthesized";
+                readsAttrs = [ ];
+                stratum = "resolution";
+                compute = self: id: (self.node id).decls.v;
+              };
+              declaredDependencies = fx.contractRelation scope (_: [ ]);
+            };
+          in
+          genMemo.warmOverride { inherit (genScope) evalWarm; } ctx "n" { v = 2; };
+        expectedError = {
+          type = "ThrownError";
+          msg = exactly "gen-memo.warm: the engine record carries no `foldEquations` (it carries [\"evalWarm\"]). A warm pass is sealed by the entry that seals a cold one: add gen-scope's own, `engine // { inherit (genScope) foldEquations; }`; an engine carrying `evalWarm` alone is the record this fold took before.";
+        };
+      };
+    };
+
     flake.tests.runScc-extra-lattice-key = {
       test-an-eq-key-is-admitted-and-not-read = {
         expr = {

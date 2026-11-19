@@ -140,20 +140,30 @@ evaluator is passed in rather than depended on:
 
 ```nix
 let
-  after = genMemo.warmOverride (engine // { inherit (genScope) evalWarm; }) ctx "someHost" {
+  after = genMemo.warmOverride (engine // { inherit (genScope) foldEquations; }) ctx "someHost" {
     class = "db";
   };
 in
 after.eval.get "someHost" "resolved"       # re-derived; everything outside the cone is reused
 ```
 
-One engine record, two capabilities: `evalWarm` produces the warm evaluation, and `schedule`
+One engine record, two capabilities: `foldEquations` seals the warm evaluation, and `schedule`
 populates the memo context beside it. They travel together because they are one thing — the
 evaluation environment the caller already has.
 
-`ctx` is a resolved context — roots, the attribute set, the accessor and a prior evaluation. The
-plane reads that prior through the evaluator's restricted facade, decides, and hands the decision
-back; the evaluator does every recomputation.
+`ctx` is a resolved context, the seal `genScope.foldEquations` returns — the scope, the schedule,
+the settings, the accessor and a prior evaluation. The plane reads that prior through the
+evaluator's restricted facade, decides, and hands the decision back to `foldEquations`, which runs
+the warm evaluation and seals it with the expressions it seals a cold fold with. So the returned
+ctx's node list, its dependency relation and its trace are the warm evaluation's, what a cold fold
+of the edited data publishes, and none of them is built by the plane.
+
+**Migrating an engine record.** The warm fold used to call `evalWarm` and now calls `foldEquations`.
+A record carrying `evalWarm` alone is refused at `warmOverride` / `warmResolve`, by name and
+catchably, with the repair: add `inherit (genScope) foldEquations;` to it. `evalWarm` itself is
+unchanged and still exported by gen-scope; only the field the fold reads moved. A ctx assembled by
+hand rather than sealed by `foldEquations` must now also carry `schedule` and `settings` — the
+simplest repair is to seal it through `foldEquations`.
 
 ## API Reference
 
@@ -236,10 +246,10 @@ are not the same predicate under three names.
 | `warmResolve`  | The batch form: N edits, one union cone, one pass                                                                                                                 |
 
 **The evaluator is a PARAMETER, not a dependency.** This library declares no evaluator input; the
-fold takes `{ evalWarm }` and calls it. So the call reads
-`warmOverride { inherit (genScope) evalWarm; } ctx id newDecls`, and what comes back is the
-context re-evaluated under the decision — every value in it produced by the evaluator, none by the
-plane.
+fold takes `{ foldEquations }` and calls it. So the call reads
+`warmOverride { inherit (genScope) foldEquations; } ctx id newDecls`, and what comes back is the
+context re-evaluated under the decision and sealed by gen-scope — every value, and the relation and
+trace over them, produced there, none by the plane.
 
 `warmDecision` is exported apart from the fold on purpose. It is the whole of what the plane
 contributes, and a surface that offered only the fold would leave the interface the design rests on
@@ -327,7 +337,7 @@ which it must be revisited; `ci/tests/accessor-modes.nix` pins both halves.
   reuse from a cone read over the topology as it stands, so an edit carrying an edge key throws
   rather than being served a decision computed against a shape that no longer holds.
 - **The warm pass is armed with the relation the cold fold sealed.** `warmOverride` hands the ctx's
-  `declaredDependencies` to `evalWarm`, so a node it recomputes refuses an undeclared `self.node`,
+  `declaredDependencies` to `foldEquations`, so a node it recomputes refuses an undeclared `self.node`,
   `self.get` or `self.getRepresentative` read exactly as the cold fold does, and a reader of that
   kind is never left outside the cone to be served a stale prior. A ctx whose `declaredDependencies`
   is not `gen-graph.mkDeclaredEdges`' relation, a missing field included, is refused by name.

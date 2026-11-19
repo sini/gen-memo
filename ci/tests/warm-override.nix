@@ -30,8 +30,8 @@ let
   # rather than a free string, so the fixture registers the one kind it declares.
   hostKinds = genScope.mkKinds [ (genScope.mkKind { } "host") ];
 
-  mkScope =
-    cv:
+  mkScopeWith =
+    extra: cv:
     genScope.buildRoots {
       kinds = hostKinds;
       parentGraph = genScope.edge {
@@ -45,12 +45,15 @@ let
         child = {
           v = cv;
         };
-      };
+      }
+      // extra;
       types = {
         parent = "host";
         child = "host";
-      };
+      }
+      // builtins.mapAttrs (_: _: "host") extra;
     };
+  mkScope = mkScopeWith { };
   # ★ `children` IS DECLARED, NOT OMITTED (den-hoag-6imt). gen-scope refuses a descent from an
   # evaluation that declares no containment relation rather than answering `{ }` and reporting a
   # PARTIAL tree with nothing marking it partial. This scope HAS a containment relation —
@@ -68,45 +71,33 @@ let
     edges-owns = _self: _id: [ ];
   };
 
-  # A resolved context, assembled here rather than taken from the retiring library — which pins this
-  # library and therefore cannot be pinned back. The fold reads exactly these fields.
+  # A resolved context, sealed by gen-scope's `foldEquations` as every real ctx is: the warm fold
+  # reads the seal's schedule and settings and returns a seal, so a hand-assembled record would be a
+  # shape nothing produces. The decision therefore reads the seal's relation, the declared half
+  # together with the structural one.
   mkCtx =
     {
       scope,
       parseParent ? (_: null),
       declaredDependencies ? (_: [ ]),
     }:
-    let
-      attributes = attributesFor scope;
-      contracted = fx.contractRelation scope declaredDependencies;
-      eval = genScope.eval {
-        inherit parseParent;
-        declaredDependencies = contracted;
-      } attributes scope;
-    in
-    {
-      inherit
-        scope
-        attributes
-        parseParent
-        eval
-        ;
-      declaredDependencies = contracted;
-      # The node map, published under the name the seal publishes it under. The fixture mirrors
-      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
-      roots = scope.nodes;
-      accessor = {
-        nodes = builtins.attrNames eval.allNodes;
-        dependencies = contracted.dependencies;
-        parent = parseParent;
-        nodeData = id: (eval.node id).decls or { };
-      };
+    genScope.foldEquations { } {
+      inherit scope parseParent;
+      schedule.equations = builtins.mapAttrs (_: f: { compute = f; }) (attributesFor scope);
+      declaredDependencies = fx.contractRelation scope declaredDependencies;
     };
   project =
     ctx: id: attr:
     ctx.eval.get id attr;
 
   pp = scope: id: scope.nodes.${id}.parent or null;
+  # The decision cells' scope: the two nodes above and `bystander`, which nothing contains and
+  # nothing declares, so no edge of either half reaches it.
+  coneScope = mkScopeWith { bystander.v = 0; } 1;
+  coneCtx = mkCtx {
+    scope = coneScope;
+    parseParent = pp coneScope;
+  };
   scope = mkScope 1;
   ctx = mkCtx {
     inherit scope;
@@ -146,22 +137,32 @@ in
       expected = 11;
     };
 
-    # ARM 1 — the cone, read as a value. `child` is the seed and is dirty; `parent` is outside its
-    # reverse cone under the empty declared-edge relation and is clean. Both directions in one cell,
-    # so a decision that called everything dirty and one that called everything clean each fail.
+    # ARM 1 — the cone, read as a value. `child` is the seed and is dirty; `bystander` reaches
+    # nothing, by either half of the seal's relation, so it is outside the reverse cone and clean.
+    # Both directions in one cell, so a decision that called everything dirty and one that called
+    # everything clean each fail. The clean node sits outside the two-node scope the other cells
+    # read, so their stores and values are the scope they were written against.
     test-decision-cone = {
       expr =
         let
-          d = warmDecision ctx.accessor ctx.eval.facade [ "child" ];
+          d = warmDecision coneCtx.accessor coneCtx.eval.facade [ "child" ];
         in
         {
           child = d.isClean "child";
-          parent = d.isClean "parent";
+          bystander = d.isClean "bystander";
         };
       expected = {
         child = false;
-        parent = true;
+        bystander = true;
       };
+    };
+
+    # The cone is taken over the seal's UNION, so `parent`, which reads `child` through its own
+    # containment (the structural half), is inside `child`'s cone under the empty declared
+    # relation. A cone over the declared half alone called it clean, and would serve it stale.
+    test-decision-cone-takes-the-structural-half = {
+      expr = (warmDecision coneCtx.accessor coneCtx.eval.facade [ "child" ]).isClean "parent";
+      expected = false;
     };
 
     # ARM 2 — the reuse vocabulary is the evaluator's resolutional projection, not a declared

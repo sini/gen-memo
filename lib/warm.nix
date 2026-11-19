@@ -8,10 +8,16 @@
 # binds no self-referential store of its own and produces no node value by applying a caller's
 # computation. The evaluator handed in is the sole recompute engine.
 #
-# The engine carries two capabilities and this fold uses both: `evalWarm`, which produces the warm
-# evaluation, and `schedule`, which the memo ctx below needs because `build` takes an engine for
-# exactly the same reason this fold does. They are one record because they are one thing — the
-# evaluation environment the caller already has.
+# The engine carries two capabilities and this fold uses both: `foldEquations`, the entry that seals
+# a cold fold and, handed a prior and a decision, the warm one, and `schedule`, which the memo ctx
+# below needs because `build` takes an engine for exactly the same reason this fold does. They are
+# one record because they are one thing — the evaluation environment the caller already has.
+#
+# THE WARM PASS IS SEALED BY THE ENTRY THAT SEALS A COLD ONE. The ctx this fold returns is a plane
+# output, so its accessor, its relation and its trace must be what a cold fold of the edited data
+# publishes (ADR-0008 item 2). The seal constructs all three in one place, over the evaluation that
+# ran, and this fold constructs none of them: a relation re-derived here would be a second site free
+# to drift from the first, and one carried over from the ctx it was handed is the prior's.
 #
 # THE DECISION IS THE INTERFACE, AND IT IS EXPORTED APART FROM THE FOLD. `warmDecision` is the whole
 # of what this plane contributes to a warm evaluation: three total functions, `isClean`, `reusable`
@@ -200,6 +206,11 @@ let
           builtins.filter (id: !(builtins.hasAttr id ctx.scope.nodes)) (builtins.attrNames edits)
         )
       } not in roots (a node spawned during evaluation is not editable; edit the root that spawns it).";
+    # The engine record is a caller's, so it is checked at the entry by name: a record built for the
+    # evaluator this fold used to call aborts on a missing attribute nothing can catch.
+    assert
+      engine ? foldEquations
+      || throw "gen-memo.warm: the engine record carries no `foldEquations` (it carries ${builtins.toJSON (builtins.attrNames engine)}). A warm pass is sealed by the entry that seals a cold one: add gen-scope's own, `engine // { inherit (genScope) foldEquations; }`; an engine carrying `evalWarm` alone is the record this fold took before.";
     let
       ids = builtins.attrNames edits;
       scope' = ctx.scope // {
@@ -213,26 +224,34 @@ let
           }
         ) ctx.scope.nodes ids;
       };
-      accessor' = ctx.accessor // {
-        nodeData = nid: (eval'.node nid).decls or { };
-      };
-
       # TWO READERS OF ONE PRIOR, AND ONLY ONE OF THEM IS THE PLANE. The decision is this plane's
       # read, so it reads the restricted facade — `get`, `nodeIds`, `resolutional` and nothing
-      # else. The prior handed to `evalWarm` is the EVALUATOR's read: it serves a clean attribute
+      # else. The prior handed through the seal is the EVALUATOR's read: it serves a clean attribute
       # through the demand form its declaration takes (`get`, or `getRepresentative` for a quotient
       # carrier), so it is handed the prior evaluation itself, which this fold neither reads nor
       # holds beyond the ctx it was given. Nothing is materialised and handed forward, and nothing
       # persists past this evaluation: what is reused is a result held live in the evaluation the
       # caller is already inside.
-      decision = warmDecision accessor' ctx.eval.facade ids;
+      #
+      # The decision reads the PRIOR's relation, off the ctx it was handed: the cone is taken over the
+      # topology the prior evaluation ran on, and the returned relation is a function of this
+      # decision, so reading that one here would be a self-reference.
+      decision = warmDecision ctx.accessor ctx.eval.facade ids;
 
-      # `evalWarm { parseParent; } { scope; attributes; prior; decision; }` (gen-scope P2, R7): the
-      # one option first, then the four operands as one record.
-      eval' =
-        engine.evalWarm
+      # `foldEquations { settings; prior; decision; } { scope; parseParent; schedule;
+      # declaredDependencies; }`: the cold fold's own entry, handed the prior evaluation and the
+      # decision. What it returns is the seal of the warm evaluation — accessor, trace, roots, scope,
+      # eval — built by the expressions that build a cold seal.
+      sealed =
+        engine.foldEquations
           {
-            inherit (ctx) parseParent;
+            inherit (ctx) settings;
+            prior = ctx.eval;
+            inherit decision;
+          }
+          {
+            scope = scope';
+            inherit (ctx) parseParent schedule;
             # The warm pass runs under the contract the cold fold ran under, so it refuses what that fold
             # refuses. The seal carries the contracted relation; anything else, a missing field
             # included, is refused here by name, since `null` would reach the evaluator as "no
@@ -245,23 +264,8 @@ let
                 throw "gen-memo.warm: the ctx's `declaredDependencies` must be the relation `gen-graph.mkDeclaredEdges` returns, as `foldEquations` seals it; received ${
                   if ctx ? declaredDependencies then builtins.typeOf ctx.declaredDependencies else "no such field"
                 }. The warm pass is armed with the relation the cold fold was armed with, and a ctx that carries none would be served reads the cold fold refuses.";
-          }
-          {
-            scope = scope';
-            inherit (ctx) attributes;
-            prior = ctx.eval;
-            inherit decision;
           };
-
-      # The verifying-trace shape (Mokhov 2018 §4.2.2): per key, its deps and a content hash. The
-      # deps are the accessor's own declared dependencies, read where they live rather than through
-      # a second surface that restates them. The hash is null, which this library's guards read as
-      # conservatively-always-dirty — the same trade the cone makes, for the same reason: a hash
-      # here would force the spine the evaluator is about to force anyway.
-      trace' = prelude.genAttrs (builtins.attrNames eval'.allNodes) (nid: {
-        deps = accessor'.dependencies nid;
-        hash = null;
-      });
+      eval' = sealed.eval;
 
       # A memo ctx over the warm evaluation, LAZY and forced by nothing on this path. Its recompute
       # reads its own paired evaluation, so its hashes describe that evaluation and no other. It is
@@ -270,7 +274,7 @@ let
       # produce, which no instrument here can tell from a matching one, and it may not be taken
       # until one exists.
       builtCtx' = build { } engine {
-        accessor = accessor';
+        inherit (sealed) accessor;
         recompute =
           _acc: _store: nid:
           priorProjection eval'.facade nid;
@@ -278,13 +282,9 @@ let
       };
     in
     ctx
+    // sealed
     // {
-      scope = scope';
-      roots = scope'.nodes;
-      eval = eval';
-      accessor = accessor';
       builtCtx = builtCtx';
-      trace = trace';
     };
 in
 {

@@ -89,33 +89,11 @@ let
 
   mkCtx =
     seed: v:
-    let
+    genScope.foldEquations { } {
       scope = scopeFor v;
-      attributes = attributesFor seed;
       parseParent = _: null;
-      contracted = fx.contractRelation scope declaredDependencies;
-      eval = genScope.eval {
-        inherit parseParent;
-        declaredDependencies = contracted;
-      } attributes scope;
-    in
-    {
-      inherit
-        scope
-        attributes
-        parseParent
-        eval
-        ;
-      declaredDependencies = contracted;
-      # The node map, published under the name the seal publishes it under. The fixture mirrors
-      # `foldEquations`' shape rather than inventing one: both fields, off the one record.
-      roots = scope.nodes;
-      accessor = {
-        nodes = builtins.attrNames eval.allNodes;
-        dependencies = contracted.dependencies;
-        parent = parseParent;
-        nodeData = id: (eval.node id).decls or { };
-      };
+      schedule.equations = builtins.mapAttrs (_: f: { compute = f; }) (attributesFor seed);
+      declaredDependencies = fx.contractRelation (scopeFor v) declaredDependencies;
     };
   project =
     ctx: id: attr:
