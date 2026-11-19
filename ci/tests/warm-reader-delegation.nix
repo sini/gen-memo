@@ -182,7 +182,7 @@ let
       {
         scope = scopeAt { kid.v = 9; };
         inherit (cold) attributes;
-        prior = cold.eval.facade;
+        prior = cold.eval;
         decision = genScope.mkDecision {
           isClean = n: !(builtins.elem n ([ "kid" ] ++ consumers));
           reusable = cold.eval.facade.resolutional;

@@ -23,8 +23,10 @@ The interface to the evaluator is **settled and built in the evaluator**: the pl
 `Decision` of two total functions and no values, reads through a restricted facade of exactly
 `get` / `nodeIds` / `resolutional`, and never receives a structural value from a prior evaluation.
 **THE TWO MIGRATIONS SIT ON OPPOSITE SIDES OF THAT INTERFACE AND THE SHEET MUST NOT AVERAGE THEM.**
-The warm fold IS expressed on it — `warmDecision` returns exactly that record, and the fold hands it
-to the evaluator through the facade. The rebuilder content is consumed the way it always was, through
+The warm fold IS expressed on it — `warmDecision` returns exactly that record, computed over the
+facade, and the fold hands it to the evaluator beside the prior evaluation itself: the facade bounds
+the plane's read, and the evaluator serves a clean attribute from its own prior through the demand
+form the declaration takes (`get`, or `getRepresentative` for a quotient carrier). The rebuilder content is consumed the way it always was, through
 a caller-supplied `recompute` and an accessor, but it no longer POPULATES anything itself.
 
 ★ **THE FIVE STORE FIXES ARE GONE, AND WHAT REPLACED THEM IS THE SAME MOVE THE WARM FOLD MAKES.**

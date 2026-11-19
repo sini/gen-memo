@@ -217,12 +217,15 @@ let
         nodeData = nid: (eval'.node nid).decls or { };
       };
 
-      # The prior is the same evaluation's own restricted facade — `get`, `nodeIds`,
-      # `resolutional` and nothing else. Nothing is materialised and handed forward, and nothing
+      # TWO READERS OF ONE PRIOR, AND ONLY ONE OF THEM IS THE PLANE. The decision is this plane's
+      # read, so it reads the restricted facade — `get`, `nodeIds`, `resolutional` and nothing
+      # else. The prior handed to `evalWarm` is the EVALUATOR's read: it serves a clean attribute
+      # through the demand form its declaration takes (`get`, or `getRepresentative` for a quotient
+      # carrier), so it is handed the prior evaluation itself, which this fold neither reads nor
+      # holds beyond the ctx it was given. Nothing is materialised and handed forward, and nothing
       # persists past this evaluation: what is reused is a result held live in the evaluation the
       # caller is already inside.
-      prior = ctx.eval.facade;
-      decision = warmDecision accessor' prior ids;
+      decision = warmDecision accessor' ctx.eval.facade ids;
 
       # `evalWarm { parseParent; } { scope; attributes; prior; decision; }` (gen-scope P2, R7): the
       # one option first, then the four operands as one record.
@@ -246,7 +249,8 @@ let
           {
             scope = scope';
             inherit (ctx) attributes;
-            inherit prior decision;
+            prior = ctx.eval;
+            inherit decision;
           };
 
       # The verifying-trace shape (Mokhov 2018 §4.2.2): per key, its deps and a content hash. The
