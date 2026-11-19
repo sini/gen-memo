@@ -69,6 +69,29 @@ let
       below = [ "sp" ];
       spawns.sp = copy;
     } "sp2")
+    # Membership that an edit grows: one `nta` child per key of the host's first definition, and one
+    # spawned child per entry of `decls.kids`.
+    (genScope.mkKind {
+      nta.x =
+        self: id:
+        let
+          d = head (self.get id "defs");
+        in
+        {
+          g = if isAttrs d then builtins.mapAttrs (k: _: [ (addr 0 [ k ]) ]) d else { };
+        };
+    } "fan")
+    (genScope.mkKind {
+      below = [ "plain" ];
+      spawns.plain =
+        h: id:
+        builtins.listToAttrs (
+          map (k: {
+            name = "${id}-${k}";
+            value.decls.v = 1;
+          }) ((h.node id).decls.kids or [ ])
+        );
+    } "spk")
   ];
   res = name: compute: {
     inherit name compute;
@@ -89,6 +112,8 @@ let
       d.host
     else if m != null then
       head m
+    else if builtins.match "sk-.*" id != null then
+      "sk"
     else
       rootsParent.${id} or null;
   hChild = nta "h" "x";
@@ -138,6 +163,7 @@ let
       self: id: if id == "r2b" && has variant "ae" then self.get "zb" "zRead" else null
     );
     zDep = res "zDep" (self: id: if id == xk then self.get "xz" "defs" else null);
+    v = res "v" (self: id: (self.node id).decls.v or 0);
   };
   declsAt =
     e:
@@ -161,6 +187,13 @@ let
       xz.defs = [ 4 ];
       r2b.defs = [ { s = 1; } ];
       zb.defs = [ 0 ];
+      hf.defs = [
+        {
+          a = 1;
+          b = 2;
+        }
+      ];
+      sk.kids = [ "a" ];
     }
     // e;
   types = {
@@ -183,6 +216,8 @@ let
     xz = "plain";
     r2b = "host";
     zb = "plain";
+    hf = "fan";
+    sk = "spk";
   };
   scopeAt =
     e:
@@ -282,6 +317,31 @@ let
     in
     builtins.deepSeq store store;
   builds = variant: (builtins.tryEval (buildOf variant)).success;
+  # An edit that GROWS a member: the new member is in no prior, so the warm plane must not serve it
+  # from one. Warm against fresh on the caller's node set and on the new member's value, each under
+  # `tryEval` (a warm refusal reads as a disagreement, not an abort).
+  grows =
+    edit: newId: attr:
+    let
+      id0 = head (attrNames edit);
+      c = foldAt acyclicVariant { };
+      warm = (genMemo.warmOverride engine c id0 edit.${id0}).eval;
+      fresh = (foldAt acyclicVariant edit).eval;
+      try =
+        v:
+        let
+          r = builtins.tryEval (builtins.deepSeq v v);
+        in
+        if r.success then r.value else "REFUSED";
+      reads = ev: {
+        nodeIds = try ev.allNodeIds;
+        value = try (ev.get newId attr);
+      };
+    in
+    {
+      equal = reads warm == reads fresh;
+      grew = !(builtins.elem newId c.eval.allNodeIds) && builtins.elem newId fresh.allNodeIds;
+    };
   fresh = {
     equal = true;
     moved = true;
@@ -291,6 +351,7 @@ in
 {
   inherit
     nta
+    ntaK
     hChild
     zChild
     hrChild
@@ -305,5 +366,6 @@ in
     builds
     fresh
     parity
+    grows
     ;
 }

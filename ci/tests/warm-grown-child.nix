@@ -41,6 +41,7 @@ let
   };
   inherit (fx)
     nta
+    ntaK
     hChild
     zChild
     hrChild
@@ -53,6 +54,7 @@ let
     builds
     fresh
     parity
+    grows
     ;
 in
 {
@@ -217,6 +219,93 @@ in
         hr = true;
         c6 = true;
         both = true;
+      };
+    };
+    # Host reads child (HR), and host and child reading each other (HR+C6): each relation builds AND a
+    # host edit propagates warm = fresh. Positive controls for the shapes the growth unit keeps acyclic.
+    test-HR-builds-and-updates = {
+      expr = {
+        built = builds [ "hr" ];
+        update = parity (
+          moves [ "hr" ] { hr.defs = [ { s = 2; } ]; } [
+            [
+              hrChild
+              "defs"
+            ]
+            [
+              "hr"
+              "hostAgg"
+            ]
+          ]
+        );
+      };
+      expected = {
+        built = true;
+        update = fresh;
+      };
+    };
+    test-HR-and-C6-build-and-update = {
+      expr = {
+        built = builds acyclicVariant;
+        update = parity (
+          moves acyclicVariant { hr.defs = [ { s = 2; } ]; } [
+            [
+              hrChild
+              "defs"
+            ]
+            [
+              "hr"
+              "hostAgg"
+            ]
+          ]
+        );
+        updateC6 = parity (
+          moves acyclicVariant { h.defs = [ { s = 2; } ]; } [
+            [
+              hChild
+              "defs"
+            ]
+            [
+              hChild
+              "hostDefs"
+            ]
+          ]
+        );
+      };
+      expected = {
+        built = true;
+        update = fresh;
+        updateC6 = fresh;
+      };
+    };
+    # An edit that grows a member (EN: a new `nta` child; ES: a new spawned child): the new member was
+    # in no prior, so nothing of it is served from one, and the caller's node set and the new member's
+    # value equal a fresh fold.
+    test-EN-a-grown-nta-member-is-not-served-from-the-prior = {
+      expr = grows {
+        hf.defs = [
+          {
+            a = 1;
+            b = 2;
+            c = 3;
+          }
+        ];
+      } (ntaK "hf" "x" "c") "defs";
+      expected = {
+        equal = true;
+        grew = true;
+      };
+    };
+    test-ES-a-grown-spawned-member-is-not-served-from-the-prior = {
+      expr = grows {
+        sk.kids = [
+          "a"
+          "b"
+        ];
+      } "sk-b" "v";
+      expected = {
+        equal = true;
+        grew = true;
       };
     };
     # The negative controls: what an edit dirties, and nothing more.

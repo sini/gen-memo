@@ -353,11 +353,11 @@
         "gen-prelude": "gen-prelude_4"
       },
       "locked": {
-        "lastModified": 1795058534,
-        "narHash": "sha256-MYUktfN9DKLC9kVtTP136FO9cjw6JoeyFOIIBfN+rME=",
+        "lastModified": 1795070392,
+        "narHash": "sha256-LiyIM75whcjPC07it91zEkkwc42vgEqIXefJM0vEj5k=",
         "owner": "sini",
         "repo": "gen-scope",
-        "rev": "94ffaeb29e44e71ef84ac00ebd3e8da55bf729bb",
+        "rev": "8413c30527fff7a38a6ea57723b2d5fd117bebf0",
         "type": "github"
       },
       "original": {
