@@ -4,8 +4,14 @@
 # of `id`); `graph.dependentsOf` is the Datafun-derived query.
 #
 # A thin re-export of graph.dependentsOf over the ctx's accessor: everyone who
-# transitively depends on `id` (single-target). `impactOf` is an alias. This is
-# the set `override` must recompute when `id` changes.
+# transitively depends on `id` in the relation the evaluator publishes
+# (single-target). `impactOf` is an alias. Queried at an edit root, this is the
+# set `override` must recompute when `id` changes. It is a cone over that
+# relation, not every reader of `id`'s value: an evaluator that grows a node
+# from a host has the grown node depend on its host, and carries a host's read
+# of its own grown node by the host's edit rather than by an edge to the grown
+# node, so queried at a grown node the answer can omit a reader whose cone the
+# edit root already covers.
 #
 # Cost is graph.dependentsOf's own: Θ(n + E) to build the reverse index — it reads
 # EVERY node's out-edges, reachable or not — then a BFS over that index costing

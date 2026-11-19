@@ -26,6 +26,7 @@
 # expectation.
 {
   lib,
+  graph,
   genMemo,
   genScope,
   engine,
@@ -233,9 +234,30 @@ let
     };
   };
 
+  grown = import ./grown-child.nix {
+    inherit
+      graph
+      genMemo
+      genScope
+      engine
+      prelude
+      ;
+  };
 in
 {
   config = {
+    # An acyclic consumer handed a relation whose only cycle is one the attribute instances do not
+    # have (`tests/warm-grown-child.nix`, AE): refused by name, the cycle's members listed.
+    flake.testsError.grown-child-refusals.test-build-names-a-cross-unit-cycle = {
+      expr = grown.buildOf [ "ae" ];
+      expectedError = {
+        type = "ThrownError";
+        msg =
+          "^gen-memo: cycle detected: "
+          + prelude.escapeRegex ''{"cycle":["${grown.aeChild}","r2b","zb"],''
+          + ".*$";
+      };
+    };
     flake.testsError.door-checks =
       lib.concatMapAttrs optionGoldens doors.options // lib.concatMapAttrs recordGoldens doors.records;
 
